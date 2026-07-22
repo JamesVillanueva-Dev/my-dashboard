@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 640" font-family="'Comic Sans MS','Segoe Print','Bradley Hand',cursive">
+  <defs>
+    <filter id="rough" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.014 0.02" numOctaves="2" seed="9" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <rect width="340" height="640" fill="#fdfdf7"/>
+
+  <!-- phone frame -->
+  <g filter="url(#rough)" fill="none" stroke="#2b2b2b" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="20" y="16" width="300" height="608" rx="30"/>
+    <line x1="118" y1="34" x2="222" y2="34"/>
+  </g>
+
+  <g filter="url(#rough)" fill="#ffe27a">
+    <rect x="214" y="70" width="70" height="30" rx="15"/>
+  </g>
+
+  <g filter="url(#rough)" fill="none" stroke="#2b2b2b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- header divider -->
+    <line x1="40" y1="118" x2="300" y2="118"/>
+    <rect x="214" y="70" width="70" height="30" rx="15"/>
+    <!-- stacked cards -->
+    <rect x="40" y="132" width="260" height="96" rx="14"/>
+    <rect x="40" y="240" width="260" height="96" rx="14"/>
+    <rect x="40" y="348" width="260" height="96" rx="14"/>
+    <rect x="40" y="456" width="260" height="96" rx="14"/>
+    <!-- content hint lines -->
+    <g stroke-width="1.6">
+      <line x1="60" y1="188" x2="280" y2="188"/><line x1="60" y1="206" x2="240" y2="206"/>
+      <line x1="60" y1="296" x2="280" y2="296"/><line x1="60" y1="314" x2="250" y2="314"/>
+      <line x1="60" y1="404" x2="280" y2="404"/><line x1="60" y1="422" x2="240" y2="422"/>
+      <line x1="60" y1="512" x2="280" y2="512"/><line x1="60" y1="530" x2="250" y2="530"/>
+    </g>
+  </g>
+
+  <g fill="#2b2b2b">
+    <text x="40" y="58" font-size="17">Good afternoon,</text>
+    <text x="40" y="80" font-size="17">James</text>
+    <text x="42" y="102" font-size="11" fill="#777">Tue, Jul 22</text>
+    <text x="228" y="90" font-size="12">⚙</text>
+    <text x="258" y="90" font-size="13">🌙</text>
+
+    <g font-size="13">
+      <text x="52"  y="160" font-size="14" fill="#aaa">⠿</text><text x="72" y="160">🎯 Focus of the Day</text>
+      <text x="52"  y="268" font-size="14" fill="#aaa">⠿</text><text x="72" y="268">🌦️ Weather</text>
+      <text x="52"  y="376" font-size="14" fill="#aaa">⠿</text><text x="72" y="376">⏰ Reminders</text>
+      <text x="52"  y="484" font-size="14" fill="#aaa">⠿</text><text x="72" y="484">📰 News</text>
+    </g>
+    <text x="170" y="588" font-size="12" fill="#999">… stacked …</text>
+  </g>
+</svg>

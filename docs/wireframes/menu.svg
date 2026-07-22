@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 420" font-family="'Comic Sans MS','Segoe Print','Bradley Hand',cursive">
+  <defs>
+    <filter id="rough" x="-6%" y="-6%" width="112%" height="112%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.015 0.02" numOctaves="2" seed="3" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <rect width="460" height="420" fill="#fdfdf7"/>
+
+  <g filter="url(#rough)" fill="#ffe27a">
+    <rect x="250" y="24" width="130" height="38" rx="19"/>
+  </g>
+
+  <g filter="url(#rough)" fill="none" stroke="#2b2b2b" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+    <!-- trigger pill -->
+    <rect x="250" y="24" width="130" height="38" rx="19"/>
+    <!-- dropdown panel -->
+    <rect x="196" y="80" width="240" height="316" rx="14"/>
+    <!-- little connector -->
+    <line x1="330" y1="63" x2="330" y2="79"/>
+    <!-- checkboxes -->
+    <g stroke-width="1.9">
+      <rect x="216" y="126" width="16" height="16" rx="3"/>
+      <rect x="216" y="158" width="16" height="16" rx="3"/>
+      <rect x="216" y="190" width="16" height="16" rx="3"/>
+      <rect x="216" y="222" width="16" height="16" rx="3"/>
+      <rect x="216" y="254" width="16" height="16" rx="3"/>
+      <rect x="216" y="286" width="16" height="16" rx="3"/>
+      <rect x="216" y="318" width="16" height="16" rx="3"/>
+    </g>
+    <!-- divider above reset -->
+    <line x1="212" y1="352" x2="420" y2="352"/>
+  </g>
+
+  <g fill="#2b2b2b">
+    <text x="266" y="49" font-size="15">⚙ Widgets</text>
+    <text x="216" y="106" font-size="11" fill="#999" letter-spacing="1">SHOW WIDGETS</text>
+
+    <g font-size="14">
+      <text x="242" y="139">🎯 Focus of the Day</text>
+      <text x="242" y="171">🌦️ Weather</text>
+      <text x="242" y="203">⏰ Reminders</text>
+      <text x="242" y="235">✅ To-do</text>
+      <text x="242" y="267">📰 News</text>
+      <text x="242" y="299">📝 Notes</text>
+      <text x="242" y="331">🔗 Quick Links</text>
+    </g>
+
+    <!-- checks (all but To-do) -->
+    <g font-size="14" fill="#3a8a3a">
+      <text x="217" y="139">✓</text>
+      <text x="217" y="171">✓</text>
+      <text x="217" y="203">✓</text>
+      <text x="217" y="267">✓</text>
+      <text x="217" y="299">✓</text>
+      <text x="217" y="331">✓</text>
+    </g>
+
+    <text x="216" y="378" font-size="13" fill="#c8961e" text-decoration="underline">Reset to default layout</text>
+  </g>
+
+  <!-- annotation -->
+  <g font-family="'Comic Sans MS',cursive" fill="#b06a00">
+    <text x="24" y="240" font-size="13">To-do unchecked</text>
+    <text x="24" y="258" font-size="13">= hidden from grid</text>
+    <path d="M150 244 C180 244 190 232 210 230" fill="none" stroke="#b06a00" stroke-width="1.6"/>
+    <path d="M205 226 L212 230 L204 235" fill="none" stroke="#b06a00" stroke-width="1.6"/>
+  </g>
+</svg>

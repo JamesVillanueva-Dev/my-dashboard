@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 320" font-family="'Comic Sans MS','Segoe Print','Bradley Hand',cursive">
+  <defs>
+    <filter id="rough" x="-6%" y="-6%" width="112%" height="112%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.014 0.02" numOctaves="2" seed="5" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <rect width="560" height="320" fill="#fdfdf7"/>
+
+  <g filter="url(#rough)" fill="#ffe27a">
+    <rect x="380" y="26" width="130" height="36" rx="18"/>
+  </g>
+
+  <g filter="url(#rough)" fill="none" stroke="#2b2b2b" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="30" y1="92" x2="530" y2="92"/>
+    <rect x="380" y="26" width="130" height="36" rx="18"/>
+    <rect x="450" y="26" width="46" height="36" rx="18" transform="translate(64,0)"/>
+    <!-- dashed empty box -->
+    <rect x="90" y="130" width="380" height="140" rx="16" stroke-dasharray="10 9"/>
+  </g>
+
+  <g fill="#2b2b2b">
+    <text x="30" y="52" font-size="24">Good afternoon, James</text>
+    <text x="396" y="50" font-size="14">⚙ Widgets</text>
+    <text x="526" y="50" font-size="16">🌙</text>
+
+    <text x="280" y="190" font-size="17" fill="#555" text-anchor="middle">No widgets enabled.</text>
+    <text x="280" y="220" font-size="15" fill="#888" text-anchor="middle">Open ⚙ Widgets to add some.</text>
+  </g>
+
+  <!-- arrow pointing to the Widgets button -->
+  <g fill="none" stroke="#b06a00" stroke-width="1.8" stroke-linecap="round">
+    <path d="M330 150 C390 120 420 90 440 66"/>
+    <path d="M432 60 L444 62 L440 74"/>
+  </g>
+</svg>

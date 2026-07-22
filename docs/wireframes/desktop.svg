@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 760" font-family="'Comic Sans MS','Segoe Print','Bradley Hand',cursive">
+  <defs>
+    <filter id="rough" x="-4%" y="-4%" width="108%" height="108%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.016" numOctaves="2" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="4.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <!-- paper -->
+  <rect width="960" height="760" fill="#fdfdf7"/>
+
+  <!-- yellow highlights (hand-drawn fills, under the ink) -->
+  <g filter="url(#rough)" fill="#ffe27a">
+    <rect x="662" y="26" width="120" height="36" rx="18"/>   <!-- Widgets pill -->
+    <rect x="355" y="366" width="48" height="24" rx="12"/>   <!-- active News tab -->
+    <rect x="586" y="120" width="34" height="24" rx="12"/>   <!-- °F pill -->
+  </g>
+
+  <!-- ink: boxes, lines, sketch strokes -->
+  <g filter="url(#rough)" fill="none" stroke="#2b2b2b" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+    <!-- header divider -->
+    <line x1="28" y1="98" x2="932" y2="98"/>
+    <!-- header pills -->
+    <rect x="662" y="26" width="120" height="36" rx="18"/>
+    <rect x="796" y="26" width="46" height="36" rx="18"/>
+
+    <!-- ===== ROW 1 ===== -->
+    <!-- Focus -->
+    <rect x="28" y="112" width="290" height="195" rx="16"/>
+    <rect x="48" y="176" width="250" height="28" rx="7"/>
+    <line x1="60" y1="238" x2="286" y2="238"/>
+    <line x1="60" y1="258" x2="250" y2="258"/>
+    <!-- Weather -->
+    <rect x="335" y="112" width="290" height="195" rx="16"/>
+    <rect x="586" y="120" width="34" height="24" rx="12"/>
+    <circle cx="380" cy="188" r="21"/>
+    <g stroke-width="1.8">
+      <rect x="360" y="238" width="34" height="42" rx="6"/>
+      <rect x="404" y="238" width="34" height="42" rx="6"/>
+      <rect x="448" y="238" width="34" height="42" rx="6"/>
+      <rect x="492" y="238" width="34" height="42" rx="6"/>
+    </g>
+    <!-- Reminders -->
+    <rect x="642" y="112" width="290" height="195" rx="16"/>
+    <rect x="662" y="158" width="208" height="26" rx="7"/>
+    <rect x="878" y="158" width="26" height="26" rx="7"/>
+    <rect x="662" y="206" width="15" height="15" rx="3"/>
+    <line x1="688" y1="214" x2="890" y2="214"/>
+    <rect x="662" y="238" width="15" height="15" rx="3"/>
+    <line x1="688" y1="246" x2="860" y2="246"/>
+
+    <!-- ===== ROW 2 ===== -->
+    <!-- To-do -->
+    <rect x="28" y="327" width="290" height="195" rx="16"/>
+    <rect x="48" y="372" width="250" height="26" rx="7"/>
+    <rect x="48" y="418" width="15" height="15" rx="3"/>
+    <line x1="74" y1="426" x2="286" y2="426"/>
+    <rect x="48" y="450" width="15" height="15" rx="3"/>
+    <line x1="74" y1="458" x2="260" y2="458"/>
+    <rect x="48" y="482" width="15" height="15" rx="3"/>
+    <line x1="74" y1="490" x2="286" y2="490"/>
+    <!-- News -->
+    <rect x="335" y="327" width="290" height="195" rx="16"/>
+    <rect x="355" y="366" width="48" height="24" rx="12"/>
+    <rect x="407" y="366" width="62" height="24" rx="12"/>
+    <rect x="473" y="366" width="48" height="24" rx="12"/>
+    <line x1="355" y1="418" x2="600" y2="418"/>
+    <line x1="355" y1="440" x2="560" y2="440"/>
+    <line x1="355" y1="470" x2="600" y2="470"/>
+    <line x1="355" y1="492" x2="540" y2="492"/>
+    <!-- Notes -->
+    <rect x="642" y="327" width="290" height="195" rx="16"/>
+    <rect x="662" y="366" width="252" height="140" rx="9"/>
+    <line x1="676" y1="396" x2="898" y2="396"/>
+    <line x1="676" y1="420" x2="906" y2="420"/>
+    <line x1="676" y1="444" x2="856" y2="444"/>
+    <line x1="676" y1="468" x2="890" y2="468"/>
+
+    <!-- ===== ROW 3 ===== -->
+    <!-- Quick links -->
+    <rect x="28" y="542" width="290" height="150" rx="16"/>
+    <rect x="286" y="552" width="24" height="24" rx="7"/>
+    <g stroke-width="1.9">
+      <rect x="48"  y="590" width="42" height="42" rx="9"/>
+      <rect x="102" y="590" width="42" height="42" rx="9"/>
+      <rect x="156" y="590" width="42" height="42" rx="9"/>
+      <rect x="210" y="590" width="42" height="42" rx="9"/>
+      <rect x="264" y="590" width="42" height="42" rx="9"/>
+    </g>
+  </g>
+
+  <!-- text + glyph icons (kept crisp, handwritten font) -->
+  <g fill="#2b2b2b">
+    <text x="30" y="52" font-size="28">Good afternoon, James</text>
+    <text x="32" y="80" font-size="15" fill="#777">Tuesday, July 22, 2026</text>
+    <text x="676" y="50" font-size="15">⚙ Widgets</text>
+    <text x="808" y="51" font-size="19">🌙</text>
+    <text x="928" y="54" font-size="26" text-anchor="end">3:42</text>
+
+    <!-- card headers: ⠿ handle + emoji + title -->
+    <g font-size="15">
+      <text x="44"  y="140" font-size="17" fill="#aaa">⠿</text><text x="64"  y="140">🎯 Focus of the Day</text>
+      <text x="351" y="140" font-size="17" fill="#aaa">⠿</text><text x="371" y="140">🌦️ Weather</text>
+      <text x="658" y="140" font-size="17" fill="#aaa">⠿</text><text x="678" y="140">⏰ Reminders</text>
+      <text x="44"  y="355" font-size="17" fill="#aaa">⠿</text><text x="64"  y="355">✅ To-do</text>
+      <text x="351" y="355" font-size="17" fill="#aaa">⠿</text><text x="371" y="355">📰 News</text>
+      <text x="658" y="355" font-size="17" fill="#aaa">⠿</text><text x="678" y="355">📝 Notes</text>
+      <text x="44"  y="570" font-size="17" fill="#aaa">⠿</text><text x="64"  y="570">🔗 Quick Links</text>
+    </g>
+
+    <!-- remove ×, actions -->
+    <g fill="#c0392b" font-size="18">
+      <text x="906" y="146">×</text>
+    </g>
+    <g fill="#555" font-size="13">
+      <text x="596" y="138">°F</text>
+      <text x="292" y="355" text-anchor="end" font-size="11" fill="#888">2 left</text>
+      <text x="600" y="355" text-anchor="end">↻</text>
+      <text x="912" y="355" text-anchor="end" font-size="11" fill="#3a8a3a">saved ✓</text>
+      <text x="296" y="569" font-size="15">+</text>
+      <text x="887" y="169">+</text>
+    </g>
+
+    <!-- Focus content -->
+    <text x="48" y="170" font-size="11" fill="#888">Today my one focus is…</text>
+    <text x="210" y="278" font-size="11" fill="#888" font-style="italic">— quote of the day</text>
+
+    <!-- Weather content -->
+    <text x="418" y="196" font-size="32">78°</text>
+    <text x="418" y="216" font-size="12" fill="#777">San Diego</text>
+    <g font-size="10" fill="#888" text-anchor="middle">
+      <text x="377" y="296">Mon</text><text x="421" y="296">Tue</text>
+      <text x="465" y="296">Wed</text><text x="509" y="296">Thu</text>
+    </g>
+
+    <!-- News tab labels -->
+    <g font-size="11">
+      <text x="363" y="382">Top</text><text x="414" y="382">World</text><text x="481" y="382">Tech</text>
+      <text x="606" y="410" font-size="9" fill="#aaa">2h</text>
+    </g>
+
+    <!-- checked items (strike-ish) -->
+    <g font-size="12" fill="#3a8a3a"><text x="663" y="250">✓</text><text x="49" y="494">✓</text></g>
+
+    <!-- quick link letters -->
+    <g font-size="13" fill="#555" text-anchor="middle">
+      <text x="69" y="617">G</text><text x="123" y="617">C</text><text x="177" y="617">D</text>
+      <text x="231" y="617">GH</text><text x="285" y="617">Y</text>
+    </g>
+
+    <text x="480" y="730" font-size="12" fill="#999" text-anchor="middle">Weather by Open-Meteo · Headlines via public RSS · Your data stays in this browser</text>
+  </g>
+</svg>
