@@ -291,6 +291,28 @@ textarea:focus {
   border-color: var(--accent);
 }
 
+/* ---------- Reminders / Calendar sync ---------- */
+.reminders__cal {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.list__badge {
+  font-size: 0.85rem;
+  line-height: 1;
+  opacity: 0.8;
+}
+.reminders__hint {
+  margin: 10px 0 0;
+}
+.reminders__hint code {
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-size: 0.78rem;
+}
+
 /* ---------- Lists (reminders / todo) ---------- */
 .reminder__form {
   display: flex;
@@ -497,6 +519,46 @@ textarea:focus {
 }
 .notes__hint {
   margin: 8px 0 0;
+}
+
+/* ---------- Spotify ---------- */
+.pill.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.spotify__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.spotify__tab {
+  display: inline-flex;
+  align-items: center;
+}
+.spotify__del {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 2px 0 4px;
+  cursor: pointer;
+}
+.spotify__del:hover {
+  color: var(--danger);
+}
+.spotify__frame {
+  border-radius: 12px;
+  overflow: hidden;
+}
+.spotify__frame iframe {
+  display: block;
+  border: 0;
+}
+.spotify__hint {
+  margin: 10px 0 0;
 }
 
 /* ---------- Quick links ---------- */

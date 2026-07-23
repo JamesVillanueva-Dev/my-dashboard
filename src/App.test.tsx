@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
+import { DEFAULT_LAYOUT } from './widgets/registry';
 
 describe('App', () => {
   it('renders every default widget', () => {
@@ -14,6 +15,7 @@ describe('App', () => {
       'News',
       'Notes',
       'Quick Links',
+      'Spotify',
     ]) {
       expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument();
     }
@@ -28,7 +30,7 @@ describe('App', () => {
   it('gives each widget a drag handle so it can be reordered', () => {
     render(<App />);
     const grips = screen.getAllByRole('button', { name: /drag to reorder/i });
-    expect(grips).toHaveLength(7);
+    expect(grips).toHaveLength(DEFAULT_LAYOUT.length);
   });
 
   it('removes a widget via its × button', async () => {

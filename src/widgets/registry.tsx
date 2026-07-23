@@ -6,6 +6,7 @@ import RemindersWidget from '../components/RemindersWidget';
 import TodoWidget from '../components/TodoWidget';
 import QuickLinksWidget from '../components/QuickLinksWidget';
 import FocusWidget from '../components/FocusWidget';
+import SpotifyWidget from '../components/SpotifyWidget';
 
 /** A dashboard widget that can be enabled, disabled, and reordered. */
 export interface WidgetDef {
@@ -32,6 +33,7 @@ export const WIDGETS: WidgetDef[] = [
   { id: 'news', title: 'News', icon: '📰', render: () => <NewsWidget /> },
   { id: 'notes', title: 'Notes', icon: '📝', render: () => <NotesWidget /> },
   { id: 'quicklinks', title: 'Quick Links', icon: '🔗', render: () => <QuickLinksWidget /> },
+  { id: 'spotify', title: 'Spotify', icon: '🎵', render: () => <SpotifyWidget /> },
 ];
 
 /** Default layout: every widget, in catalogue order. */
