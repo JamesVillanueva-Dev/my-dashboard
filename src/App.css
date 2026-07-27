@@ -17,6 +17,30 @@
   margin-bottom: 24px;
   flex-wrap: wrap;
 }
+@media (max-width: 560px) {
+  .dashboard {
+    padding: 18px 14px 32px;
+  }
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .topbar__right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .topbar__clock {
+    font-size: 1.6rem;
+  }
+  /* The widget menu button now sits at the left edge of the row instead of the
+     right, so anchor the dropdown from the left or it overflows off-screen. */
+  .menu__panel {
+    left: 0;
+    right: auto;
+  }
+}
 .topbar__greeting h1 {
   margin: 0;
   font-size: clamp(1.6rem, 3vw, 2.3rem);
@@ -75,6 +99,17 @@
   .grid {
     column-width: auto;
     columns: 1;
+  }
+}
+@media (max-width: 560px) {
+  .grid {
+    column-gap: 14px;
+  }
+  .grid__item {
+    margin-bottom: 14px;
+  }
+  .widget {
+    padding: 15px;
   }
 }
 
@@ -187,6 +222,7 @@
   right: 0;
   z-index: 20;
   min-width: 220px;
+  max-width: calc(100vw - 32px);
   background: var(--card);
   border: 1px solid var(--card-border);
   border-radius: 12px;
@@ -744,4 +780,28 @@ textarea:focus {
   color: var(--text-muted);
   font-size: 0.82rem;
   font-style: italic;
+}
+
+/* ---------- Touch devices ---------- */
+/* Hover-reveal controls (remove/delete ×'s) are invisible on touch — there's no
+   :hover to trigger them. Placed last so it wins the cascade against the
+   equal-specificity opacity:0 rules defined earlier for each control. */
+@media (hover: none) {
+  .widget__remove,
+  .list__del,
+  .links__del {
+    opacity: 0.55;
+  }
+}
+@media (pointer: coarse) {
+  .widget__grip,
+  .widget__remove,
+  .list__del {
+    padding: 8px;
+  }
+  .links__del {
+    width: 26px;
+    height: 26px;
+    font-size: 1rem;
+  }
 }

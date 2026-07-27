@@ -72,6 +72,7 @@ body {
   background: radial-gradient(1200px 600px at 80% -10%, var(--bg-grad-1), transparent),
     radial-gradient(900px 500px at 0% 0%, var(--bg-grad-2), transparent), var(--bg);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 button {
