@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
+import FocusWidget from '../components/FocusWidget';
 import WeatherWidget from '../components/WeatherWidget';
-import NewsWidget from '../components/NewsWidget';
-import NotesWidget from '../components/NotesWidget';
 import RemindersWidget from '../components/RemindersWidget';
 import TodoWidget from '../components/TodoWidget';
+import NewsWidget from '../components/NewsWidget';
+import NotesWidget from '../components/NotesWidget';
 import QuickLinksWidget from '../components/QuickLinksWidget';
-import FocusWidget from '../components/FocusWidget';
 import SpotifyWidget from '../components/SpotifyWidget';
 
 /** A dashboard widget that can be enabled, disabled, and reordered. */

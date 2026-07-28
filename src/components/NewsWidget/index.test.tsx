@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import NewsWidget from './NewsWidget';
+import NewsWidget from './index';
+import styles from './styles.module.css';
 
 const RSS = `<?xml version="1.0"?>
 <rss version="2.0"><channel>
@@ -49,7 +50,9 @@ describe('NewsWidget', () => {
 
     await user.click(screen.getByRole('button', { name: 'Tech' }));
 
-    expect(screen.getByRole('button', { name: 'Tech' })).toHaveClass('is-active');
+    const tab = screen.getByRole('button', { name: 'Tech' });
+    expect(tab).toHaveClass(styles.isActive);
+    expect(tab).toHaveAttribute('aria-pressed', 'true');
     expect(localStorage.getItem('news.feed')).toBe(JSON.stringify('bbc-tech'));
   });
 });

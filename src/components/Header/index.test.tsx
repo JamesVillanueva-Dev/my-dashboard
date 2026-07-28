@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import Header from './Header';
+import Header from './index';
 
 describe('Header', () => {
   it('shows a time-of-day greeting and the user name', () => {

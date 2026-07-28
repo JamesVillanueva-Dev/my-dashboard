@@ -1,0 +1,70 @@
+/* Refresh button in the widget header. */
+.refresh {
+  composes: pill from '../../styles/controls.module.css';
+}
+
+/* ---------- Source tabs ---------- */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  border: 1px solid var(--card-border);
+  background: var(--card);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+}
+.tab.isActive {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* Loading and error lines. */
+.container p {
+  color: var(--text-muted);
+}
+
+.retry {
+  composes: link from '../../styles/controls.module.css';
+}
+
+/* ---------- Headlines ---------- */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.list li:last-child {
+  border-bottom: none;
+}
+.list a {
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+.list a:hover {
+  color: var(--accent);
+}
+
+/* Relative timestamp under each headline. */
+.list span {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}

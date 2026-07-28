@@ -1,0 +1,140 @@
+/* ---------- Google Calendar controls (widget header) ---------- */
+.cal {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* "📅 Synced" / "Syncing…" status text. */
+.status {
+  composes: muted small from '../../styles/controls.module.css';
+}
+
+/* Both the "Connect Calendar" and "sync now" buttons. */
+.calBtn {
+  composes: pill from '../../styles/controls.module.css';
+}
+
+.disconnect {
+  composes: link small from '../../styles/controls.module.css';
+}
+
+/* ---------- Add-a-reminder row ---------- */
+.form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.form input[type='text'] {
+  flex: 1 1 140px;
+}
+
+.add {
+  composes: btn from '../../styles/controls.module.css';
+}
+
+.error {
+  composes: muted small from '../../styles/controls.module.css';
+}
+
+/* Empty state. */
+.container p {
+  color: var(--text-muted);
+}
+
+/* ---------- Reminder list ---------- */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 4px;
+  border-radius: 8px;
+}
+.list li:hover {
+  background: var(--bg);
+}
+.list label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  cursor: pointer;
+  min-width: 0;
+}
+
+/* The reminder text. */
+.list label span {
+  overflow-wrap: anywhere;
+}
+.list li.isDone label span {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+/* 📅 marker on reminders that are mirrored as calendar events. */
+.badge {
+  font-size: 0.85rem;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.due {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.due.isOverdue {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Delete button, revealed on hover. */
+.list li > button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0 4px;
+  opacity: 0;
+}
+.list li:hover > button {
+  opacity: 1;
+}
+.list li > button:hover {
+  color: var(--danger);
+}
+
+/* ---------- Calendar setup hint ---------- */
+.hint {
+  composes: muted small from '../../styles/controls.module.css';
+  margin: 10px 0 0;
+}
+.hint code {
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-size: 0.78rem;
+}
+
+/* Touch devices have no :hover, so keep the delete control visible and larger. */
+@media (hover: none) {
+  .list li > button {
+    opacity: 0.55;
+  }
+}
+@media (pointer: coarse) {
+  .list li > button {
+    padding: 8px;
+  }
+}

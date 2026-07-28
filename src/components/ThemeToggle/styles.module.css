@@ -1,0 +1,6 @@
+.container {
+  composes: pill from '../../styles/controls.module.css';
+  font-size: 1.1rem;
+  padding: 8px 12px;
+  line-height: 1;
+}

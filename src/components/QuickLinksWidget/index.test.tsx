@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import QuickLinksWidget from './QuickLinksWidget';
+import QuickLinksWidget from './index';
+import styles from './styles.module.css';
 
 describe('QuickLinksWidget', () => {
   it('renders the default bookmarks', () => {
@@ -44,7 +45,7 @@ describe('QuickLinksWidget', () => {
     const user = userEvent.setup();
     render(<QuickLinksWidget />);
 
-    const gmail = screen.getByText('Gmail').closest('.links__item')!;
+    const gmail = screen.getByText('Gmail').closest<HTMLElement>(`.${styles.item}`)!;
     await user.click(within(gmail).getByTitle('Remove'));
 
     expect(screen.queryByText('Gmail')).not.toBeInTheDocument();

@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import App from './App';
-import { DEFAULT_LAYOUT } from './widgets/registry';
+import Dashboard from './index';
+import { DEFAULT_LAYOUT } from '../../lib/registry';
 
-describe('App', () => {
+describe('Dashboard', () => {
   it('renders every default widget', () => {
-    render(<App />);
+    render(<Dashboard />);
     for (const title of [
       'Focus of the Day',
       'Weather',
@@ -22,20 +22,20 @@ describe('App', () => {
   });
 
   it('handles network failure gracefully (weather shows an error, not a crash)', async () => {
-    render(<App />);
+    render(<Dashboard />);
     // fetch is stubbed to reject in test setup; the widget should surface a handled error.
     expect(await screen.findByText(/Couldn't load weather/i)).toBeInTheDocument();
   });
 
   it('gives each widget a drag handle so it can be reordered', () => {
-    render(<App />);
+    render(<Dashboard />);
     const grips = screen.getAllByRole('button', { name: /drag to reorder/i });
     expect(grips).toHaveLength(DEFAULT_LAYOUT.length);
   });
 
   it('removes a widget via its × button', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<Dashboard />);
     expect(screen.getByRole('heading', { level: 2, name: 'Notes' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /remove notes widget/i }));
@@ -45,7 +45,7 @@ describe('App', () => {
 
   it('opens the Privacy Policy and Terms of Service from the footer', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<Dashboard />);
 
     await user.click(screen.getByRole('button', { name: 'Privacy Policy' }));
     const dialog = screen.getByRole('dialog', { name: 'Privacy Policy' });
@@ -61,7 +61,7 @@ describe('App', () => {
 
   it('toggles widgets on and off through the widget menu', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<Dashboard />);
 
     await user.click(screen.getByRole('button', { name: /manage widgets/i }));
     const menu = screen.getByRole('menu');

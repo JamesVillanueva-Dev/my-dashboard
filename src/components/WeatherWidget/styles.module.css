@@ -1,0 +1,117 @@
+/* °F/°C toggle in the widget header. */
+.unit {
+  composes: pill from '../../styles/controls.module.css';
+}
+
+/* ---------- City search ---------- */
+.search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* "Use my location" button. */
+.locate {
+  composes: pill from '../../styles/controls.module.css';
+}
+
+.results {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 4px;
+  border: 1px solid var(--card-border);
+  border-radius: 9px;
+  background: var(--bg);
+}
+.results button {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+}
+.results button:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Searching, loading, and error lines. */
+.container p {
+  color: var(--text-muted);
+}
+
+.retry {
+  composes: link from '../../styles/controls.module.css';
+}
+
+/* ---------- Current conditions ---------- */
+.now {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px 14px;
+}
+
+/* The condition emoji, spanning both rows on the left. */
+.now > span {
+  font-size: 3rem;
+  grid-row: span 2;
+}
+
+.temp {
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Condition label under the temperature. */
+.desc {
+  composes: muted from '../../styles/controls.module.css';
+}
+
+.place {
+  grid-column: 2;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 12px 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+/* ---------- 4-day forecast ---------- */
+.forecast {
+  list-style: none;
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Each row: weekday, emoji, high/low. */
+.forecast li {
+  display: grid;
+  grid-template-columns: 3.5ch 2ch 1fr;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+.forecast li > span:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The low temperature, nested inside the high/low cell. */
+.forecast li span span {
+  color: var(--text-muted);
+}

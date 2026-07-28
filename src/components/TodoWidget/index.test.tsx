@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import TodoWidget from './TodoWidget';
+import TodoWidget from './index';
+import styles from './styles.module.css';
 
 describe('TodoWidget', () => {
   it('adds a task and shows the remaining count', async () => {
@@ -41,7 +42,7 @@ describe('TodoWidget', () => {
     await user.click(within(doneItem).getByRole('checkbox'));
 
     expect(screen.getByText('1 left')).toBeInTheDocument();
-    expect(screen.getByText('Second').closest('li')).toHaveClass('is-done');
+    expect(screen.getByText('Second').closest('li')).toHaveClass(styles.isDone);
 
     // Completed task drops below the incomplete one.
     const texts = screen.getAllByText(/First|Second/).map((el) => el.textContent);

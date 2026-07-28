@@ -35,7 +35,7 @@ local storage otherwise**, deferring Google integration to a later phase.
 5. **Google Docs / Calendar are out of scope for this phase** and documented as a
    follow-up requiring OAuth + a small backend.
 6. **Layout is data.** The set and order of visible widgets is a persisted
-   `string[]` of widget ids; a central registry (`src/widgets/registry.tsx`) maps
+   `string[]` of widget ids; a central registry (`src/lib/registry.tsx`) maps
    ids to components. Widgets are enabled/disabled via a menu and reordered by
    drag-and-drop.
 7. **Theming** ships two palettes (black & yellow default; purple/blue "dark").

@@ -55,6 +55,15 @@
   color-scheme: dark;
 }
 
+/* ---------------------------------------------------------------------------
+   Global resets and base element styles.
+
+   This is the only global stylesheet in the app — everything else is a CSS
+   Module co-located with its component. Keep this file to design tokens,
+   resets, and bare element defaults; anything component-specific belongs in
+   that component's styles.module.css.
+   --------------------------------------------------------------------------- */
+
 * {
   box-sizing: border-box;
 }
@@ -83,4 +92,24 @@ button {
 input,
 textarea {
   font-family: inherit;
+}
+
+/* Base appearance for text-entry controls. Component modules restyle these via
+   descendant selectors (e.g. `.container input`) when they need something else. */
+input[type='text'],
+input[type='datetime-local'],
+textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: 9px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+input:focus,
+textarea:focus {
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent);
 }

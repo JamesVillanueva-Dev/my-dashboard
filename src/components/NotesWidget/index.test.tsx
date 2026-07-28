@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import NotesWidget from './NotesWidget';
+import NotesWidget from './index';
 
 afterEach(() => {
   vi.useRealTimers();

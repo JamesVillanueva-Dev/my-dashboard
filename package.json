@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "create:component": "node scripts/create-component.mjs"
   },
   "dependencies": {
     "react": "^19.2.4",

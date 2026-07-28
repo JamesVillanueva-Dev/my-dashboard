@@ -1,0 +1,29 @@
+.container label {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.container input {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.container blockquote {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  background: var(--accent-soft);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.container blockquote cite {
+  display: block;
+  margin-top: 6px;
+  font-style: normal;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}

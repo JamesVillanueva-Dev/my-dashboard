@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import WeatherWidget from './WeatherWidget';
+import WeatherWidget from './index';
 
 /** A minimal Open-Meteo forecast payload the widget knows how to read. */
 const FORECAST = {

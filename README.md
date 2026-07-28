@@ -1,73 +1,80 @@
-# React + TypeScript + Vite
+# Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A personal start-page dashboard: weather, news, reminders (with optional Google
+Calendar sync), to-dos, notes, quick links, a daily focus, and an embedded
+Spotify player. Everything runs client-side — there is no backend, and your data
+stays in your browser's `localStorage`.
 
-Currently, two official plugins are available:
+React + TypeScript + Vite, tested with Vitest and Testing Library.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Getting started
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+| Script                     | What it does                                  |
+| -------------------------- | --------------------------------------------- |
+| `npm run dev`              | Vite dev server with HMR                      |
+| `npm run build`            | Typecheck (`tsc -b`) then production build     |
+| `npm run preview`          | Serve the production build locally            |
+| `npm test`                 | Vitest in watch mode                          |
+| `npm run test:run`         | Vitest once (CI)                              |
+| `npm run lint`             | ESLint                                        |
+| `npm run create:component` | Scaffold a new component folder               |
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Google Calendar sync is optional and off unless a `VITE_GOOGLE_CLIENT_ID` is set
+in `.env.local` — see [ADR 0002](docs/adr/0002-google-calendar-integration.md).
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Project structure
+
+Every component lives in one flat `src/components/` directory, each in its own
+folder holding `index.tsx`, `styles.module.css`, and `index.test.tsx`.
+
 ```
+src/
+├── main.tsx                  mounts <Dashboard>
+├── styles.css                the ONLY global stylesheet (tokens + resets)
+├── styles/
+│   └── controls.module.css   shared control primitives, pulled in via `composes`
+├── hooks/
+│   ├── useLocalStorage.ts
+│   └── useCalendarSync.ts    drives the optional Google Calendar sync
+├── lib/
+│   ├── registry.tsx          catalogue of available widgets
+│   ├── gcalSync.ts           Google Calendar reconciliation
+│   └── googleAuth.ts         in-memory OAuth token handling
+└── components/
+    ├── Dashboard/            the grid: layout, drag-to-reorder, footer
+    ├── Header/               greeting, clock, theme toggle
+    ├── WidgetMenu/           enable/disable widgets
+    ├── Widget/               card shell every widget renders into (+ chrome.ts)
+    ├── ThemeToggle/
+    ├── LegalModal/
+    ├── FocusWidget/
+    ├── WeatherWidget/
+    ├── RemindersWidget/
+    ├── TodoWidget/
+    ├── NewsWidget/
+    ├── NotesWidget/
+    ├── QuickLinksWidget/
+    └── SpotifyWidget/
+```
+
+Conventions — and the reasoning behind them — are documented in
+[CLAUDE.md](CLAUDE.md).
+
+## Adding a component
+
+```bash
+npm run create:component                    # prompts for the name
+npm run create:component -- EventsCard
+npm run create:component -- EventsCard --no-test
+```
+
+## Architecture decisions
+
+- [ADR 0001 — Client-only dashboard architecture](docs/adr/0001-client-only-dashboard-architecture.md)
+- [ADR 0002 — Google Calendar integration](docs/adr/0002-google-calendar-integration.md)
+- [User stories](docs/user-stories.md) · [Wireframes](docs/wireframes.md)

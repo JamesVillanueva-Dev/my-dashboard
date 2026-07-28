@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import RemindersWidget from './RemindersWidget';
+import RemindersWidget from './index';
+import styles from './styles.module.css';
 
 // With no VITE_GOOGLE_CLIENT_ID configured the widget is purely local:
 // no "Connect Calendar" button, and the setup hint is shown instead.
@@ -31,7 +32,7 @@ describe('RemindersWidget (local, calendar not configured)', () => {
     const item = screen.getByText('Water plants').closest('li')!;
     await user.click(within(item).getByRole('checkbox'));
 
-    expect(screen.getByText('Water plants').closest('li')).toHaveClass('is-done');
+    expect(screen.getByText('Water plants').closest('li')).toHaveClass(styles.isDone);
   });
 
   it('removes a reminder', async () => {
@@ -56,6 +57,6 @@ describe('RemindersWidget (local, calendar not configured)', () => {
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
     const item = screen.getByText('Past due').closest('li')!;
-    expect(item.querySelector('.is-overdue')).not.toBeNull();
+    expect(item.querySelector(`.${styles.isOverdue}`)).not.toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import ThemeToggle from './ThemeToggle';
+import ThemeToggle from './index';
 
 describe('ThemeToggle', () => {
   it('defaults to the light (black & yellow) theme and applies it to the root', () => {

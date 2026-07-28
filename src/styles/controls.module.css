@@ -1,0 +1,74 @@
+/* ---------------------------------------------------------------------------
+   Shared control primitives.
+
+   These are the handful of styles used by nearly every widget. They are a CSS
+   Module like any other — components pull them in with `composes` rather than
+   importing this file into their .tsx:
+
+     .addButton {
+       composes: btn from '../../styles/controls.module.css';
+     }
+
+   `composes` puts both class names on the element, so the shared rules (and any
+   descendant rules they define) apply alongside the component's own.
+
+   Keep this file small. Anything used by a single component belongs in that
+   component's styles.module.css instead.
+   --------------------------------------------------------------------------- */
+
+/* Secondary action: a small outlined chip, used for widget header buttons. */
+.pill {
+  border: 1px solid var(--card-border);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 0.85rem;
+  line-height: 1;
+  transition: background 0.15s, border-color 0.15s;
+}
+.pill:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Primary action: a filled button, used to submit the inline "add" forms. */
+.btn {
+  composes: pill;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.btn:hover {
+  color: var(--accent-text);
+  filter: brightness(1.06);
+}
+
+/* A button that reads as inline text (retry, disconnect, footer links). */
+.link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* De-emphasised text: status lines, hints, counts. */
+.muted {
+  color: var(--text-muted);
+}
+
+.small {
+  font-size: 0.82rem;
+}
+
+/* Dashed placeholder box shown when there is nothing to display. */
+.empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 60px 20px;
+  border: 1px dashed var(--card-border);
+  border-radius: var(--radius);
+}

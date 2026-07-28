@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import FocusWidget from './FocusWidget';
+import FocusWidget from './index';
 
 describe('FocusWidget', () => {
   it('shows the daily quote with an attribution', () => {

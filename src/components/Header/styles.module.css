@@ -1,0 +1,77 @@
+.container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+/* ---------- Greeting (left) ---------- */
+.container h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* The date line. */
+.container > div:first-child p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* Inline-editable name: a button until clicked, then a text input. */
+.container h1 button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  border-bottom: 2px dashed transparent;
+}
+.container h1 button:hover {
+  border-bottom-color: var(--accent);
+}
+.container h1 input {
+  font: inherit;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: none;
+  border-radius: 6px;
+  padding: 0 6px;
+  max-width: 12ch;
+  width: auto;
+}
+
+/* ---------- Controls + clock (right) ---------- */
+.container > div:last-child {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.container time {
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+}
+
+@media (max-width: 560px) {
+  .container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .container > div:last-child {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .container time {
+    font-size: 1.6rem;
+  }
+}

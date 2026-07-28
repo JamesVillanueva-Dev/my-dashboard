@@ -1,0 +1,80 @@
+/* The +/× button that reveals the add-source form. */
+.toggle {
+  composes: pill from '../../styles/controls.module.css';
+}
+
+/* ---------- Add-a-source row ---------- */
+.form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.form input {
+  flex: 1 1 140px;
+}
+
+.add {
+  composes: btn from '../../styles/controls.module.css';
+}
+
+/* Shown when a pasted link isn't a recognisable Spotify URL. */
+.error {
+  composes: muted small from '../../styles/controls.module.css';
+}
+
+/* ---------- Source tabs ---------- */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+/* Each tab pairs a "play" button with its own remove button. */
+.tabs > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tab {
+  composes: pill from '../../styles/controls.module.css';
+}
+.tab.isActive {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.del {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 2px 0 4px;
+  cursor: pointer;
+}
+.del:hover {
+  color: var(--danger);
+}
+
+/* ---------- Embedded player ---------- */
+.frame {
+  border-radius: 12px;
+  overflow: hidden;
+}
+.frame iframe {
+  display: block;
+  border: 0;
+}
+
+/* Shown when every source has been removed. */
+.empty {
+  composes: empty from '../../styles/controls.module.css';
+}
+
+.hint {
+  composes: muted small from '../../styles/controls.module.css';
+  margin: 10px 0 0;
+}

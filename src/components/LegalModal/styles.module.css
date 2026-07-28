@@ -1,0 +1,95 @@
+/* Backdrop. */
+.container {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 50;
+  animation: fade 0.15s ease;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The dialog itself — the backdrop's only child. */
+.container > div {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  max-width: 620px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+/* Close button — the only button in the dialog. */
+.container button {
+  position: sticky;
+  top: 0;
+  float: right;
+  margin: 10px 10px 0 0;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.container button:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Document body. */
+.container > div > div {
+  padding: 8px 28px 28px;
+  text-align: left;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+.container h2 {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+}
+.container h3 {
+  margin: 22px 0 6px;
+  font-size: 1.02rem;
+  color: var(--accent);
+}
+.container ul {
+  padding-left: 20px;
+}
+.container code {
+  background: var(--accent-soft);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+/* "Last updated" line under each document heading. */
+.meta {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-top: 0;
+}
+
+/* Closing "not legal advice" disclaimer. */
+.note {
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid var(--card-border);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-style: italic;
+}
