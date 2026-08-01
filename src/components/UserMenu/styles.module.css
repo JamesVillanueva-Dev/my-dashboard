@@ -1,0 +1,7 @@
+/* user-menu
+   `.container` is the root. Clerk renders and styles the avatar button itself,
+   so this only reserves a consistent slot beside the other header controls. */
+.container {
+  display: flex;
+  align-items: center;
+}

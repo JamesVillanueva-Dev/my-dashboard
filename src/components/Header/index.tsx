@@ -1,5 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import ThemeToggle from '../ThemeToggle';
+import UserMenu from '../UserMenu';
 import styles from './styles.module.css';
 
 /**
@@ -78,6 +79,7 @@ export default function Header({ name, onNameChange, actions }: HeaderProps) {
       <div>
         {actions}
         <ThemeToggle />
+        <UserMenu />
         <time aria-label="Current time">{time}</time>
       </div>
     </header>
