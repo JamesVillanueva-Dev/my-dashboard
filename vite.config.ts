@@ -13,5 +13,14 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: true,
     restoreMocks: true,
+    // Vitest loads `.env.local` like the app does, so without this the suite
+    // would behave differently on a machine that has the optional integrations
+    // configured — Clerk would try to mount <UserButton> with no provider, and
+    // the Reminders tests would take the Calendar path. Force both off; the
+    // tests that cover the configured paths mock those modules directly.
+    env: {
+      VITE_CLERK_PUBLISHABLE_KEY: '',
+      VITE_GOOGLE_CLIENT_ID: '',
+    },
   },
 })

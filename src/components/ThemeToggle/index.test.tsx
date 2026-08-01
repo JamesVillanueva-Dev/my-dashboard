@@ -7,8 +7,8 @@ describe('ThemeToggle', () => {
   it('defaults to the light (black & yellow) theme and applies it to the root', () => {
     render(<ThemeToggle />);
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
-    // In light mode the button offers the moon (switch to dark).
-    expect(screen.getByRole('button', { name: /toggle color theme/i })).toHaveTextContent('🌙');
+    // The label names the theme the button switches *to*, not the current one.
+    expect(screen.getByRole('button', { name: /toggle color theme/i })).toHaveTextContent('Dark');
   });
 
   it('toggles to the dark (purple) theme and persists the choice', async () => {
@@ -18,6 +18,6 @@ describe('ThemeToggle', () => {
 
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
     expect(localStorage.getItem('theme')).toBe(JSON.stringify('dark'));
-    expect(screen.getByRole('button', { name: /toggle color theme/i })).toHaveTextContent('☀️');
+    expect(screen.getByRole('button', { name: /toggle color theme/i })).toHaveTextContent('Light');
   });
 });

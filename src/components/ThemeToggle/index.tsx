@@ -69,7 +69,7 @@ export default function ThemeToggle() {
       title={`Switch to ${next === 'dark' ? 'black & yellow (dark)' : 'white & blue (light)'} theme`}
       aria-label="Toggle color theme"
     >
-      {theme === 'light' ? '🌙' : '☀️'}
+      {next === 'dark' ? 'Dark' : 'Light'}
     </button>
   );
 }
