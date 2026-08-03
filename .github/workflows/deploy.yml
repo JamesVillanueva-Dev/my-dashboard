@@ -32,14 +32,26 @@ jobs:
       - run: npm run lint
       - run: npm run test:run
 
-      # Both integrations are optional — an unset variable just leaves that
-      # feature invisible, so the build succeeds either way. Anything prefixed
-      # `VITE_` is inlined into the bundle, so these are repo *variables*, not
-      # secrets: publishable keys and OAuth client ids are public by design.
+      # Both integrations are optional — an unset value just leaves that feature
+      # invisible, so the build succeeds either way. Anything prefixed `VITE_`
+      # is inlined into the bundle, so these belong in repo *variables*:
+      # publishable keys and OAuth client ids are public by design. The
+      # `secrets` fallback is only so a value added under the wrong tab still
+      # works rather than failing silently.
       - run: npm run build
         env:
-          VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
-          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY || secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || secrets.VITE_GOOGLE_CLIENT_ID }}
+
+      # Fail loudly rather than shipping a build with sign-in silently missing.
+      - name: Report which integrations were built in
+        run: |
+          grep -q 'pk_test_[A-Za-z0-9]\|pk_live_[A-Za-z0-9]' dist/assets/*.js \
+            && echo "Clerk: enabled" \
+            || echo "::warning::Clerk sign-in is NOT in this build — set the VITE_CLERK_PUBLISHABLE_KEY repository variable and re-run."
+          grep -q 'apps.googleusercontent.com' dist/assets/*.js \
+            && echo "Google Calendar: enabled" \
+            || echo "::warning::Google Calendar sync is NOT in this build — set the VITE_GOOGLE_CLIENT_ID repository variable and re-run."
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
