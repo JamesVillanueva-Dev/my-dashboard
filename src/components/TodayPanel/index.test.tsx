@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TodayPanel from './index';
@@ -39,7 +39,19 @@ function dueIn(ms: number): string {
 
 describe('TodayPanel', () => {
   beforeEach(() => {
+    // Pin the clock to midday. This panel counts only what falls on today's
+    // calendar date, so the multi-hour `dueIn` offsets below would cross
+    // midnight — and drop out of the count — whenever the suite ran in the last
+    // couple of hours of the day. That is a real failure on a UTC CI runner
+    // while passing all afternoon locally. `shouldAdvanceTime` keeps the
+    // panel's once-a-minute tick and userEvent's internal delays working.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 0, 15, 12, 0, 0));
     window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('falls back to an empty state with no calendar and no tasks', () => {
