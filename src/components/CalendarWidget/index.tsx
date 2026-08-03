@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import Widget from '../Widget';
+import Icon from '../Icon';
 import CalendarModal from '../CalendarModal';
-import { useUpcomingEvents } from '../../hooks/useUpcomingEvents';
+import { useDashboardData } from '../../hooks/useDashboardData';
 import { groupByDay, WINDOW_DAYS, type CalendarEvent } from '../../lib/gcalEvents';
 import styles from './styles.module.css';
 
@@ -34,13 +35,16 @@ function timeLabel(ev: CalendarEvent, now: number): string {
  * already holds, which is why it is only offered once connected.
  */
 export default function CalendarWidget() {
-  const cal = useUpcomingEvents();
+  // Shared with the Today zone via the provider. Calling `useUpcomingEvents`
+  // here as well would mean a second access-token request and a second poll.
+  const { upcoming: cal } = useDashboardData();
   const days = groupByDay(cal.events, cal.now);
   const [monthOpen, setMonthOpen] = useState(false);
 
   return (
     <Widget
       title="Calendar"
+      icon="calendar"
       className={styles.container}
       action={
         cal.configured ? (
@@ -52,15 +56,16 @@ export default function CalendarWidget() {
                 title="Open full calendar"
                 aria-label="Open full calendar"
               >
-                ⤢
+                <Icon name="expand" />
               </button>
               <button
                 className={styles.iconBtn}
                 onClick={cal.refresh}
                 disabled={cal.loading}
                 title="Refresh"
+                aria-label="Refresh"
               >
-                ⟳
+                <Icon name="refresh" />
               </button>
               <button className={styles.disconnect} onClick={cal.disconnect} title="Stop showing">
                 Disconnect

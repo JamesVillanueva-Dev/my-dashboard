@@ -1,0 +1,7 @@
+/* Sized in `em` by the component, so the only job here is to make an icon sit on
+   the text baseline and never be squashed by a flex parent. */
+.container {
+  display: inline-block;
+  vertical-align: -0.14em;
+  flex: none;
+}

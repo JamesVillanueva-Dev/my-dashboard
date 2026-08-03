@@ -68,6 +68,14 @@
   color-scheme: dark;
 }
 
+/* Layout tokens for the dashboard's content column. These are not theme
+   dependent, so they live outside the palette blocks above. The nav bar is
+   full-bleed but uses both to line its contents up with the grid below it. */
+:root {
+  --page-max: 1800px;
+  --page-pad: clamp(14px, 2.5vw, 48px);
+}
+
 /* ---------------------------------------------------------------------------
    Global resets and base element styles.
 

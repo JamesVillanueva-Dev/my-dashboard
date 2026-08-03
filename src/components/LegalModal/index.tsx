@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import Icon from '../Icon';
 import styles from './styles.module.css';
 
 /** Which legal document to show, or `null` for none. */
@@ -147,7 +148,7 @@ export default function LegalModal({ doc, onClose }: LegalModalProps) {
         onClick={(e) => e.stopPropagation()}
       >
         <button onClick={onClose} aria-label="Close">
-          ×
+          <Icon name="close" />
         </button>
         <div>{doc === 'privacy' ? <PrivacyPolicy /> : <TermsOfService />}</div>
       </div>

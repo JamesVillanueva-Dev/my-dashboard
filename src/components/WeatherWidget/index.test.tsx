@@ -35,8 +35,8 @@ describe('WeatherWidget', () => {
     expect(await screen.findByText('72°F')).toBeInTheDocument();
     expect(screen.getByText('Clear sky')).toBeInTheDocument();
     expect(screen.getByText('San Diego')).toBeInTheDocument();
-    // The 4-day forecast (days after today) renders.
-    expect(screen.getByText('💧 55%')).toBeInTheDocument();
+    // Humidity and wind read out beside their icons.
+    expect(screen.getByText('55%')).toBeInTheDocument();
   });
 
   it('shows an error state with a retry when the network fails', async () => {

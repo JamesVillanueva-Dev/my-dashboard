@@ -55,10 +55,12 @@
   gap: 4px 14px;
 }
 
-/* The condition emoji, spanning both rows on the left. */
-.now > span {
+/* The condition icon, spanning both rows on the left. */
+.now > svg {
   font-size: 3rem;
   grid-row: span 2;
+  color: var(--accent);
+  stroke-width: 1.4;
 }
 
 .temp {
@@ -86,6 +88,12 @@
   font-size: 0.85rem;
   color: var(--text-muted);
 }
+/* The humidity and wind readings pair an icon with their value. */
+.meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 
 /* ---------- 4-day forecast ---------- */
 .forecast {
@@ -98,13 +106,17 @@
   gap: 6px;
 }
 
-/* Each row: weekday, emoji, high/low. */
+/* Each row: weekday, icon, high/low. */
 .forecast li {
   display: grid;
-  grid-template-columns: 3.5ch 2ch 1fr;
+  grid-template-columns: 3.5ch auto 1fr;
   align-items: center;
   gap: 10px;
   font-size: 0.9rem;
+}
+.forecast li > svg {
+  font-size: 1.15rem;
+  color: var(--accent);
 }
 .forecast li > span:last-child {
   text-align: right;

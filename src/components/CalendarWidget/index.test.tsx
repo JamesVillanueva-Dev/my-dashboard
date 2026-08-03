@@ -1,8 +1,13 @@
+import type { ReactElement } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render as rtlRender, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CalendarWidget from './index';
 import styles from './styles.module.css';
+import { DashboardDataProvider } from '../../hooks/DashboardDataProvider';
+
+/** Calendar events come from the shared provider now, so tests supply one. */
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: DashboardDataProvider });
 
 // The widget's Google path is gated on a configured client id, which the test
 // env forces off (see vite.config.ts). Mock the auth module so the connected

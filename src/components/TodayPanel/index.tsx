@@ -1,0 +1,109 @@
+import AgendaList from '../AgendaList';
+import StatStrip from '../StatStrip';
+import Icon from '../Icon';
+import { useDashboardData } from '../../hooks/useDashboardData';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { nextUp, relativeLabel, timeLabel, todayItems } from '../../lib/agenda';
+import styles from './styles.module.css';
+
+/**
+ * @returns Today's date as a stable `YYYY-MM-DD` key in **local** time, used to
+ *   reset the focus field when the calendar day changes.
+ */
+function todayKey(now: number): string {
+  const d = new Date(now);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Props for {@link TodayPanel}. */
+interface TodayPanelProps {
+  /**
+   * Whether to show the daily focus field. Turned off from the widget menu, for
+   * people who do not want to be asked to set an intention every morning.
+   */
+  showFocus?: boolean;
+}
+
+/**
+ * The lead zone: the one part of the dashboard that answers "what now?".
+ *
+ * Pulls the merged agenda from {@link useDashboardData} — calendar events and
+ * dated tasks in a single timeline — and surfaces what is happening next, the
+ * day's one stated intention, and the aggregate counts. Ticking a task here
+ * writes through to the shared list, so the Tasks panel updates in the same
+ * render.
+ *
+ * Unlike a widget this is not draggable or removable: it is the frame the rest
+ * of the dashboard hangs off, not one more panel competing for attention.
+ */
+export default function TodayPanel({ showFocus = true }: TodayPanelProps) {
+  const { agenda, counts, now, toggleTask, upcoming } = useDashboardData();
+  // The fallback carries no date on purpose: reading the clock during render is
+  // impure, and an empty date simply reads as "no focus set for today".
+  const [focus, setFocus] = useLocalStorage<{ date: string; text: string }>('focus', {
+    date: '',
+    text: '',
+  });
+
+  const key = todayKey(now);
+  // The stored focus expires with the day it was written for.
+  const focusText = focus.date === key ? focus.text : '';
+
+  const today = todayItems(agenda, now);
+  const next = nextUp(agenda, now);
+
+  return (
+    <section
+      className={`${styles.container}${showFocus ? '' : ` ${styles.isFocusOff}`}`}
+      aria-labelledby="today-heading"
+    >
+      <div className={styles.lead}>
+        <div className={styles.next}>
+          <h2 id="today-heading">Next up</h2>
+          {next ? (
+            <>
+              <p className={styles.title}>{next.title}</p>
+              <p className={styles.when}>
+                <span>{relativeLabel(next, now)}</span>
+                <span aria-hidden="true">·</span>
+                <span>{timeLabel(next)}</span>
+              </p>
+            </>
+          ) : (
+            <p className={styles.title}>
+              {upcoming.configured && !upcoming.connected
+                ? 'Connect your calendar to see what’s coming.'
+                : 'Nothing scheduled.'}
+            </p>
+          )}
+          <StatStrip counts={counts} />
+        </div>
+
+        {showFocus && (
+          <div className={styles.focus}>
+            <label htmlFor="today-focus">
+              <Icon name="target" /> Today, my one focus is…
+            </label>
+            <input
+              id="today-focus"
+              value={focusText}
+              onChange={(e) => setFocus({ date: key, text: e.target.value })}
+              placeholder="Set your intention"
+            />
+          </div>
+        )}
+      </div>
+
+      <div className={styles.agenda}>
+        <h3>Today</h3>
+        <AgendaList
+          items={today}
+          now={now}
+          onToggleTask={toggleTask}
+          emptyLabel="Nothing on today. Add a task below, or connect your calendar."
+        />
+      </div>
+    </section>
+  );
+}

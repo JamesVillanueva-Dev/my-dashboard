@@ -5,9 +5,12 @@
   line-height: 1.5;
 }
 
-/* The "saved ✓" flash in the widget header. */
+/* The "saved" flash in the widget header. */
 .status {
   composes: muted small from '../../styles/controls.module.css';
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .container p {

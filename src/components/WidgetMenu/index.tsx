@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import Icon from '../Icon';
 import { WIDGETS } from '../../lib/registry';
 import styles from './styles.module.css';
 
@@ -8,8 +9,12 @@ interface WidgetMenuProps {
   layout: string[];
   /** Toggle a widget on/off by id. */
   onToggle: (id: string) => void;
-  /** Restore the default set and order of widgets. */
+  /** Restore the default set, order, and sizes of widgets. */
   onReset: () => void;
+  /** Whether the Today zone shows the daily focus field. */
+  showFocus: boolean;
+  /** Show or hide the daily focus field. */
+  onToggleFocus: () => void;
 }
 
 /**
@@ -18,7 +23,13 @@ interface WidgetMenuProps {
  *
  * @param props - See {@link WidgetMenuProps}.
  */
-export default function WidgetMenu({ layout, onToggle, onReset }: WidgetMenuProps) {
+export default function WidgetMenu({
+  layout,
+  onToggle,
+  onReset,
+  showFocus,
+  onToggleFocus,
+}: WidgetMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -46,10 +57,21 @@ export default function WidgetMenu({ layout, onToggle, onReset }: WidgetMenuProp
         aria-label="Manage widgets"
         title="Manage widgets"
       >
-        ⚙️ Widgets
+        <Icon name="grid" /> Widgets
       </button>
       {open && (
         <div role="menu">
+          <p>Today</p>
+          <ul>
+            <li>
+              <label>
+                <input type="checkbox" checked={showFocus} onChange={onToggleFocus} />
+                <Icon name="target" />
+                Daily focus
+              </label>
+            </li>
+          </ul>
+
           <p>Show widgets</p>
           <ul>
             {WIDGETS.map((w) => (
@@ -60,14 +82,16 @@ export default function WidgetMenu({ layout, onToggle, onReset }: WidgetMenuProp
                     checked={layout.includes(w.id)}
                     onChange={() => onToggle(w.id)}
                   />
-                  <span aria-hidden="true">{w.icon}</span>
+                  <Icon name={w.icon} />
                   {w.title}
                 </label>
               </li>
             ))}
           </ul>
+          <p className={styles.note}>Resize a panel from the ⟷ button in its header.</p>
+
           <button className={styles.reset} onClick={onReset}>
-            Reset to default layout
+            Reset layout and sizes
           </button>
         </div>
       )}

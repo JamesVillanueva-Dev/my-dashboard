@@ -1,0 +1,34 @@
+.container {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.container li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.container strong {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Overdue is the only figure that is bad news, so it is the only coloured one. */
+.isUrgent strong {
+  color: var(--danger);
+}
+
+.clear {
+  composes: muted small from '../../styles/controls.module.css';
+  margin: 0;
+}

@@ -28,18 +28,18 @@ describe('NotesWidget', () => {
     render(<NotesWidget />);
 
     // Nothing to save yet, so no indicator.
-    expect(screen.queryByText('saved ✓')).not.toBeInTheDocument();
+    expect(screen.queryByText('saved')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText(/Jot anything down/i), {
       target: { value: 'x' },
     });
     // While the debounce is pending the flash is hidden.
-    expect(screen.queryByText('saved ✓')).not.toBeInTheDocument();
+    expect(screen.queryByText('saved')).not.toBeInTheDocument();
 
     // The 600ms settle timer fires and the indicator appears.
     act(() => {
       vi.advanceTimersByTime(600);
     });
-    expect(screen.getByText('saved ✓')).toBeInTheDocument();
+    expect(screen.getByText('saved')).toBeInTheDocument();
   });
 });

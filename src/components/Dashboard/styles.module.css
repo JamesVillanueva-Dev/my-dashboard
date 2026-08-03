@@ -1,11 +1,7 @@
-/* Wide by design: this is a dashboard, so panels should fill the display rather
-   than sit in a reading-width column. The cap only stops things sprawling on
-   ultrawide monitors — raise or drop it if you want the full width. Side padding
-   grows with the viewport so the grid never runs into the screen edge. */
+/* The root spans the viewport so the sticky nav bar can run edge to edge. All
+   page content is inset by .body instead. */
 .container {
-  max-width: 1800px;
-  margin: 0 auto;
-  padding: 28px clamp(20px, 2.5vw, 48px) 40px;
+  min-height: 100vh;
 }
 
 /* Set while a card is being dragged, to suppress text selection everywhere. */
@@ -14,18 +10,34 @@
   cursor: grabbing;
 }
 
-/* ---------- Masonry grid: columns pack tightly, no dead space ---------- */
-.container > main {
-  column-width: 300px;
-  column-gap: 18px;
+/* ---------- Content column ----------
+   Wide by design: this is a dashboard, so panels should fill the display rather
+   than sit in a reading-width column. --page-max only stops things sprawling on
+   ultrawide monitors; raise or drop it for the full width. The nav bar reads
+   both tokens so its contents line up with the grid. */
+.body {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 26px var(--page-pad) 40px;
+}
+
+/* ---------- Grid ----------
+   Fine-grained rows (8px) that each panel spans according to its measured
+   height, set from JS in Dashboard. That combination is the only way to get both
+   behaviours at once: CSS multi-column packs tightly but cannot span columns,
+   while a plain grid spans but stretches every row to its tallest item, leaving
+   dead space. Keep ROW/GAP in Dashboard/index.tsx in step with these values. */
+.body > main {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(288px, 1fr));
+  grid-auto-rows: 8px;
+  gap: 18px;
+  align-items: start;
 }
 
 /* ---------- Grid item (the draggable wrapper around each widget) ---------- */
 .item {
   min-width: 0;
-  break-inside: avoid;
-  -webkit-column-break-inside: avoid;
-  margin-bottom: 18px;
   will-change: transform;
 }
 .item.isDragging {
@@ -34,13 +46,40 @@
   cursor: grabbing;
 }
 
+/* ---------- Widths ----------
+   Set per panel from the widget menu or the header's resize control, and capped
+   at the breakpoints below: an item spanning more columns than the grid actually
+   has would create implicit columns and overflow the page. */
+.compact {
+  grid-column: span 1;
+}
+.standard {
+  grid-column: span 2;
+}
+.wide {
+  grid-column: span 3;
+}
+
 /* ---------- Empty state ---------- */
 .empty {
   composes: empty from '../../styles/controls.module.css';
 }
 
+/* Visually hidden, but still announced — the keyboard-reorder live region. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* ---------- Footer ---------- */
-.container > footer {
+.body > footer {
   margin-top: 28px;
   text-align: center;
   font-size: 0.78rem;
@@ -50,12 +89,12 @@
   align-items: center;
   gap: 6px;
 }
-.container > footer nav {
+.body > footer nav {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.container > footer button {
+.body > footer button {
   background: none;
   border: none;
   padding: 0;
@@ -64,21 +103,29 @@
   font-size: 0.8rem;
 }
 
+/* Below roughly three columns' worth of room, a `wide` panel cannot have its
+   three columns. Step the caps down rather than letting the grid overflow. */
+@media (max-width: 1000px) {
+  .wide {
+    grid-column: span 2;
+  }
+}
+
 @media (max-width: 640px) {
-  .container > main {
-    column-width: auto;
-    columns: 1;
+  .body > main {
+    grid-template-columns: 1fr;
+  }
+  .standard,
+  .wide {
+    grid-column: span 1;
   }
 }
 
 @media (max-width: 560px) {
-  .container {
-    padding: 18px 14px 32px;
+  .body {
+    padding-block: 18px 32px;
   }
-  .container > main {
-    column-gap: 14px;
-  }
-  .item {
-    margin-bottom: 14px;
+  .body > main {
+    gap: 14px;
   }
 }

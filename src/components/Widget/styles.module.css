@@ -13,6 +13,22 @@
   transition: background 0.18s, box-shadow 0.18s, border-color 0.18s;
 }
 
+/* Tier 3: reference material you glance at. Tighter padding and a smaller type
+   scale, so an ambient panel never competes with a panel you act on. */
+.container.isCompact {
+  padding: 13px 14px;
+  font-size: 0.94em;
+}
+.container.isCompact > header {
+  margin-bottom: 9px;
+}
+.container.isCompact h2 {
+  font-size: 0.9rem;
+}
+.container.isCompact h2 svg {
+  font-size: 1rem;
+}
+
 /* A dragged panel is the one thing that leaves the surface: it swaps to the
    raised --card treatment so it visibly pops out of its slot and back in. */
 .container.isDragging {
@@ -52,9 +68,11 @@
   font-weight: 650;
 }
 
-/* The optional icon is the only element inside the heading. */
-.container h2 span {
-  font-size: 1.1rem;
+/* The optional icon is the only element inside the heading. Accent-coloured so
+   each panel keeps the visual identity the emoji used to carry. */
+.container h2 svg {
+  font-size: 1.15rem;
+  color: var(--accent);
 }
 
 /* ---------- Body ---------- */
@@ -66,10 +84,11 @@
 /* Hidden at rest and revealed on hover, matching the remove button — a quiet
    surface is the point of the recessed look. */
 .grip {
+  display: inline-flex;
+  align-items: center;
   cursor: grab;
   color: var(--text-muted);
-  font-size: 1rem;
-  line-height: 1;
+  font-size: 1.05rem;
   padding-right: 2px;
   user-select: none;
   touch-action: none;
@@ -84,6 +103,13 @@
   opacity: 1;
   color: var(--accent);
 }
+/* The grip is keyboard-reachable, so its focus ring must be visible even though
+   the control itself is hidden until hover. */
+.grip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 /* Dashboard sets pointer-events:none on the lifted card, so :hover drops out
    mid-drag — keep the grip lit until the drop. */
 .container.isDragging .grip {
@@ -94,23 +120,36 @@
   cursor: grabbing;
 }
 
-/* ---------- Remove button ---------- */
+/* ---------- Resize and remove buttons ----------
+   Both stay out of the way until the panel is hovered, matching the grip. */
+.resize,
 .remove {
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 1.25rem;
-  line-height: 1;
-  padding: 0 2px;
+  font-size: 1.05rem;
+  line-height: 0;
+  padding: 2px;
   opacity: 0;
   transition: opacity 0.15s, color 0.15s;
 }
+.container:hover .resize,
 .container:hover .remove {
   opacity: 0.6;
+}
+.resize:hover,
+.resize:focus-visible {
+  opacity: 1;
+  color: var(--accent);
 }
 .remove:hover {
   opacity: 1;
   color: var(--danger);
+}
+/* Keyboard users need to see these even without hover. */
+.resize:focus-visible,
+.remove:focus-visible {
+  opacity: 1;
 }
 
 @media (max-width: 560px) {
@@ -123,12 +162,14 @@
    and give both controls a larger tap target. */
 @media (hover: none) {
   .grip,
+  .resize,
   .remove {
     opacity: 0.55;
   }
 }
 @media (pointer: coarse) {
   .grip,
+  .resize,
   .remove {
     padding: 8px;
   }

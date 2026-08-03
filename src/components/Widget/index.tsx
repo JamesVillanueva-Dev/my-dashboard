@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import Icon, { type IconName } from '../Icon';
+import { nextSize } from '../../lib/registry';
 import { useWidgetChrome } from './chrome';
 import styles from './styles.module.css';
 
@@ -6,8 +8,8 @@ import styles from './styles.module.css';
 interface WidgetProps {
   /** Heading text shown in the card header. */
   title: string;
-  /** Optional emoji/glyph rendered before the title. */
-  icon?: string;
+  /** Optional icon rendered before the title. */
+  icon?: IconName;
   /** Optional element rendered on the right of the header (buttons, status, etc.) */
   action?: ReactNode;
   /**
@@ -34,7 +36,12 @@ interface WidgetProps {
  */
 export default function Widget({ title, icon, action, className, children }: WidgetProps) {
   const chrome = useWidgetChrome();
-  const classes = [styles.container, className, chrome?.isDragging && styles.isDragging]
+  const classes = [
+    styles.container,
+    className,
+    chrome?.size === 'compact' && styles.isCompact,
+    chrome?.isDragging && styles.isDragging,
+  ]
     .filter(Boolean)
     .join(' ');
 
@@ -46,29 +53,41 @@ export default function Widget({ title, icon, action, className, children }: Wid
             <span
               className={styles.grip}
               onPointerDown={(e) => chrome.onGrab(e, chrome.id)}
-              title="Drag to reorder"
-              aria-label={`Drag to reorder ${title}`}
+              onKeyDown={(e) => chrome.onGripKeyDown(e, chrome.id)}
+              title="Drag, or use the arrow keys, to reorder"
+              aria-label={`Reorder ${title}. Use the arrow keys to move it.`}
               role="button"
+              tabIndex={0}
             >
-              ⠿
+              <Icon name="grip" />
             </span>
           )}
           <h2>
-            {icon && <span aria-hidden="true">{icon}</span>}
+            {icon && <Icon name={icon} />}
             {title}
           </h2>
         </div>
         <div>
           {action}
           {chrome && (
-            <button
-              className={styles.remove}
-              onClick={chrome.onRemove}
-              title={`Remove ${title}`}
-              aria-label={`Remove ${title} widget`}
-            >
-              ×
-            </button>
+            <>
+              <button
+                className={styles.resize}
+                onClick={chrome.onResize}
+                title={`Width: ${chrome.size}. Click to make it ${nextSize(chrome.size)}.`}
+                aria-label={`Resize ${title}. Currently ${chrome.size}.`}
+              >
+                <Icon name="resize" />
+              </button>
+              <button
+                className={styles.remove}
+                onClick={chrome.onRemove}
+                title={`Remove ${title}`}
+                aria-label={`Remove ${title} widget`}
+              >
+                <Icon name="close" />
+              </button>
+            </>
           )}
         </div>
       </header>

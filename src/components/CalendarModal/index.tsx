@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { createPortal } from 'react-dom';
+import Icon from '../Icon';
 import { useMonthEvents } from '../../hooks/useMonthEvents';
 import { useEventEditor } from '../../hooks/useEventEditor';
 import EventForm from '../EventForm';
@@ -249,7 +250,7 @@ export default function CalendarModal({ now, onClose }: CalendarModalProps) {
               aria-label="Previous month"
               title="Previous month"
             >
-              ‹
+              <Icon name="chevronLeft" />
             </button>
             <button className={styles.today} onClick={goToday}>
               Today
@@ -260,7 +261,7 @@ export default function CalendarModal({ now, onClose }: CalendarModalProps) {
               aria-label="Next month"
               title="Next month"
             >
-              ›
+              <Icon name="chevronRight" />
             </button>
             <button
               className={styles.step}
@@ -269,7 +270,7 @@ export default function CalendarModal({ now, onClose }: CalendarModalProps) {
               aria-label="Refresh"
               title="Refresh"
             >
-              ⟳
+              <Icon name="refresh" />
             </button>
             {cal.loading && (
               <span className={styles.loading} role="status">
@@ -278,7 +279,7 @@ export default function CalendarModal({ now, onClose }: CalendarModalProps) {
             )}
           </div>
           <button className={styles.close} onClick={onClose} aria-label="Close calendar">
-            ×
+            <Icon name="close" />
           </button>
         </header>
 

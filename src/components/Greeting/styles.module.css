@@ -1,0 +1,46 @@
+.container {
+  margin-bottom: 22px;
+}
+
+.container h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* The date line. */
+.container p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* Inline-editable name: a button until clicked, then a text input. */
+.container h1 button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  border-bottom: 2px dashed transparent;
+}
+.container h1 button:hover {
+  border-bottom-color: var(--accent);
+}
+.container h1 input {
+  font: inherit;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: none;
+  border-radius: 6px;
+  padding: 0 6px;
+  max-width: 12ch;
+  width: auto;
+}
+
+@media (max-width: 560px) {
+  .container {
+    margin-bottom: 16px;
+  }
+}

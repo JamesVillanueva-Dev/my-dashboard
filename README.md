@@ -1,10 +1,15 @@
 # Dashboard
 
-A personal start-page dashboard: weather, news, reminders (with optional Google
-Calendar sync), to-dos, notes, quick links, a daily focus, and an embedded
-Spotify player. Everything runs client-side — there is no backend, and your data
-stays in your browser's `localStorage`. Sign-in (via Clerk) and Google Calendar
-sync are both optional and off until you configure them.
+A personal dashboard for running your day. It leads with a **Today** zone — what
+is happening next, your one focus for the day, and a single timeline merging
+calendar events with your dated tasks — above a grid of panels: tasks (with
+optional Google Calendar sync), calendar, weather, news, notes, quick links, and
+an embedded Spotify player. Everything runs client-side — there is no backend,
+and your data stays in your browser's `localStorage`. Sign-in (via Clerk) and
+Google Calendar sync are both optional and off until you configure them.
+
+Panels can be reordered by dragging their handle or, from the keyboard, by
+focusing a handle and pressing the arrow keys.
 
 React + TypeScript + Vite, tested with Vitest and Testing Library.
 

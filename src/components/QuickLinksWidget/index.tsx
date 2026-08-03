@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Widget from '../Widget';
+import Icon from '../Icon';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import styles from './styles.module.css';
 
@@ -67,8 +68,13 @@ export default function QuickLinksWidget() {
       title="Quick Links"
       className={styles.container}
       action={
-        <button className={styles.toggle} onClick={() => setAdding((a) => !a)} title="Add link">
-          {adding ? '×' : '+'}
+        <button
+          className={styles.toggle}
+          onClick={() => setAdding((a) => !a)}
+          title={adding ? 'Cancel' : 'Add link'}
+          aria-label={adding ? 'Cancel adding a link' : 'Add link'}
+        >
+          <Icon name={adding ? 'close' : 'plus'} />
         </button>
       }
     >
@@ -99,8 +105,8 @@ export default function QuickLinksWidget() {
               <img src={favicon(l.url)} alt="" width={28} height={28} />
               <span>{l.label}</span>
             </a>
-            <button onClick={() => remove(l.id)} title="Remove">
-              ×
+            <button onClick={() => remove(l.id)} title="Remove" aria-label={`Remove ${l.label}`}>
+              <Icon name="close" />
             </button>
           </div>
         ))}

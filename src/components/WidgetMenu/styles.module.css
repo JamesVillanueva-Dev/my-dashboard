@@ -2,9 +2,12 @@
   position: relative;
 }
 
-/* The "⚙️ Widgets" trigger. */
+/* The "Widgets" trigger. */
 .button {
   composes: pill from '../../styles/controls.module.css';
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.85rem;
 }
 
@@ -23,13 +26,34 @@
   padding: 12px;
 }
 
-/* "Show widgets" heading. */
+/* Section headings ("Today", "Show widgets"). */
 .container > div > p {
   margin: 0 0 8px;
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted);
+}
+/* Sections after the first need air above them. */
+.container > div > ul + p {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border);
+}
+
+/* Hint about the per-panel resize control. `composes` only works on a lone class
+   selector, so the shared primitives come in here... */
+.note {
+  composes: muted small from '../../styles/controls.module.css';
+}
+/* ...and the overrides go on a class-heavy selector, which has to outrank the
+   uppercase section-heading rule above — that one matches this element too. */
+.container .note {
+  margin: 0 0 10px;
+  padding-top: 0;
+  border-top: none;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .container > div > ul {
@@ -51,6 +75,11 @@
 }
 .container > div > ul label:hover {
   background: var(--bg);
+}
+/* The per-widget icon, matching the accent treatment in the panel headers. */
+.container > div > ul label svg {
+  font-size: 1.05rem;
+  color: var(--accent);
 }
 
 .reset {

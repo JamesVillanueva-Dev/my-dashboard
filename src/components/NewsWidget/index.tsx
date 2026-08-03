@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Widget from '../Widget';
+import Icon from '../Icon';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import styles from './styles.module.css';
 
@@ -96,8 +97,8 @@ export default function NewsWidget() {
       title="News"
       className={styles.container}
       action={
-        <button className={styles.refresh} onClick={load} title="Refresh">
-          ↻
+        <button className={styles.refresh} onClick={load} title="Refresh" aria-label="Refresh">
+          <Icon name="refresh" />
         </button>
       }
     >

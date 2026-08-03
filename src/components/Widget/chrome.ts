@@ -1,4 +1,5 @@
-import { createContext, useContext, type PointerEvent } from 'react';
+import { createContext, useContext, type KeyboardEvent, type PointerEvent } from 'react';
+import type { WidgetSize } from '../../lib/registry';
 
 /**
  * Chrome (management controls) injected around each widget by the dashboard grid.
@@ -8,10 +9,19 @@ import { createContext, useContext, type PointerEvent } from 'react';
 export interface WidgetChrome {
   /** Stable id of the widget instance, used for reordering and removal. */
   id: string;
+  /** Current width of this panel, which also drives its density. */
+  size: WidgetSize;
+  /** Cycles the panel to the next width. */
+  onResize: () => void;
   /** Removes (disables) this widget from the dashboard. */
   onRemove: () => void;
   /** Begins a pointer-based drag from this widget's handle. */
   onGrab: (e: PointerEvent, id: string) => void;
+  /**
+   * Arrow-key reordering from the handle — the keyboard equivalent of a drag.
+   * Without it the layout could only be rearranged with a pointer.
+   */
+  onGripKeyDown: (e: KeyboardEvent, id: string) => void;
   /** Whether this widget is the one currently being dragged. */
   isDragging: boolean;
 }

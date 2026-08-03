@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Widget from '../Widget';
+import Icon from '../Icon';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import styles from './styles.module.css';
 
@@ -109,9 +110,10 @@ export default function SpotifyWidget() {
             setAdding((a) => !a);
             setError('');
           }}
-          title="Add a playlist, album, or track"
+          title={adding ? 'Cancel' : 'Add a playlist, album, or track'}
+          aria-label={adding ? 'Cancel adding a source' : 'Add a playlist, album, or track'}
         >
-          {adding ? '×' : '+'}
+          <Icon name={adding ? 'close' : 'plus'} />
         </button>
       }
     >
@@ -154,7 +156,7 @@ export default function SpotifyWidget() {
                 title={`Remove ${s.label}`}
                 aria-label={`Remove ${s.label}`}
               >
-                ×
+                <Icon name="close" />
               </button>
             </span>
           ))}

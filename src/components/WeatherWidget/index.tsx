@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Widget from '../Widget';
+import Icon, { type IconName } from '../Icon';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import styles from './styles.module.css';
 
@@ -20,44 +21,44 @@ interface Weather {
   daily: { date: string; code: number; max: number; min: number }[];
 }
 
-// WMO weather codes -> emoji + label. https://open-meteo.com/en/docs
-const WMO: Record<number, [string, string]> = {
-  0: ['☀️', 'Clear sky'],
-  1: ['🌤️', 'Mainly clear'],
-  2: ['⛅', 'Partly cloudy'],
-  3: ['☁️', 'Overcast'],
-  45: ['🌫️', 'Fog'],
-  48: ['🌫️', 'Rime fog'],
-  51: ['🌦️', 'Light drizzle'],
-  53: ['🌦️', 'Drizzle'],
-  55: ['🌧️', 'Dense drizzle'],
-  61: ['🌦️', 'Light rain'],
-  63: ['🌧️', 'Rain'],
-  65: ['🌧️', 'Heavy rain'],
-  66: ['🌧️', 'Freezing rain'],
-  67: ['🌧️', 'Freezing rain'],
-  71: ['🌨️', 'Light snow'],
-  73: ['🌨️', 'Snow'],
-  75: ['❄️', 'Heavy snow'],
-  77: ['🌨️', 'Snow grains'],
-  80: ['🌦️', 'Rain showers'],
-  81: ['🌧️', 'Rain showers'],
-  82: ['⛈️', 'Violent showers'],
-  85: ['🌨️', 'Snow showers'],
-  86: ['❄️', 'Snow showers'],
-  95: ['⛈️', 'Thunderstorm'],
-  96: ['⛈️', 'Thunderstorm + hail'],
-  99: ['⛈️', 'Thunderstorm + hail'],
+// WMO weather codes -> icon + label. https://open-meteo.com/en/docs
+const WMO: Record<number, [IconName, string]> = {
+  0: ['sun', 'Clear sky'],
+  1: ['cloudSun', 'Mainly clear'],
+  2: ['cloudSun', 'Partly cloudy'],
+  3: ['cloud', 'Overcast'],
+  45: ['cloudFog', 'Fog'],
+  48: ['cloudFog', 'Rime fog'],
+  51: ['cloudDrizzle', 'Light drizzle'],
+  53: ['cloudDrizzle', 'Drizzle'],
+  55: ['cloudRain', 'Dense drizzle'],
+  61: ['cloudDrizzle', 'Light rain'],
+  63: ['cloudRain', 'Rain'],
+  65: ['cloudRain', 'Heavy rain'],
+  66: ['cloudRain', 'Freezing rain'],
+  67: ['cloudRain', 'Freezing rain'],
+  71: ['cloudSnow', 'Light snow'],
+  73: ['cloudSnow', 'Snow'],
+  75: ['cloudSnow', 'Heavy snow'],
+  77: ['cloudSnow', 'Snow grains'],
+  80: ['cloudDrizzle', 'Rain showers'],
+  81: ['cloudRain', 'Rain showers'],
+  82: ['cloudLightning', 'Violent showers'],
+  85: ['cloudSnow', 'Snow showers'],
+  86: ['cloudSnow', 'Snow showers'],
+  95: ['cloudLightning', 'Thunderstorm'],
+  96: ['cloudLightning', 'Thunderstorm + hail'],
+  99: ['cloudLightning', 'Thunderstorm + hail'],
 };
 
 /**
- * Resolves a WMO weather code to its `[emoji, label]` pair.
+ * Resolves a WMO weather code to its `[icon, label]` pair.
  *
  * @param code - WMO weather interpretation code from the Open-Meteo API.
- * @returns A tuple of emoji and human-readable label; falls back to a generic
+ * @returns A tuple of icon name and human-readable label; falls back to a generic
  *   thermometer + "Unknown" for unrecognised codes.
  */
-const desc = (code: number) => WMO[code] ?? ['🌡️', 'Unknown'];
+const desc = (code: number): [IconName, string] => WMO[code] ?? ['thermometer', 'Unknown'];
 
 const DEFAULT_PLACE: Place = {
   name: 'San Diego',
@@ -192,8 +193,13 @@ export default function WeatherWidget() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <button className={styles.locate} onClick={useMyLocation} title="Use my location">
-          📍
+        <button
+          className={styles.locate}
+          onClick={useMyLocation}
+          title="Use my location"
+          aria-label="Use my location"
+        >
+          <Icon name="pin" />
         </button>
       </div>
       {results.length > 0 && (
@@ -219,7 +225,7 @@ export default function WeatherWidget() {
       {status === 'ready' && weather && (
         <>
           <div className={styles.now}>
-            <span>{desc(weather.code)[0]}</span>
+            <Icon name={desc(weather.code)[0]} label={desc(weather.code)[1]} />
             <div>
               <div className={styles.temp}>
                 {weather.temp}
@@ -232,8 +238,12 @@ export default function WeatherWidget() {
           <div className={styles.meta}>
             <span>Feels {weather.feelsLike}{unitSymbol}</span>
             <span>H {weather.todayMax}° / L {weather.todayMin}°</span>
-            <span>💧 {weather.humidity}%</span>
-            <span>💨 {weather.wind} mph</span>
+            <span>
+              <Icon name="droplet" /> {weather.humidity}%
+            </span>
+            <span>
+              <Icon name="wind" /> {weather.wind} mph
+            </span>
           </div>
           <ul className={styles.forecast}>
             {weather.daily.slice(1).map((d) => (
@@ -241,7 +251,7 @@ export default function WeatherWidget() {
                 <span>
                   {new Date(d.date + 'T00:00').toLocaleDateString(undefined, { weekday: 'short' })}
                 </span>
-                <span>{desc(d.code)[0]}</span>
+                <Icon name={desc(d.code)[0]} label={desc(d.code)[1]} />
                 <span>
                   {d.max}° <span>{d.min}°</span>
                 </span>

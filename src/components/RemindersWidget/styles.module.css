@@ -1,13 +1,17 @@
-/* ---------- Google Calendar controls (widget header) ---------- */
-.cal {
+/* ---------- Header actions ----------
+   Deliberately only a count and one icon button. The connection status and the
+   Disconnect link used to sit here too and overlapped the panel title once the
+   column got narrow; they now live in `.sync` at the foot of the panel. */
+.headerActions {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
-/* "📅 Synced" / "Syncing…" status text. */
-.status {
+.count {
   composes: muted small from '../../styles/controls.module.css';
+  white-space: nowrap;
 }
 
 /* Both the "Connect Calendar" and "sync now" buttons. */
@@ -19,7 +23,27 @@
   composes: link small from '../../styles/controls.module.css';
 }
 
-/* ---------- Add-a-reminder row ---------- */
+/* ---------- Google Calendar connection row (panel footer) ---------- */
+.sync {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--card-border);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.sync svg {
+  color: var(--accent);
+  flex: none;
+}
+.sync > span {
+  min-width: 0;
+}
+
+/* ---------- Add-a-task row ---------- */
 .form {
   display: flex;
   gap: 8px;
@@ -80,10 +104,12 @@
   color: var(--text-muted);
 }
 
-/* 📅 marker on reminders that are mirrored as calendar events. */
+/* Marker on tasks that are mirrored as calendar events. */
 .badge {
+  display: inline-flex;
   font-size: 0.85rem;
   line-height: 1;
+  color: var(--text-muted);
   opacity: 0.8;
 }
 

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import Widget from '../Widget';
+import Icon from '../Icon';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import styles from './styles.module.css';
 
 /**
  * Free-form scratchpad whose contents autosave to localStorage on every
- * keystroke. A brief "saved ✓" indicator appears once typing settles. Intended
+ * keystroke. A brief "saved" indicator appears once typing settles. Intended
  * as a placeholder until Google Docs sync is added.
  */
 export default function NotesWidget() {
@@ -28,7 +29,17 @@ export default function NotesWidget() {
     <Widget
       title="Notes"
       className={styles.container}
-      action={<span className={styles.status}>{saved && notes ? 'saved ✓' : ''}</span>}
+      action={
+        <span className={styles.status}>
+          {saved && notes ? (
+            <>
+              <Icon name="check" /> saved
+            </>
+          ) : (
+            ''
+          )}
+        </span>
+      }
     >
       <textarea
         value={notes}
