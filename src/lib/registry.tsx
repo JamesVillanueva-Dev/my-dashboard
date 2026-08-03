@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import FocusWidget from '../components/FocusWidget';
 import WeatherWidget from '../components/WeatherWidget';
+import CalendarWidget from '../components/CalendarWidget';
 import RemindersWidget from '../components/RemindersWidget';
 import TodoWidget from '../components/TodoWidget';
 import NewsWidget from '../components/NewsWidget';
@@ -28,6 +29,7 @@ export interface WidgetDef {
 export const WIDGETS: WidgetDef[] = [
   { id: 'focus', title: 'Focus of the Day', icon: '🎯', render: () => <FocusWidget /> },
   { id: 'weather', title: 'Weather', icon: '🌦️', render: () => <WeatherWidget /> },
+  { id: 'calendar', title: 'Calendar', icon: '📅', render: () => <CalendarWidget /> },
   { id: 'reminders', title: 'Reminders', icon: '⏰', render: () => <RemindersWidget /> },
   { id: 'todo', title: 'To-do', icon: '✅', render: () => <TodoWidget /> },
   { id: 'news', title: 'News', icon: '📰', render: () => <NewsWidget /> },
