@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Served from https://<user>.github.io/my-dashboard/, so assets need the repo
+  // name as a prefix. Overridable for a different host (e.g. `BASE_PATH=/` for a
+  // custom domain).
+  base: process.env.BASE_PATH ?? '/my-dashboard/',
   plugins: [react()],
   // Vitest augments Vite's config with `test`. The rolldown-vite (Vite 8) and
   // Vitest-bundled Vite type definitions differ, so we assert this property
