@@ -1,7 +1,11 @@
+/* Wide by design: this is a dashboard, so panels should fill the display rather
+   than sit in a reading-width column. The cap only stops things sprawling on
+   ultrawide monitors — raise or drop it if you want the full width. Side padding
+   grows with the viewport so the grid never runs into the screen edge. */
 .container {
-  max-width: 1240px;
+  max-width: 1800px;
   margin: 0 auto;
-  padding: 28px 20px 40px;
+  padding: 28px clamp(20px, 2.5vw, 48px) 40px;
 }
 
 /* Set while a card is being dragged, to suppress text selection everywhere. */

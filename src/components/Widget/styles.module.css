@@ -1,18 +1,25 @@
+/* Panels are recessed, not raised: --well sits below the page surface and
+   --well-shadow supplies the inner shadow that reads as a cut. The border is
+   the lip of that cut. Nothing here lifts — the only raised state is a drag. */
 .container {
-  background: var(--card);
+  background: var(--well);
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--well-shadow);
   padding: 18px;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  transition: background 0.18s, box-shadow 0.18s, border-color 0.18s;
 }
 
-/* Lifted look while the card is being dragged around the grid. */
+/* A dragged panel is the one thing that leaves the surface: it swaps to the
+   raised --card treatment so it visibly pops out of its slot and back in. */
 .container.isDragging {
+  background: var(--card);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28), 0 4px 10px rgba(0, 0, 0, 0.18);
   border-color: var(--accent);
+  transition: none;
 }
 
 /* ---------- Header ---------- */
@@ -56,6 +63,8 @@
 }
 
 /* ---------- Drag handle ---------- */
+/* Hidden at rest and revealed on hover, matching the remove button — a quiet
+   surface is the point of the recessed look. */
 .grip {
   cursor: grab;
   color: var(--text-muted);
@@ -64,10 +73,20 @@
   padding-right: 2px;
   user-select: none;
   touch-action: none;
-  opacity: 0.5;
+  opacity: 0;
   transition: opacity 0.15s, color 0.15s;
 }
-.grip:hover {
+.container:hover .grip {
+  opacity: 0.6;
+}
+.grip:hover,
+.grip:focus-visible {
+  opacity: 1;
+  color: var(--accent);
+}
+/* Dashboard sets pointer-events:none on the lifted card, so :hover drops out
+   mid-drag — keep the grip lit until the drop. */
+.container.isDragging .grip {
   opacity: 1;
   color: var(--accent);
 }
@@ -103,6 +122,7 @@
 /* Touch devices have no :hover to reveal the remove button, so show it faintly
    and give both controls a larger tap target. */
 @media (hover: none) {
+  .grip,
   .remove {
     opacity: 0.55;
   }
