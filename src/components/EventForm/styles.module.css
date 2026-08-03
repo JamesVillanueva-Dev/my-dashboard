@@ -1,0 +1,132 @@
+/* event-form
+   `.container` is the root — the <form> itself. Labels and inputs alternate, so
+   they are styled by element rather than by className. */
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.container h3 {
+  margin: 0 0 10px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.container label {
+  margin-top: 8px;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+/* `src/styles.css` styles text inputs and textareas globally; date, time and
+   select need matching treatment here. */
+.container input[type='date'],
+.container input[type='time'],
+.container select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--card-border);
+  border-radius: 9px;
+  padding: 7px 9px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+.container select:focus,
+.container input[type='date']:focus,
+.container input[type='time']:focus {
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.container textarea {
+  resize: vertical;
+}
+
+/* Date and its time sit side by side, and wrap when there is no room. */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.row input[type='date'] {
+  flex: 1 1 130px;
+}
+.row input[type='time'] {
+  flex: 1 1 92px;
+}
+
+/* The "All day" checkbox reads as one control, so its label wraps the input. */
+.check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: var(--text);
+  cursor: pointer;
+}
+.check input {
+  width: auto;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Recurring-occurrence caveat. */
+.note {
+  composes: muted small from '../../styles/controls.module.css';
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.error {
+  margin: 12px 0 0;
+  color: var(--danger);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+/* ---------- Actions ---------- */
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* "Delete this event?" — pushes the buttons to the right. */
+.prompt {
+  composes: small from '../../styles/controls.module.css';
+  margin-right: auto;
+  color: var(--text);
+}
+
+.save {
+  composes: btn from '../../styles/controls.module.css';
+}
+
+.text {
+  composes: link small from '../../styles/controls.module.css';
+}
+
+.danger {
+  composes: btn from '../../styles/controls.module.css';
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.container button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

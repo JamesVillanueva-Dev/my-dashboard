@@ -166,6 +166,50 @@ describe('CalendarWidget', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
+  it('offers the month view only once connected', async () => {
+    stubCalendar([]);
+    const user = userEvent.setup();
+    render(<CalendarWidget />);
+
+    expect(screen.queryByRole('button', { name: 'Open full calendar' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Connect Google' }));
+    expect(await screen.findByRole('button', { name: 'Open full calendar' })).toBeInTheDocument();
+  });
+
+  it('fetches a month only once the month view is opened', async () => {
+    stubCalendar([]);
+    const user = userEvent.setup();
+    render(<CalendarWidget />);
+    await user.click(screen.getByRole('button', { name: 'Connect Google' }));
+    await screen.findByText(/Nothing scheduled/);
+
+    const spy = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const beforeOpen = spy.mock.calls.length;
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Open full calendar' }));
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(spy.mock.calls.length).toBeGreaterThan(beforeOpen);
+  });
+
+  it('returns focus to the trigger when the month view closes', async () => {
+    stubCalendar([]);
+    const user = userEvent.setup();
+    render(<CalendarWidget />);
+    await user.click(screen.getByRole('button', { name: 'Connect Google' }));
+
+    const trigger = await screen.findByRole('button', { name: 'Open full calendar' });
+    await user.click(trigger);
+    await screen.findByRole('dialog');
+
+    await user.click(screen.getByRole('button', { name: 'Close calendar' }));
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
   it('requests interactively only when the user clicks connect', async () => {
     stubCalendar([]);
     const user = userEvent.setup();

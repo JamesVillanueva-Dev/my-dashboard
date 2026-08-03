@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import Widget from '../Widget';
+import CalendarModal from '../CalendarModal';
 import { useUpcomingEvents } from '../../hooks/useUpcomingEvents';
 import { groupByDay, WINDOW_DAYS, type CalendarEvent } from '../../lib/gcalEvents';
 import styles from './styles.module.css';
@@ -26,10 +28,15 @@ function timeLabel(ev: CalendarEvent, now: number): string {
  * dedicated app-created calendar, while this reads across every calendar the
  * user has selected in Google Calendar and never writes. Events the user has
  * declined are filtered out; in-progress events are marked "Now".
+ *
+ * The header's expand button opens {@link CalendarModal}, a full month grid over
+ * the dashboard. That view fetches its own months on the token this widget
+ * already holds, which is why it is only offered once connected.
  */
 export default function CalendarWidget() {
   const cal = useUpcomingEvents();
   const days = groupByDay(cal.events, cal.now);
+  const [monthOpen, setMonthOpen] = useState(false);
 
   return (
     <Widget
@@ -39,6 +46,14 @@ export default function CalendarWidget() {
         cal.configured ? (
           cal.connected ? (
             <span className={styles.controls}>
+              <button
+                className={styles.iconBtn}
+                onClick={() => setMonthOpen(true)}
+                title="Open full calendar"
+                aria-label="Open full calendar"
+              >
+                ⤢
+              </button>
               <button
                 className={styles.iconBtn}
                 onClick={cal.refresh}
@@ -116,6 +131,12 @@ export default function CalendarWidget() {
             </section>
           ))}
         </div>
+      )}
+
+      {/* Also gated on `connected`, so disconnecting while the month view is
+          open closes it rather than leaving a dialog with no data behind it. */}
+      {monthOpen && cal.connected && (
+        <CalendarModal now={cal.now} onClose={() => setMonthOpen(false)} />
       )}
     </Widget>
   );

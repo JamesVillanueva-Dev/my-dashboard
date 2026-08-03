@@ -1,0 +1,398 @@
+/* calendar-modal
+   `.container` is the backdrop and the root; its only child is the dialog. */
+.container {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 60;
+  animation: fade 0.15s ease;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The dialog itself. */
+.container > div {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 1080px;
+  max-height: 90vh;
+  overflow: hidden;
+}
+.container > div:focus {
+  outline: none;
+}
+
+/* ---------- Header ---------- */
+.container header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.container h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 650;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* Pushes the close button to the far edge. */
+  margin-right: auto;
+}
+
+.step,
+.today {
+  composes: pill from '../../styles/controls.module.css';
+}
+.step {
+  min-width: 30px;
+  padding: 5px 9px;
+}
+.step:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.loading {
+  composes: muted small from '../../styles/controls.module.css';
+  margin-left: 4px;
+}
+
+.close {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.close:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* ---------- Error banner ---------- */
+.error {
+  composes: muted small from '../../styles/controls.module.css';
+  margin: 0;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.retry {
+  composes: link small from '../../styles/controls.module.css';
+}
+
+/* ---------- Body: grid beside the day detail ---------- */
+.body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+/* ---------- Month grid ---------- */
+.grid {
+  flex: 1;
+  min-width: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.grid th {
+  padding: 8px 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--card-border);
+}
+
+.grid td {
+  padding: 0;
+  width: calc(100% / 7);
+  vertical-align: top;
+  border: 1px solid var(--card-border);
+  border-width: 0 1px 1px 0;
+}
+.grid td:last-child {
+  border-right-width: 0;
+}
+
+/* Each cell is one button, so a day is selectable by click or keyboard. */
+.day {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  width: 100%;
+  min-height: 92px;
+  padding: 5px 5px 6px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  color: inherit;
+  text-align: left;
+  font-size: 0.78rem;
+}
+.day:hover {
+  background: var(--bg);
+}
+.day:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.num {
+  align-self: flex-start;
+  min-width: 21px;
+  padding: 2px 0;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Days borrowed from the neighbouring months stay legible but recede. */
+.day.isOutsideMonth {
+  opacity: 0.42;
+}
+
+/* Days already gone: dimmed a little, but not as far as another month. */
+.day.isPast .num {
+  color: var(--text-muted);
+}
+
+.day.isToday .num {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+.day.isSelected {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* ---------- Event chips ---------- */
+.chip {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  border-left: 3px solid var(--event-color, var(--accent));
+  background: var(--bg);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The chip's leading time. */
+.chip b {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* All-day events read as a solid bar rather than a ruled line. */
+.chip.isAllDay {
+  background: var(--event-color, var(--accent));
+  border-left-color: transparent;
+  color: #fff;
+}
+
+.more {
+  composes: muted from '../../styles/controls.module.css';
+  padding-left: 4px;
+  font-size: 0.7rem;
+}
+
+/* ---------- Day detail panel ---------- */
+.detail {
+  flex: 0 0 282px;
+  min-width: 0;
+  padding: 14px 16px 18px;
+  border-left: 1px solid var(--card-border);
+  overflow-y: auto;
+}
+
+/* Wider while a form is open — the day list needs far less room than the form. */
+.detail.isEditing {
+  flex-basis: 340px;
+}
+
+.detailHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.detail h3 {
+  margin: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.add {
+  composes: pill from '../../styles/controls.module.css';
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  font-size: 0.76rem;
+}
+
+.detail ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Time and title stack in the first column; Edit sits beside them. */
+.detail li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  column-gap: 8px;
+  row-gap: 2px;
+  padding-left: 10px;
+  border-left: 3px solid var(--event-color, var(--accent));
+}
+
+.edit {
+  composes: link small from '../../styles/controls.module.css';
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  font-size: 0.74rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.detail li:hover .edit,
+.edit:focus-visible {
+  opacity: 1;
+}
+
+/* No hover to reveal it on touch, so keep it visible there. */
+@media (hover: none) {
+  .edit {
+    opacity: 0.75;
+  }
+}
+
+.when {
+  grid-column: 1;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.what {
+  grid-column: 1;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+.what a {
+  color: inherit;
+  text-decoration: none;
+}
+.what a:hover {
+  text-decoration: underline;
+}
+
+/* Location. */
+.what em {
+  display: block;
+  font-style: normal;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+/* Source calendar. */
+.what small {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.empty {
+  composes: muted small from '../../styles/controls.module.css';
+  margin: 0;
+}
+
+/* ---------- Narrow screens: detail stacks under the grid ---------- */
+@media (max-width: 860px) {
+  .container {
+    padding: 10px;
+  }
+  .body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .detail {
+    flex: 0 0 auto;
+    border-left: none;
+    border-top: 1px solid var(--card-border);
+    overflow-y: visible;
+  }
+  .day {
+    min-height: 66px;
+  }
+  /* Chip text does not survive a seventh of a phone screen. Collapse each chip
+     to a coloured bar — the day still reads as busy or free at a glance, and
+     the detail panel carries the actual titles. */
+  .chip {
+    height: 4px;
+    padding: 0;
+    border-left: none;
+    border-radius: 2px;
+    background: var(--event-color, var(--accent));
+    font-size: 0;
+  }
+  .chip b,
+  .more {
+    display: none;
+  }
+  .day .num {
+    align-self: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .container {
+    animation: none;
+  }
+}

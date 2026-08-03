@@ -17,8 +17,14 @@ const API = 'https://www.googleapis.com/calendar/v3';
 
 /** How far ahead the agenda looks. */
 export const WINDOW_DAYS = 7;
-/** Cap per calendar, so a busy account cannot blow up the request. */
-const MAX_PER_CALENDAR = 50;
+/** Events requested per round trip. Google's own default; the max is 2500. */
+const PAGE_SIZE = 250;
+/**
+ * Pages followed per calendar before giving up. A month across several busy
+ * calendars needs more than one page, but an account with thousands of events in
+ * the window should degrade to "most of them" rather than hammering the API.
+ */
+const MAX_PAGES = 5;
 
 /** One upcoming event, flattened to what the widget renders. */
 export interface CalendarEvent {
@@ -35,8 +41,46 @@ export interface CalendarEvent {
   /** True for date-only events, which sort above timed ones. */
   allDay: boolean;
   location?: string;
+  description?: string;
   /** Link to the event in Google Calendar. */
   htmlLink?: string;
+  /** Name of the calendar it came from, for the month view's tooltips. */
+  calendarTitle?: string;
+  /** The calendar's colour (`#rrggbb`), so chips read as colour-coded. */
+  calendarColor?: string;
+  /** The source calendar grants write access — gates the edit UI. */
+  canWrite?: boolean;
+  /**
+   * Set when this is one occurrence of a recurring event. Because everything is
+   * read with `singleEvents=true`, editing or deleting it affects that
+   * occurrence alone, which the form says out loud.
+   */
+  recurringEventId?: string;
+}
+
+/** The bits of a calendar list entry an event carries with it. */
+export interface CalendarMeta {
+  title?: string;
+  color?: string;
+  canWrite?: boolean;
+}
+
+/** A calendar the user can file an event under. */
+export interface CalendarOption {
+  id: string;
+  title: string;
+  color?: string;
+  /** The user's main calendar — the default target for a new event. */
+  primary: boolean;
+  /** `accessRole` is owner or writer. */
+  canWrite: boolean;
+}
+
+/** What {@link fetchRange} returns: the events, and where they can be filed. */
+export interface RangeResult {
+  events: CalendarEvent[];
+  /** Every calendar in the list, selected or not, for the event form's picker. */
+  calendars: CalendarOption[];
 }
 
 /** A day's worth of events, as rendered by the agenda. */
@@ -53,6 +97,8 @@ interface RawCalendar {
   summary?: string;
   selected?: boolean;
   primary?: boolean;
+  backgroundColor?: string;
+  accessRole?: string;
 }
 
 interface RawEvent {
@@ -60,10 +106,17 @@ interface RawEvent {
   status?: string;
   summary?: string;
   location?: string;
+  description?: string;
   htmlLink?: string;
+  recurringEventId?: string;
   start?: { dateTime?: string; date?: string };
   end?: { dateTime?: string; date?: string };
   attendees?: { self?: boolean; responseStatus?: string }[];
+}
+
+/** Access roles that allow creating and editing events. */
+function canWrite(cal: RawCalendar): boolean {
+  return cal.accessRole === 'owner' || cal.accessRole === 'writer';
 }
 
 async function api<T>(token: string, path: string): Promise<T> {
@@ -83,13 +136,13 @@ async function api<T>(token: string, path: string): Promise<T> {
  * anyone west of Greenwich — the exact bug that makes all-day events show up
  * under the wrong heading.
  */
-function localMidnight(date: string): number {
+export function localMidnight(date: string): number {
   const [y, m, d] = date.split('-').map(Number);
   return new Date(y, m - 1, d).getTime();
 }
 
 /** `YYYY-MM-DD` for a local timestamp, used to bucket events into days. */
-function dayKey(ms: number): string {
+export function dayKey(ms: number): string {
   const d = new Date(ms);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -99,8 +152,15 @@ function dayKey(ms: number): string {
  * Converts a Google event to a {@link CalendarEvent}, or `null` when it should
  * not appear: cancelled events, events the user has declined, and anything
  * without an id or start (which the API can return for malformed recurrences).
+ *
+ * @param calendar - Name and colour of the source calendar, carried onto the
+ *   event so the month grid can colour-code chips without a second lookup.
  */
-export function toEvent(raw: RawEvent, calendarId: string): CalendarEvent | null {
+export function toEvent(
+  raw: RawEvent,
+  calendarId: string,
+  calendar?: CalendarMeta,
+): CalendarEvent | null {
   if (!raw.id || raw.status === 'cancelled') return null;
   const self = raw.attendees?.find((a) => a.self);
   if (self?.responseStatus === 'declined') return null;
@@ -129,7 +189,12 @@ export function toEvent(raw: RawEvent, calendarId: string): CalendarEvent | null
     end,
     allDay,
     location: raw.location,
+    description: raw.description,
     htmlLink: raw.htmlLink,
+    recurringEventId: raw.recurringEventId,
+    calendarTitle: calendar?.title,
+    calendarColor: calendar?.color,
+    canWrite: calendar?.canWrite,
   };
 }
 
@@ -182,7 +247,46 @@ export function groupByDay(events: CalendarEvent[], now: number): DayGroup[] {
 }
 
 /**
- * Fetches the next {@link WINDOW_DAYS} days of events across every selected
+ * Reads one calendar's events in a window, following `nextPageToken`.
+ *
+ * A week rarely needs a second page; a month across several calendars regularly
+ * does, and without this the tail of the month would silently go missing.
+ */
+async function fetchCalendar(
+  token: string,
+  cal: RawCalendar,
+  timeMin: string,
+  timeMax: string,
+): Promise<CalendarEvent[]> {
+  const meta: CalendarMeta = {
+    title: cal.summary,
+    color: cal.backgroundColor,
+    canWrite: canWrite(cal),
+  };
+  const events: CalendarEvent[] = [];
+  let pageToken: string | undefined;
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const path =
+      `/calendars/${encodeURIComponent(cal.id)}/events` +
+      `?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}` +
+      `&singleEvents=true&orderBy=startTime&maxResults=${PAGE_SIZE}` +
+      (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '');
+
+    const res = await api<{ items?: RawEvent[]; nextPageToken?: string }>(token, path);
+    for (const raw of res.items ?? []) {
+      const ev = toEvent(raw, cal.id, meta);
+      if (ev) events.push(ev);
+    }
+    if (!res.nextPageToken) break;
+    pageToken = res.nextPageToken;
+  }
+
+  return events;
+}
+
+/**
+ * Fetches every visible event between two instants, across every selected
  * calendar.
  *
  * Calendars are queried in parallel and one failing calendar does not sink the
@@ -191,36 +295,57 @@ export function groupByDay(events: CalendarEvent[], now: number): DayGroup[] {
  *
  * @param interactive - `true` may open the Google consent popup, so it must come
  *   from a user gesture; `false` refreshes silently and rejects if it cannot.
- * @param now - Window start, injected for tests.
- * @returns Every visible event in the window, sorted.
+ * @param timeMin - Window start, epoch ms.
+ * @param timeMax - Window end, epoch ms (exclusive as far as Google is concerned).
+ * @returns The window's events, sorted, plus the full calendar list — the event
+ *   form needs somewhere to file a new event, and this request has already paid
+ *   for that lookup.
  */
-export async function fetchUpcoming(interactive: boolean, now: number): Promise<CalendarEvent[]> {
+export async function fetchRange(
+  interactive: boolean,
+  timeMin: number,
+  timeMax: number,
+): Promise<RangeResult> {
   const token = await getAccessToken(interactive);
 
   const list = await api<{ items?: RawCalendar[] }>(token, '/users/me/calendarList');
+  const all = list.items ?? [];
   // `selected` is what the user has ticked in Google Calendar; treat a calendar
   // with the flag absent as visible, which is how the API reports the primary.
-  const calendars = (list.items ?? []).filter((c) => c.selected !== false);
+  const visible = all.filter((c) => c.selected !== false);
 
-  const timeMin = new Date(now).toISOString();
-  const timeMax = new Date(now + WINDOW_DAYS * 86_400_000).toISOString();
+  const min = new Date(timeMin).toISOString();
+  const max = new Date(timeMax).toISOString();
 
   const results = await Promise.all(
-    calendars.map(async (cal) => {
-      const path =
-        `/calendars/${encodeURIComponent(cal.id)}/events` +
-        `?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}` +
-        `&singleEvents=true&orderBy=startTime&maxResults=${MAX_PER_CALENDAR}`;
+    visible.map(async (cal) => {
       try {
-        const page = await api<{ items?: RawEvent[] }>(token, path);
-        return (page.items ?? [])
-          .map((raw) => toEvent(raw, cal.id))
-          .filter((e): e is CalendarEvent => e !== null);
+        return await fetchCalendar(token, cal, min, max);
       } catch {
         return [];
       }
     }),
   );
 
-  return sortEvents(results.flat());
+  return {
+    events: sortEvents(results.flat()),
+    calendars: all.map((c) => ({
+      id: c.id,
+      title: c.summary ?? c.id,
+      color: c.backgroundColor,
+      primary: !!c.primary,
+      canWrite: canWrite(c),
+    })),
+  };
+}
+
+/**
+ * Fetches the next {@link WINDOW_DAYS} days of events — what the agenda widget
+ * shows.
+ *
+ * @param now - Window start, injected for tests.
+ */
+export async function fetchUpcoming(interactive: boolean, now: number): Promise<CalendarEvent[]> {
+  const { events } = await fetchRange(interactive, now, now + WINDOW_DAYS * 86_400_000);
+  return events;
 }

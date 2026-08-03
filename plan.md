@@ -136,6 +136,48 @@ read-only widget, not an extension of Reminders.
 6. Tests: mock `fetch`, assert grouping/ordering, the unconfigured path renders
    the hint and makes **no** network calls, and error states render.
 
+### Phase 2b — month view (done, pending Phase 0 verification)
+
+The agenda answers "what's next?"; it does not answer "what does my month look
+like?". That is a second surface, opened from the widget's header rather than
+crammed into a dashboard card:
+
+| Piece | File | Notes |
+| --- | --- | --- |
+| Range fetch | [src/lib/gcalEvents.ts](src/lib/gcalEvents.ts) | `fetchRange(interactive, timeMin, timeMax)`; `fetchUpcoming` is now a wrapper over it. Follows `nextPageToken` (capped at 5 pages) — a month across several calendars overruns one page, which would have silently dropped the tail of the month. Events carry `calendarTitle`/`calendarColor`. |
+| Grid maths | [src/lib/calendarGrid.ts](src/lib/calendarGrid.ts) | Pure, clock-free: fixed 6×7 grid, fetch window covering the borrowed days at each end, and day bucketing that repeats multi-day events. |
+| Data driver | [src/hooks/useMonthEvents.ts](src/hooks/useMonthEvents.ts) | Per-month cache, request-sequence guard against out-of-order responses. Read-only and silent — it never starts a consent flow and owns no storage key. |
+| UI | [src/components/CalendarModal/index.tsx](src/components/CalendarModal/index.tsx) | Month grid + day detail panel, portalled over the dashboard. Focus trap, focus restore, roving-tabindex arrow navigation. |
+
+Two things worth remembering, both tested in
+[src/lib/calendarGrid.test.ts](src/lib/calendarGrid.test.ts):
+
+- Google's all-day `end.date` is **exclusive** (3–5 Aug arrives as end `08-06`),
+  and a timed event ending at exactly midnight belongs to the previous day.
+  Backing the end off by 1ms resolves both with one rule.
+- Days are stepped through `Date`'s calendar fields, never by adding
+  86,400,000ms — the latter lands on the wrong day across a DST boundary.
+
+Still open: the month view holds its cache only while the dialog is mounted, and
+`WEEK_STARTS_ON` is a constant rather than a setting.
+
+### Phase 2c — editing (done, pending Phase 0 verification)
+
+The month view now creates, edits and deletes events on the user's **real**
+calendars, per [ADR 0004](docs/adr/0004-calendar-writes-to-user-calendars.md).
+This reverses ADR 0002's containment rule deliberately; read that ADR before
+changing anything here.
+
+| Piece | File | Notes |
+| --- | --- | --- |
+| Writes | [src/lib/gcalWrite.ts](src/lib/gcalWrite.ts) | The only module that mutates real calendars. Pure mapping (`blankDraft`, `draftFromEvent`, `validateDraft`, `toResource`, `needsMove`) plus create/update/delete. Changing an event's calendar moves it first — patching the organiser does nothing. |
+| Flow | [src/hooks/useEventEditor.ts](src/hooks/useEventEditor.ts) | Owns new/edit/delete state. A failed write keeps the form open holding the user's input. |
+| Form | [src/components/EventForm/index.tsx](src/components/EventForm/index.tsx) | Replaces the day detail panel. Delete takes two clicks. |
+
+What keeps this safe, now that the sandbox is gone: writes live in one module,
+happen only from the form's Save/Delete, always name their target calendar, and
+are never offered for calendars the user cannot write to.
+
 ---
 
 ## Phase 3 — Google Tasks ↔ To-do widget
@@ -195,10 +237,12 @@ useful of the four on a start page.
   and reduce the widget buttons to a status badge. Incremental authorisation
   (Phase 1 §2) is what makes this coherent — the user grants Calendar now and
   Tasks later without re-consenting to everything.
-- **Scope tightening.** ADR 0002's own follow-up: move Reminders sync from the
-  full `calendar` scope to `calendar.app.created`, so the app *cannot* read the
-  user's other calendars. Do this after Phase 2 has settled which read scope the
-  viewing widget needs.
+- ~~**Scope tightening.** ADR 0002's own follow-up: move Reminders sync to
+  `calendar.app.created`.~~ **Withdrawn** by
+  [ADR 0004](docs/adr/0004-calendar-writes-to-user-calendars.md) — Phase 2c
+  writes to the user's own calendars, which needs the full `calendar` scope.
+  Reminders sync could still be narrowed on its own, but the app as a whole can
+  no longer claim it cannot reach real calendars.
 - **Failure UX.** One shared pattern for expired token / revoked access /
   offline / quota exceeded, rather than each widget inventing its own string.
   Revoked access should reset `wantConnected` so the app stops retrying silently.
@@ -212,7 +256,9 @@ useful of the four on a start page.
 ## Decisions to make before starting
 
 1. **Is this dashboard ever going public?** If yes, Phase 4 (Gmail) is probably
-   out and `calendar.app.created` becomes mandatory rather than a nice-to-have.
+   out — and note that Phase 2c has already made `calendar.app.created`
+   impossible, so a write-capable Calendar scope is what Google's verification
+   review would be looking at.
 2. **Tasks vs. Reminders overlap.** Once Phase 3 exists, Reminders (Calendar,
    dateless items local) and To-dos (Tasks, completion syncs) are similar enough
    that keeping both may confuse. Decide whether they stay separate widgets or
