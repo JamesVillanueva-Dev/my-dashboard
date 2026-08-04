@@ -89,8 +89,15 @@ describe('WIDGETS', () => {
 });
 
 describe('DEFAULT_LAYOUT', () => {
-  it('enables every catalogue widget, in catalogue order', () => {
-    expect(DEFAULT_LAYOUT).toEqual(WIDGETS.map((w) => w.id));
+  it('enables every widget that is not opt-in, in catalogue order', () => {
+    expect(DEFAULT_LAYOUT).toEqual(WIDGETS.filter((w) => !w.defaultOff).map((w) => w.id));
+  });
+
+  it('leaves Spotify off, and offers YouTube as the music panel instead', () => {
+    expect(DEFAULT_LAYOUT).not.toContain('spotify');
+    expect(DEFAULT_LAYOUT).toContain('youtube');
+    // Off by default, but still in the catalogue so the widget menu can offer it.
+    expect(widgetById('spotify')?.title).toBe('Spotify');
   });
 });
 

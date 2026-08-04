@@ -75,6 +75,12 @@ const ICONS = {
       <circle cx="18" cy="16" r="3" />
     </>
   ),
+  video: (
+    <>
+      <rect x="2" y="5" width="20" height="14" rx="4.5" />
+      <path d="m10.5 8.75 5 3.25-5 3.25V8.75Z" />
+    </>
+  ),
 
   /* ---------- Weather conditions (WMO codes) ---------- */
   sun: (

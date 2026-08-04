@@ -14,7 +14,8 @@ interface Source {
 const SOURCES: Source[] = [
   { label: 'Open-Meteo', role: 'weather', href: 'https://open-meteo.com' },
   { label: 'Public RSS', role: 'headlines' },
-  { label: 'Spotify', role: 'player', href: 'https://open.spotify.com' },
+  { label: 'YouTube', role: 'player', href: 'https://www.youtube.com' },
+  { label: 'Spotify', role: 'optional player', href: 'https://open.spotify.com' },
 ];
 
 /** Props for {@link Footer}. */

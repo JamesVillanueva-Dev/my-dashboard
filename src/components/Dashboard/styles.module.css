@@ -71,6 +71,19 @@
   composes: empty from '../../styles/controls.module.css';
 }
 
+/* Account sync failed. Loud on purpose: the dashboard still works and still
+   saves locally, so nothing on screen would otherwise reveal that this browser
+   has become the only copy. */
+.syncError {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
 /* Visually hidden, but still announced — the keyboard-reorder live region. */
 .srOnly {
   position: absolute;

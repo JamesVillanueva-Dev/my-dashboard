@@ -4,7 +4,9 @@ A personal dashboard for running your day. It leads with a **Today** zone — wh
 is happening next, your one focus for the day, and a single timeline merging
 calendar events with your dated tasks — above a grid of panels: tasks (with
 optional Google Calendar sync), calendar, weather, news, notes, and an embedded
-Spotify player. Your bookmark shortcuts live in the nav bar, always in reach.
+YouTube music player. (A Spotify panel ships too, off by default — switch it on
+from the **Widgets** menu.) Your bookmark shortcuts live in the nav bar, always
+in reach.
 Everything runs client-side — there is no backend,
 and your data stays in your browser's `localStorage`. Sign-in (via Clerk) and
 Google Calendar sync are both optional and off until you configure them.
@@ -51,11 +53,42 @@ sharing a browser don't see each other's dashboards. The first account to sign i
 inherits any data saved before auth was switched on. Sign out from the avatar menu
 in the header. See [ADR 0003](docs/adr/0003-clerk-authentication.md).
 
-Note that Clerk authenticates you; it does **not** sync your data. Signing in on a
-different device gives you an empty dashboard, because widgets still read from that
-browser's `localStorage`.
+Signing in also **restores your dashboard**. Layout, panel sizes, theme, tasks,
+notes, quick links, and your saved music sources are mirrored into your Clerk
+account, pulled down before the page paints and pushed back as you change things.
+Sign in on a new device — or in a browser that clears site data on exit — and your
+dashboard comes with you. Still no backend: Clerk's user metadata is written
+straight from the browser. See [ADR 0008](docs/adr/0008-account-synced-dashboard-state.md).
 
-### Optional: in-page Spotify player
+Two limits worth knowing:
+
+- Clerk caps account metadata at **8KB**. That is roomy for preferences and tight
+  for prose, so a very long Notes panel can outgrow it. When that happens the
+  dashboard says so and names the offending panel — it never silently drops data,
+  and everything keeps working locally.
+- Conflicts are **last-write-wins**. Edit the same dashboard on two devices while
+  one is offline and the older set of changes is lost.
+
+Cached weather and headlines stay local (they're refetchable), as does the Google
+Calendar sync cursor — that one tracks what *this browser* has already seen, so
+copying it to another device would make it skip events.
+
+Without a Clerk key there is no account, and the dashboard runs entirely from
+`localStorage` exactly as before.
+
+### Music: YouTube by default, Spotify opt-in
+
+The **YouTube** panel is the music player a fresh dashboard shows. Paste any
+YouTube link — a video, a playlist, a live radio stream, a `music.youtube.com`
+link — and it plays in the embedded player, volume and all, with no account and
+no configuration. Sources are saved as tabs in `localStorage`.
+
+The **Spotify** panel is off by default; add it from the **Widgets** menu. It is
+kept because its opt-in mode is genuinely better for Premium subscribers, but its
+zero-setup mode serves 30-second previews to a signed-out browser, which is a
+poor default. See [ADR 0007](docs/adr/0007-youtube-as-the-default-music-panel.md).
+
+#### Optional: in-page Spotify player
 
 The Spotify panel uses Spotify's iframe embed by default, which works with no
 setup but cannot be volume-controlled — a cross-origin frame is closed to the
@@ -94,9 +127,11 @@ src/
 │   ├── useCalendarSync.ts    drives the optional Google Calendar sync
 │   ├── useTheme.ts           colour-scheme preference + data-theme/favicon
 │   ├── useDismiss.ts         outside-click / Escape dismissal for popovers
-│   └── useSpotifyPlayer.ts   optional Web Playback SDK device + volume
+│   ├── useSpotifyPlayer.ts   optional Web Playback SDK device + volume
+│   └── useProfileSync.ts     pulls/pushes the dashboard to the Clerk account
 ├── lib/
 │   ├── registry.tsx          catalogue of available widgets
+│   ├── profileSync.ts        which keys follow the account, and conflict rules
 │   ├── themes.ts             the colour schemes offered in settings
 │   ├── spotifyAuth.ts        Spotify OAuth (PKCE), opt-in
 │   ├── cache.ts              stale-while-revalidate store behind the hook above
@@ -120,7 +155,8 @@ src/
     ├── TodoWidget/
     ├── NewsWidget/
     ├── NotesWidget/
-    └── SpotifyWidget/
+    ├── SpotifyWidget/
+    └── YouTubeWidget/
 ```
 
 Conventions — and the reasoning behind them — are documented in
@@ -140,4 +176,6 @@ npm run create:component -- EventsCard --no-test
 - [ADR 0002 — Google Calendar integration](docs/adr/0002-google-calendar-integration.md)
 - [ADR 0003 — Clerk authentication and per-user local data](docs/adr/0003-clerk-authentication.md)
 - [ADR 0006 — Opt-in Spotify in-page player](docs/adr/0006-spotify-in-page-player.md)
+- [ADR 0007 — YouTube as the default music panel](docs/adr/0007-youtube-as-the-default-music-panel.md)
+- [ADR 0008 — Account-synced dashboard state](docs/adr/0008-account-synced-dashboard-state.md)
 - [User stories](docs/user-stories.md) · [Wireframes](docs/wireframes.md)

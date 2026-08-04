@@ -16,6 +16,27 @@ export const StorageScopeProvider = StorageScopeContext.Provider;
 /** Separator between the scope and the key. No unscoped key contains one. */
 const SEP = ':';
 
+/**
+ * Listeners notified whenever this hook persists a value.
+ *
+ * Account sync needs to know when the dashboard changed, and neither of the
+ * obvious channels works: the `storage` event fires only in *other* tabs, and
+ * polling storage on a timer would be both late and wasteful. Since every write
+ * already funnels through the effect below, announcing it there is exact.
+ */
+const writeListeners = new Set<(key: string) => void>();
+
+/**
+ * Subscribes to writes made through {@link useLocalStorage}, in this tab.
+ *
+ * @param listener - Called with the fully scoped key just written.
+ * @returns An unsubscribe function.
+ */
+export function onStorageWrite(listener: (key: string) => void): () => void {
+  writeListeners.add(listener);
+  return () => writeListeners.delete(listener);
+}
+
 /** Prefixes `key` with the active scope, if any. */
 function scopedKey(scope: string, key: string): string {
   return scope ? `${scope}${SEP}${key}` : key;
@@ -103,6 +124,9 @@ export function useLocalStorage<T>(key: string, initialValue: T) {
     } catch {
       // Storage full or unavailable — ignore, widget still works in-memory.
     }
+    // Announced even if the write threw: a listener that mirrors state elsewhere
+    // (account sync) should still learn the value changed.
+    for (const listener of writeListeners) listener(state.key);
   }, [state]);
 
   const setValue = useCallback((action: T | ((prev: T) => T)) => {

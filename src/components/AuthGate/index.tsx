@@ -1,6 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { SignIn, SignedIn, SignedOut, useUser } from '@clerk/clerk-react';
 import { StorageScopeProvider, adoptLegacyKeys } from '../../hooks/useLocalStorage';
+import {
+  ProfileSyncProvider,
+  useProfileSync,
+  type SyncUser,
+} from '../../hooks/useProfileSync';
 import { hasClerkKey } from '../../lib/clerkAuth';
 import styles from './styles.module.css';
 
@@ -14,10 +19,13 @@ interface AuthGateProps {
 interface ScopeProps extends AuthGateProps {
   /** The signed-in user's id; always non-empty here. */
   scope: string;
+  /** The signed-in user, whose account carries the synced dashboard. */
+  user: SyncUser;
 }
 
 /**
- * Publishes one account's storage namespace to the app below it.
+ * Publishes one account's storage namespace to the app below it, and mirrors
+ * that namespace to the account itself.
  *
  * Mounted with `key={scope}`, so React remounts it whenever the account changes
  * and the `useState` initializer below runs exactly once per account — during
@@ -25,12 +33,22 @@ interface ScopeProps extends AuthGateProps {
  * storage. An effect would be too late: the widgets would already have read the
  * empty namespace and would render (and then persist) their defaults.
  *
+ * Both calls below hydrate storage *during this render*, and their order is
+ * load-bearing: `adoptLegacyKeys` must move the pre-auth dashboard into this
+ * account's namespace before `useProfileSync` collects it, or that data reads as
+ * absent and loses to whatever the account already held.
+ *
  * @param props - See {@link ScopeProps}.
  */
-function Scope({ scope, children }: ScopeProps) {
+function Scope({ scope, user, children }: ScopeProps) {
   useState(() => adoptLegacyKeys(scope));
+  const sync = useProfileSync(user);
 
-  return <StorageScopeProvider value={scope}>{children}</StorageScopeProvider>;
+  return (
+    <ProfileSyncProvider value={sync}>
+      <StorageScopeProvider value={scope}>{children}</StorageScopeProvider>
+    </ProfileSyncProvider>
+  );
 }
 
 /**
@@ -46,10 +64,10 @@ function ScopedApp({ children }: AuthGateProps) {
   const { user } = useUser();
   const scope = user?.id ?? '';
 
-  if (!scope) return null;
+  if (!user || !scope) return null;
 
   return (
-    <Scope key={scope} scope={scope}>
+    <Scope key={scope} scope={scope} user={user}>
       {children}
     </Scope>
   );

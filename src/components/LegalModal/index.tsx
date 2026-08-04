@@ -43,6 +43,15 @@ function PrivacyPolicy() {
           <strong>Google's favicon service</strong> — to show icons for your quick
           links.
         </li>
+        <li>
+          <strong>YouTube</strong> — the embedded music player, loaded from
+          youtube-nocookie.com. It is contacted only while the YouTube panel is on
+          your dashboard.
+        </li>
+        <li>
+          <strong>Spotify</strong> — the optional music player, off unless you add
+          that panel yourself.
+        </li>
       </ul>
       <p>
         These providers may receive your IP address and request details as part of

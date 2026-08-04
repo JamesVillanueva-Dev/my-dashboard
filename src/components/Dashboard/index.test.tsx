@@ -7,9 +7,20 @@ import { DEFAULT_LAYOUT } from '../../lib/registry';
 describe('Dashboard', () => {
   it('renders every default widget', () => {
     render(<Dashboard />);
-    for (const title of ['Tasks', 'Calendar', 'Weather', 'News', 'Notes', 'Spotify']) {
+    for (const title of ['Tasks', 'Calendar', 'Weather', 'News', 'Notes', 'YouTube']) {
       expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument();
     }
+  });
+
+  it('leaves the opt-in Spotify panel off until it is switched on', async () => {
+    const user = userEvent.setup();
+    render(<Dashboard />);
+    expect(screen.queryByRole('heading', { level: 2, name: 'Spotify' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Manage widgets' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Spotify' }));
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Spotify' })).toBeInTheDocument();
   });
 
   it('leads with the Today zone, above the widget grid', () => {

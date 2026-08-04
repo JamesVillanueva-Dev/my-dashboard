@@ -6,6 +6,7 @@ import RemindersWidget from '../components/RemindersWidget';
 import NewsWidget from '../components/NewsWidget';
 import NotesWidget from '../components/NotesWidget';
 import SpotifyWidget from '../components/SpotifyWidget';
+import YouTubeWidget from '../components/YouTubeWidget';
 
 /**
  * How big a panel is. Both axes are set by dragging the handle in the panel's
@@ -85,6 +86,12 @@ export interface WidgetDef {
   icon: IconName;
   /** Default width in grid columns. The user can resize any panel from its corner. */
   cols: number;
+  /**
+   * Leave the widget out of {@link DEFAULT_LAYOUT}. It still appears in the
+   * widget menu, ready to be switched on — this only decides whether a dashboard
+   * that has never been arranged starts with it.
+   */
+  defaultOff?: boolean;
   /** Renders the widget. */
   render: () => ReactNode;
 }
@@ -109,11 +116,22 @@ export const WIDGETS: WidgetDef[] = [
   { id: 'weather', title: 'Weather', icon: 'cloudSun', cols: 1, render: () => <WeatherWidget /> },
   { id: 'news', title: 'News', icon: 'newspaper', cols: 2, render: () => <NewsWidget /> },
   { id: 'notes', title: 'Notes', icon: 'note', cols: 1, render: () => <NotesWidget /> },
-  { id: 'spotify', title: 'Spotify', icon: 'music', cols: 1, render: () => <SpotifyWidget /> },
+  { id: 'youtube', title: 'YouTube', icon: 'video', cols: 2, render: () => <YouTubeWidget /> },
+  {
+    id: 'spotify',
+    title: 'Spotify',
+    icon: 'music',
+    cols: 1,
+    // YouTube is the music panel a fresh dashboard shows: it plays full tracks
+    // with no account at all, where Spotify's embed serves 30-second previews
+    // until you are logged in and needs Premium for anything better (ADR 0007).
+    defaultOff: true,
+    render: () => <SpotifyWidget />,
+  },
 ];
 
-/** Default layout: every widget, in catalogue order. */
-export const DEFAULT_LAYOUT: string[] = WIDGETS.map((w) => w.id);
+/** Default layout: every widget that isn't opt-in, in catalogue order. */
+export const DEFAULT_LAYOUT: string[] = WIDGETS.filter((w) => !w.defaultOff).map((w) => w.id);
 
 /** Look up a widget definition by id. */
 export function widgetById(id: string): WidgetDef | undefined {

@@ -15,6 +15,7 @@ import TodayPanel from '../TodayPanel';
 import Footer from '../Footer';
 import WidgetMenu from '../WidgetMenu';
 import { DashboardDataProvider } from '../../hooks/DashboardDataProvider';
+import { useSyncStatus } from '../../hooks/useProfileSync';
 import {
   DEFAULT_LAYOUT,
   MAX_COLS,
@@ -101,6 +102,7 @@ function applySpan(item: HTMLElement) {
  * greeting survives reloads.
  */
 export default function Dashboard() {
+  const sync = useSyncStatus();
   const [name, setName] = useLocalStorage<string>('user.name', '');
   const [layout, setLayout] = useLocalStorage<string[]>('layout', DEFAULT_LAYOUT);
   /** Per-widget size overrides. Absent ids fall back to the registry default. */
@@ -469,6 +471,12 @@ export default function Dashboard() {
         <div className={styles.body}>
           <Greeting name={name} onNameChange={setName} />
           <TodayPanel showFocus={showFocus} />
+
+          {sync.error && (
+            <p className={styles.syncError} role="alert">
+              {sync.error}
+            </p>
+          )}
 
           <p aria-live="polite" className={styles.srOnly}>
             {announcement}
