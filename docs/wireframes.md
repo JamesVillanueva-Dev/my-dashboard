@@ -15,7 +15,7 @@ mark the accent colour.
 Responsive card grid (columns auto-fill, min ~300px, and reflow). Each card has a
 drag handle (⠿) for reordering and a remove (×) control on hover.
 
-## 2. Widget menu (⚙️ Widgets open)
+## 2. Widget menu (Widgets open)
 
 ![Widget menu wireframe](./wireframes/menu.svg)
 
@@ -57,38 +57,38 @@ Below ~300px per column the grid collapses to a single stacked column.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  Good afternoon, James                        [⚙️ Widgets] [🌙]   3:42:07  │
-│  Tuesday, July 22, 2026                                                    │
+│  Good afternoon, James                      [Widgets] [Theme]   3:42:07  │
+│  Tuesday, July 22, 2026                                                  │
 ├──────────────────────────────────────────────────────────────────────────┤
-│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐                │
-│  │⠿ 🎯 Focus      │  │⠿ 🌦️ Weather °F │  │⠿ ⏰ Reminders ×│                │
-│  └────────────────┘  └────────────────┘  └────────────────┘                │
-│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐                │
-│  │⠿ ✅ To-do      │  │⠿ 📰 News     ↻ │  │⠿ 📝 Notes      │                │
-│  └────────────────┘  └────────────────┘  └────────────────┘                │
-│  ┌────────────────┐                                                        │
-│  │⠿ 🔗 Quick Links│   Cards drag to reorder; grid reflows to fill space.   │
-│  └────────────────┘                                                        │
-│  Privacy · Terms · Weather by Open-Meteo · Data stays in your browser      │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐              │
+│  │⠿ Focus         │  │⠿ Weather °F    │  │⠿ Reminders    ×│              │
+│  └────────────────┘  └────────────────┘  └────────────────┘              │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐              │
+│  │⠿ To-do         │  │⠿ News         ↻│  │⠿ Notes         │              │
+│  └────────────────┘  └────────────────┘  └────────────────┘              │
+│  ┌────────────────┐                                                      │
+│  │⠿ Quick Links   │   Cards drag to reorder; grid reflows to fill space. │
+│  └────────────────┘                                                      │
+│  Privacy · Terms · Weather by Open-Meteo · Data stays in your browser     │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Widget menu
 
 ```
-                    [⚙️ Widgets]┌──────────────────────────┐
-                                │ SHOW WIDGETS             │
-                                │ ☑ 🎯 Focus of the Day    │
-                                │ ☐ ✅ To-do  (hidden)     │
-                                │ ☑ …                      │
-                                │ Reset to default layout  │
-                                └──────────────────────────┘
+                    [Widgets]┌──────────────────────────┐
+                             │ SHOW WIDGETS             │
+                             │ ☑ Focus of the Day       │
+                             │ ☐ To-do  (hidden)        │
+                             │ ☑ …                      │
+                             │ Reset to default layout  │
+                             └──────────────────────────┘
 ```
 
 ### Empty state
 
 ```
-No widgets enabled. Open ⚙️ Widgets to add some.
+No widgets enabled. Open Widgets to add some.
 ```
 
 </details>

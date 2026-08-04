@@ -93,19 +93,19 @@
   <g fill="#2b2b2b">
     <text x="30" y="52" font-size="28">Good afternoon, James</text>
     <text x="32" y="80" font-size="15" fill="#777">Tuesday, July 22, 2026</text>
-    <text x="676" y="50" font-size="15">⚙ Widgets</text>
-    <text x="808" y="51" font-size="19">🌙</text>
+    <text x="722" y="50" font-size="15" text-anchor="middle">Widgets</text>
+    <text x="819" y="50" font-size="12" text-anchor="middle">Theme</text>
     <text x="928" y="54" font-size="26" text-anchor="end">3:42</text>
 
-    <!-- card headers: ⠿ handle + emoji + title -->
+    <!-- card headers: ⠿ handle + title -->
     <g font-size="15">
-      <text x="44"  y="140" font-size="17" fill="#aaa">⠿</text><text x="64"  y="140">🎯 Focus of the Day</text>
-      <text x="351" y="140" font-size="17" fill="#aaa">⠿</text><text x="371" y="140">🌦️ Weather</text>
-      <text x="658" y="140" font-size="17" fill="#aaa">⠿</text><text x="678" y="140">⏰ Reminders</text>
-      <text x="44"  y="355" font-size="17" fill="#aaa">⠿</text><text x="64"  y="355">✅ To-do</text>
-      <text x="351" y="355" font-size="17" fill="#aaa">⠿</text><text x="371" y="355">📰 News</text>
-      <text x="658" y="355" font-size="17" fill="#aaa">⠿</text><text x="678" y="355">📝 Notes</text>
-      <text x="44"  y="570" font-size="17" fill="#aaa">⠿</text><text x="64"  y="570">🔗 Quick Links</text>
+      <text x="44"  y="140" font-size="17" fill="#aaa">⠿</text><text x="64"  y="140">Focus of the Day</text>
+      <text x="351" y="140" font-size="17" fill="#aaa">⠿</text><text x="371" y="140">Weather</text>
+      <text x="658" y="140" font-size="17" fill="#aaa">⠿</text><text x="678" y="140">Reminders</text>
+      <text x="44"  y="355" font-size="17" fill="#aaa">⠿</text><text x="64"  y="355">To-do</text>
+      <text x="351" y="355" font-size="17" fill="#aaa">⠿</text><text x="371" y="355">News</text>
+      <text x="658" y="355" font-size="17" fill="#aaa">⠿</text><text x="678" y="355">Notes</text>
+      <text x="44"  y="570" font-size="17" fill="#aaa">⠿</text><text x="64"  y="570">Quick Links</text>
     </g>
 
     <!-- remove ×, actions -->

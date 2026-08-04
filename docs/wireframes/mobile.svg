@@ -14,13 +14,13 @@
   </g>
 
   <g filter="url(#rough)" fill="#ffe27a">
-    <rect x="214" y="70" width="70" height="30" rx="15"/>
+    <rect x="190" y="70" width="94" height="30" rx="15"/>
   </g>
 
   <g filter="url(#rough)" fill="none" stroke="#2b2b2b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     <!-- header divider -->
     <line x1="40" y1="118" x2="300" y2="118"/>
-    <rect x="214" y="70" width="70" height="30" rx="15"/>
+    <rect x="190" y="70" width="94" height="30" rx="15"/>
     <!-- stacked cards -->
     <rect x="40" y="132" width="260" height="96" rx="14"/>
     <rect x="40" y="240" width="260" height="96" rx="14"/>
@@ -39,14 +39,14 @@
     <text x="40" y="58" font-size="17">Good afternoon,</text>
     <text x="40" y="80" font-size="17">James</text>
     <text x="42" y="102" font-size="11" fill="#777">Tue, Jul 22</text>
-    <text x="228" y="90" font-size="12">⚙</text>
-    <text x="258" y="90" font-size="13">🌙</text>
+    <text x="214" y="90" font-size="11" text-anchor="middle">Widgets</text>
+    <text x="257" y="90" font-size="11" text-anchor="middle">Theme</text>
 
     <g font-size="13">
-      <text x="52"  y="160" font-size="14" fill="#aaa">⠿</text><text x="72" y="160">🎯 Focus of the Day</text>
-      <text x="52"  y="268" font-size="14" fill="#aaa">⠿</text><text x="72" y="268">🌦️ Weather</text>
-      <text x="52"  y="376" font-size="14" fill="#aaa">⠿</text><text x="72" y="376">⏰ Reminders</text>
-      <text x="52"  y="484" font-size="14" fill="#aaa">⠿</text><text x="72" y="484">📰 News</text>
+      <text x="52"  y="160" font-size="14" fill="#aaa">⠿</text><text x="72" y="160">Focus of the Day</text>
+      <text x="52"  y="268" font-size="14" fill="#aaa">⠿</text><text x="72" y="268">Weather</text>
+      <text x="52"  y="376" font-size="14" fill="#aaa">⠿</text><text x="72" y="376">Reminders</text>
+      <text x="52"  y="484" font-size="14" fill="#aaa">⠿</text><text x="72" y="484">News</text>
     </g>
     <text x="170" y="588" font-size="12" fill="#999">… stacked …</text>
   </g>
