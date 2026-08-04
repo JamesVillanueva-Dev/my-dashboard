@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Widget from '../Widget';
 import Icon, { type IconName } from '../Icon';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { useCachedResource } from '../../hooks/useCachedResource';
 import styles from './styles.module.css';
 
 interface Place {
@@ -66,6 +67,10 @@ const DEFAULT_PLACE: Place = {
   longitude: -117.1611,
 };
 
+/** A forecast this old is refreshed in the background. Conditions and the
+ *  hourly-derived "current" figures do not move faster than this. */
+const TTL = 10 * 60_000;
+
 /**
  * Live weather widget backed by the free, key-less Open-Meteo API.
  *
@@ -73,53 +78,56 @@ const DEFAULT_PLACE: Place = {
  * geocoding endpoint (debounced), "use my location" through the browser
  * Geolocation API, and an °F/°C unit toggle. The selected place and unit persist
  * in localStorage. All network calls degrade to an error state with a retry.
+ *
+ * The forecast is read through {@link useCachedResource}, keyed by place and
+ * unit: re-mounting the panel, reloading the page, or toggling back to a unit
+ * you were just looking at all paint from cache and refresh quietly behind it.
  */
 export default function WeatherWidget() {
   const [place, setPlace] = useLocalStorage<Place>('weather.place', DEFAULT_PLACE);
   const [unit, setUnit] = useLocalStorage<'fahrenheit' | 'celsius'>('weather.unit', 'fahrenheit');
-  const [weather, setWeather] = useState<Weather | null>(null);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
+  const [geoError, setGeoError] = useState(false);
 
   const unitSymbol = unit === 'fahrenheit' ? '°F' : '°C';
 
-  const fetchWeather = useCallback(async () => {
-    setStatus('loading');
-    try {
-      const url =
-        `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}` +
-        `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m` +
-        `&daily=weather_code,temperature_2m_max,temperature_2m_min` +
-        `&temperature_unit=${unit}&wind_speed_unit=mph&timezone=auto&forecast_days=5`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('bad response');
-      const d = await res.json();
-      setWeather({
-        temp: Math.round(d.current.temperature_2m),
-        feelsLike: Math.round(d.current.apparent_temperature),
-        humidity: d.current.relative_humidity_2m,
-        wind: Math.round(d.current.wind_speed_10m),
-        code: d.current.weather_code,
-        todayMax: Math.round(d.daily.temperature_2m_max[0]),
-        todayMin: Math.round(d.daily.temperature_2m_min[0]),
-        daily: d.daily.time.map((date: string, i: number) => ({
-          date,
-          code: d.daily.weather_code[i],
-          max: Math.round(d.daily.temperature_2m_max[i]),
-          min: Math.round(d.daily.temperature_2m_min[i]),
-        })),
-      });
-      setStatus('ready');
-    } catch {
-      setStatus('error');
-    }
-  }, [place, unit]);
+  const fetchWeather = async (): Promise<Weather> => {
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}` +
+      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m` +
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min` +
+      `&temperature_unit=${unit}&wind_speed_unit=mph&timezone=auto&forecast_days=5`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('bad response');
+    const d = await res.json();
+    return {
+      temp: Math.round(d.current.temperature_2m),
+      feelsLike: Math.round(d.current.apparent_temperature),
+      humidity: d.current.relative_humidity_2m,
+      wind: Math.round(d.current.wind_speed_10m),
+      code: d.current.weather_code,
+      todayMax: Math.round(d.daily.temperature_2m_max[0]),
+      todayMin: Math.round(d.daily.temperature_2m_min[0]),
+      daily: d.daily.time.map((date: string, i: number) => ({
+        date,
+        code: d.daily.weather_code[i],
+        max: Math.round(d.daily.temperature_2m_max[i]),
+        min: Math.round(d.daily.temperature_2m_min[i]),
+      })),
+    };
+  };
 
-  useEffect(() => {
-    fetchWeather();
-  }, [fetchWeather]);
+  const {
+    data: weather,
+    status,
+    refresh,
+  } = useCachedResource<Weather>(
+    `weather:${place.latitude},${place.longitude}:${unit}`,
+    TTL,
+    fetchWeather,
+  );
 
   // City search (debounced) via Open-Meteo geocoding.
   useEffect(() => {
@@ -161,8 +169,9 @@ export default function WeatherWidget() {
         });
         setQuery('');
         setResults([]);
+        setGeoError(false);
       },
-      () => setStatus('error'),
+      () => setGeoError(true),
     );
   };
 
@@ -212,12 +221,13 @@ export default function WeatherWidget() {
         </ul>
       )}
       {searching && <p>Searching…</p>}
+      {geoError && <p>Couldn't get your location.</p>}
 
       {status === 'loading' && <p>Loading weather…</p>}
       {status === 'error' && (
         <p>
           Couldn't load weather.{' '}
-          <button className={styles.retry} onClick={fetchWeather}>
+          <button className={styles.retry} onClick={refresh}>
             Retry
           </button>
         </p>

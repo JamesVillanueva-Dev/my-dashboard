@@ -1,0 +1,87 @@
+.container {
+  position: relative;
+}
+
+/* The "Settings" trigger, sized to match the other header controls. */
+.button {
+  composes: pill from '../../styles/controls.module.css';
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+/* ---------- Dropdown panel ---------- */
+.container > div {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  min-width: 232px;
+  max-width: calc(100vw - 32px);
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 12px;
+}
+
+/* Section heading ("Appearance"). */
+.container > div > p {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.container > div > ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* "Follow system" sits in its own list so it reads as a peer of the palettes
+   rather than one more of them. */
+.container > div > ul + ul {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--card-border);
+}
+
+.container label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.container label:hover {
+  background: var(--bg);
+}
+
+/* The mode hint ("light" / "dark") trails the label, hard right. */
+.container small {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+/* The monitor glyph on "Follow system", matched to the swatches beside it. */
+.container label > svg:not(.swatch) {
+  font-size: 1.15rem;
+  color: var(--accent);
+}
+
+/* Sits on the text colour so the swatch outline (which uses currentColor at low
+   opacity) reads against both a pale and a near-black dot. */
+.swatch {
+  flex: none;
+  color: var(--text);
+}

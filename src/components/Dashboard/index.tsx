@@ -22,7 +22,7 @@ import styles from './styles.module.css';
  * itself; these only need to be in the right ballpark.
  */
 const ROW = 8;
-const GAP = 18;
+const GAP = 12;
 
 /**
  * Root of the dashboard. Owns the persisted layout — the ordered list of enabled

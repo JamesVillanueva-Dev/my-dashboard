@@ -1,5 +1,0 @@
-/* Sized by the shared `pill` primitive: the label is now text, so it should match
-   the other header controls rather than the larger box the emoji glyph needed. */
-.container {
-  composes: pill from '../../styles/controls.module.css';
-}

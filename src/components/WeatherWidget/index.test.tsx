@@ -57,4 +57,35 @@ describe('WeatherWidget', () => {
     await waitFor(() => expect(screen.getByText('72°C')).toBeInTheDocument());
     expect(localStorage.getItem('weather.unit')).toBe(JSON.stringify('celsius'));
   });
+
+  it('paints a re-mounted panel from cache without fetching again', async () => {
+    stubForecast();
+    const { unmount } = render(<WeatherWidget />);
+    await screen.findByText('72°F');
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+    render(<WeatherWidget />);
+
+    // No "Loading weather…" flash: the forecast is there on the first render.
+    expect(screen.getByText('72°F')).toBeInTheDocument();
+    expect(screen.queryByText(/Loading weather/i)).not.toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('caches each unit separately and switches back instantly', async () => {
+    stubForecast();
+    const user = userEvent.setup();
+    render(<WeatherWidget />);
+    await screen.findByText('72°F');
+
+    await user.click(screen.getByTitle('Toggle units'));
+    await screen.findByText('72°C');
+    expect(fetch).toHaveBeenCalledTimes(2); // °C is a different request
+
+    await user.click(screen.getByTitle('Toggle units'));
+
+    expect(screen.getByText('72°F')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
 });

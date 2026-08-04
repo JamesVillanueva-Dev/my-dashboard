@@ -39,8 +39,9 @@ Below ~300px per column the grid collapses to a single stacked column.
   `layout`).
 - **Remove:** hover a card → its `×` appears (top-right) → click to hide. Re-add
   it any time from the widget menu.
-- **Theme:** the toggle flips black/yellow ↔ purple/blue and persists; the initial
-  theme follows the OS setting.
+- **Theme:** Settings → Appearance lists the palettes (three light, four dark)
+  as a radio group; the choice persists. "Follow system" is one of the options
+  and is the default, tracking the OS light/dark setting live.
 - **Editable name:** click the name in the greeting to edit inline.
 - **All network widgets** (weather, news) show explicit loading, error, and retry
   states — a failed request never blanks the card.
@@ -57,7 +58,7 @@ Below ~300px per column the grid collapses to a single stacked column.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  Good afternoon, James                      [Widgets] [Theme]   3:42:07  │
+│  Good afternoon, James                   [Widgets] [Settings]   3:42:07  │
 │  Tuesday, July 22, 2026                                                  │
 ├──────────────────────────────────────────────────────────────────────────┤
 │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐              │

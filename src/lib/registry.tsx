@@ -5,7 +5,6 @@ import CalendarWidget from '../components/CalendarWidget';
 import RemindersWidget from '../components/RemindersWidget';
 import NewsWidget from '../components/NewsWidget';
 import NotesWidget from '../components/NotesWidget';
-import QuickLinksWidget from '../components/QuickLinksWidget';
 import SpotifyWidget from '../components/SpotifyWidget';
 
 /**
@@ -59,10 +58,11 @@ export interface WidgetDef {
  * Standard-size widgets lead, so the default layout reads top-down in order of
  * how much of your attention the panel deserves.
  *
- * Two ids are deliberately absent and will be filtered out of any saved layout
+ * Three ids are deliberately absent and will be filtered out of any saved layout
  * that still contains them:
  * - `todo` — merged into `reminders`, which is now the single task list.
  * - `focus` — moved into the Today zone, where the day's one intention belongs.
+ * - `quicklinks` — moved into the nav bar, where navigation is always in reach.
  */
 export const WIDGETS: WidgetDef[] = [
   { id: 'reminders', title: 'Tasks', icon: 'checkSquare', size: 'standard', render: () => <RemindersWidget /> },
@@ -70,7 +70,6 @@ export const WIDGETS: WidgetDef[] = [
   { id: 'weather', title: 'Weather', icon: 'cloudSun', size: 'compact', render: () => <WeatherWidget /> },
   { id: 'news', title: 'News', icon: 'newspaper', size: 'standard', render: () => <NewsWidget /> },
   { id: 'notes', title: 'Notes', icon: 'note', size: 'compact', render: () => <NotesWidget /> },
-  { id: 'quicklinks', title: 'Quick Links', icon: 'link', size: 'compact', render: () => <QuickLinksWidget /> },
   { id: 'spotify', title: 'Spotify', icon: 'music', size: 'compact', render: () => <SpotifyWidget /> },
 ];
 

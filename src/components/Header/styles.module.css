@@ -1,6 +1,7 @@
 /* Full-bleed sticky bar. The horizontal padding resolves to the dashboard's own
-   side padding on normal screens, and grows past --page-max so the clock and
-   controls stay aligned with the grid below instead of drifting to the edges. */
+   side padding, and — should --page-max ever be capped to a length again — grows
+   to match, so the clock and controls stay aligned with the grid below instead
+   of drifting to the edges. */
 .container {
   position: sticky;
   top: 0;
@@ -25,7 +26,10 @@
 }
 
 /* ---------- Clock (left) ---------- */
+/* The clock and the controls hold their size; the quick links between them take
+   what is left and scroll their own overflow. */
 .container time {
+  flex: none;
   font-size: 1.35rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -35,6 +39,7 @@
 
 /* ---------- Controls (right) ---------- */
 .container > div {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 12px;

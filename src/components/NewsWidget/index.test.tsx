@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import NewsWidget from './index';
 import styles from './styles.module.css';
@@ -54,5 +54,65 @@ describe('NewsWidget', () => {
     expect(tab).toHaveClass(styles.isActive);
     expect(tab).toHaveAttribute('aria-pressed', 'true');
     expect(localStorage.getItem('news.feed')).toBe(JSON.stringify('bbc-tech'));
+  });
+
+  it('paints a re-mounted panel from cache without fetching again', async () => {
+    stubFeed();
+    const { unmount } = render(<NewsWidget />);
+    await screen.findByRole('link', { name: 'Headline One' });
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    unmount();
+    render(<NewsWidget />);
+
+    // Present on the very first render — no "Loading headlines…" in between.
+    expect(screen.getByRole('link', { name: 'Headline One' })).toBeInTheDocument();
+    expect(screen.queryByText(/Loading headlines/i)).not.toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-reads a feed it already loaded without another fetch', async () => {
+    stubFeed();
+    const user = userEvent.setup();
+    render(<NewsWidget />);
+    await screen.findByRole('link', { name: 'Headline One' });
+
+    await user.click(screen.getByRole('button', { name: 'Tech' }));
+    await screen.findByRole('link', { name: 'Headline One' });
+    expect(fetch).toHaveBeenCalledTimes(2); // a different feed is a different key
+
+    await user.click(screen.getByRole('button', { name: 'BBC Top' }));
+
+    expect(screen.getByRole('link', { name: 'Headline One' })).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('refreshes on demand even when the cached copy is fresh', async () => {
+    stubFeed();
+    const user = userEvent.setup();
+    render(<NewsWidget />);
+    await screen.findByRole('link', { name: 'Headline One' });
+
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+  });
+
+  it('keeps stale headlines on screen when a refresh fails', async () => {
+    stubFeed();
+    const user = userEvent.setup();
+    render(<NewsWidget />);
+    await screen.findByRole('link', { name: 'Headline One' });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new Error('offline'))),
+    );
+    await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    // A stale headline beats an error message.
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(screen.getByRole('link', { name: 'Headline One' })).toBeInTheDocument();
+    expect(screen.queryByText(/Couldn't load this feed/i)).not.toBeInTheDocument();
   });
 });

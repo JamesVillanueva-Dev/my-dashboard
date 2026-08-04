@@ -1,0 +1,174 @@
+/* Quick links in the nav bar. The row takes the space left between the clock and
+   the app controls; the + button opens a popover for editing it. */
+.container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  /* Without this the row refuses to shrink below its content and pushes the
+     controls off the bar instead of scrolling. */
+  min-width: 0;
+  justify-content: center;
+}
+
+/* ---------- The row of bookmarks ---------- */
+.container > ul {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  /* Too many links (or a narrow window) scroll rather than wrap — the bar is a
+     single row and must stay one. The scrollbar itself would be noise. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.container > ul::-webkit-scrollbar {
+  display: none;
+}
+
+.container > ul a {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1;
+  transition: border-color 0.15s, color 0.15s;
+}
+.container > ul a:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.container img {
+  flex: none;
+  border-radius: 50%;
+  background: #fff;
+  padding: 2px;
+  object-fit: contain;
+}
+
+/* ---------- Edit popover ---------- */
+.manage {
+  position: relative;
+  flex: none;
+}
+
+.trigger {
+  composes: pill from '../../styles/controls.module.css';
+  display: inline-flex;
+  align-items: center;
+  padding: 6px;
+}
+
+.manage > div {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: 250px;
+  max-width: calc(100vw - 32px);
+  padding: 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.manage p {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+/* The "Your links" heading, which follows the add form. */
+.manage div + p {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border);
+}
+
+.form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.form input {
+  flex: 1 1 100%;
+}
+
+.add {
+  composes: btn from '../../styles/controls.module.css';
+  flex: 1 1 100%;
+}
+
+/* The editable list behind the + button, where links can be removed. */
+.manage ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.manage li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.manage li:hover {
+  background: var(--bg);
+}
+.manage li span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.manage li button {
+  flex: none;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  padding: 2px;
+  line-height: 1;
+}
+.manage li button:hover {
+  color: var(--danger);
+}
+
+/* Labels are the first thing to go when the bar gets tight — the favicons stay
+   recognisable on their own, and the title attribute still names each link. */
+@media (max-width: 900px) {
+  .container > ul span {
+    display: none;
+  }
+  .container > ul a {
+    padding: 5px 7px;
+  }
+}
+
+@media (max-width: 560px) {
+  /* The row is centred by now, so anchoring the popover to the button's right
+     edge would run it off the left of the screen. Centre it on the button. */
+  .manage > div {
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 24px);
+  }
+}

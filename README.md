@@ -3,8 +3,9 @@
 A personal dashboard for running your day. It leads with a **Today** zone — what
 is happening next, your one focus for the day, and a single timeline merging
 calendar events with your dated tasks — above a grid of panels: tasks (with
-optional Google Calendar sync), calendar, weather, news, notes, quick links, and
-an embedded Spotify player. Everything runs client-side — there is no backend,
+optional Google Calendar sync), calendar, weather, news, notes, and an embedded
+Spotify player. Your bookmark shortcuts live in the nav bar, always in reach.
+Everything runs client-side — there is no backend,
 and your data stays in your browser's `localStorage`. Sign-in (via Clerk) and
 Google Calendar sync are both optional and off until you configure them.
 
@@ -67,20 +68,26 @@ src/
 │   └── controls.module.css   shared control primitives, pulled in via `composes`
 ├── hooks/
 │   ├── useLocalStorage.ts    persistence + per-user key namespacing
-│   └── useCalendarSync.ts    drives the optional Google Calendar sync
+│   ├── useCachedResource.ts  cached, refreshable network reads
+│   ├── useCalendarSync.ts    drives the optional Google Calendar sync
+│   ├── useTheme.ts           colour-scheme preference + data-theme/favicon
+│   └── useDismiss.ts         outside-click / Escape dismissal for popovers
 ├── lib/
 │   ├── registry.tsx          catalogue of available widgets
+│   ├── themes.ts             the colour schemes offered in settings
+│   ├── cache.ts              stale-while-revalidate store behind the hook above
 │   ├── gcalSync.ts           Google Calendar reconciliation
 │   ├── googleAuth.ts         in-memory OAuth token handling
 │   └── clerkAuth.ts          Clerk key + "is auth enabled?" check
 └── components/
     ├── Dashboard/            the grid: layout, drag-to-reorder, footer
     ├── AuthGate/             optional Clerk sign-in gate + storage scope
-    ├── Header/               greeting, clock, theme toggle
+    ├── Header/               clock, quick links, settings
+    ├── QuickLinks/           bookmark shortcuts in the nav bar
     ├── UserMenu/             Clerk avatar menu (hidden when auth is off)
     ├── WidgetMenu/           enable/disable widgets
     ├── Widget/               card shell every widget renders into (+ chrome.ts)
-    ├── ThemeToggle/
+    ├── Settings/             colour-scheme picker
     ├── LegalModal/
     ├── FocusWidget/
     ├── WeatherWidget/
@@ -88,7 +95,6 @@ src/
     ├── TodoWidget/
     ├── NewsWidget/
     ├── NotesWidget/
-    ├── QuickLinksWidget/
     └── SpotifyWidget/
 ```
 

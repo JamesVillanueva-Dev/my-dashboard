@@ -24,12 +24,14 @@
   color-scheme: light;
 }
 
-/* Dark-mode variant: black & yellow.
-   Applied when the OS prefers dark (no manual override) OR when the user
-   explicitly picks it via the toggle. The [data-theme] selectors have higher
-   specificity than the media query, so a manual choice always wins. */
+/* Pre-hydration dark fallback.
+   Only applies while `data-theme` is *absent* — the split second before the
+   settings menu writes the stored choice onto <html>. Every theme below sets
+   the attribute, so this never competes with an explicit selection; matching
+   `:not([data-theme])` rather than `:not([data-theme='light'])` is what keeps
+   it from bleeding into the light-but-not-'light' palettes (Rose, Solarized). */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not([data-theme]) {
     --bg: #0c0c0d;
     --bg-grad-1: #211c00;
     --bg-grad-2: #131311;
@@ -49,6 +51,17 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   The palettes.
+
+   One block per theme, keyed by the id in `src/lib/themes.ts` — the two lists
+   must stay in step, since the settings menu offers what that module declares
+   and the styling comes from here. Each block defines the *whole* token set:
+   themes never inherit from one another, so a missing token would fall through
+   to the light palette above and produce an unreadable hybrid.
+   --------------------------------------------------------------------------- */
+
+/* Black & yellow. */
 :root[data-theme='dark'] {
   --bg: #0c0c0d;
   --bg-grad-1: #211c00;
@@ -68,12 +81,116 @@
   color-scheme: dark;
 }
 
+/* Purple & blue. */
+:root[data-theme='midnight'] {
+  --bg: #0d0b16;
+  --bg-grad-1: #241a4d;
+  --bg-grad-2: #141026;
+  --card: #191527;
+  --card-border: #2e2745;
+  --text: #ece9f7;
+  --text-muted: #a49dc0;
+  --accent: #8b7cff;
+  --accent-soft: #241d47;
+  --accent-text: #0d0b16;
+  --danger: #ff6f8d;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px rgba(0, 0, 0, 0.55);
+  --well: #0a0813;
+  --well-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 1px 0 rgba(255, 255, 255, 0.05);
+  color-scheme: dark;
+}
+
+/* Deep green. */
+:root[data-theme='forest'] {
+  --bg: #0a1310;
+  --bg-grad-1: #0f2d1f;
+  --bg-grad-2: #0d1a15;
+  --card: #13201b;
+  --card-border: #24382e;
+  --text: #e8f2ec;
+  --text-muted: #94ab9f;
+  --accent: #4ade80;
+  --accent-soft: #102a1c;
+  --accent-text: #062012;
+  --danger: #ff7a66;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px rgba(0, 0, 0, 0.5);
+  --well: #071009;
+  --well-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 1px 0 rgba(255, 255, 255, 0.05);
+  color-scheme: dark;
+}
+
+/* Deep blue & cyan. */
+:root[data-theme='ocean'] {
+  --bg: #071018;
+  --bg-grad-1: #0b2f45;
+  --bg-grad-2: #0a1a24;
+  --card: #0f1d28;
+  --card-border: #1e3546;
+  --text: #e6f1f8;
+  --text-muted: #92a9ba;
+  --accent: #38bdf8;
+  --accent-soft: #0c2a3b;
+  --accent-text: #04131c;
+  --danger: #ff7a7a;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px rgba(0, 0, 0, 0.5);
+  --well: #050c12;
+  --well-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 1px 0 rgba(255, 255, 255, 0.05);
+  color-scheme: dark;
+}
+
+/* Warm pink, light. */
+:root[data-theme='rose'] {
+  --bg: #fdf6f7;
+  --bg-grad-1: #ffe4ec;
+  --bg-grad-2: #fff6f8;
+  --card: #ffffff;
+  --card-border: #f2dfe4;
+  --text: #3b1f2a;
+  --text-muted: #7d6069;
+  --accent: #d6336c;
+  --accent-soft: #ffe3ec;
+  --accent-text: #ffffff;
+  --danger: #c92a2a;
+  --shadow: 0 1px 2px rgba(80, 20, 40, 0.05), 0 8px 24px rgba(80, 20, 40, 0.09);
+  --well: #f7e8ec;
+  --well-shadow: inset 0 1px 2px rgba(80, 20, 40, 0.09),
+    inset 0 0 0 1px rgba(80, 20, 40, 0.045), 0 1px 0 rgba(255, 255, 255, 0.75);
+  color-scheme: light;
+}
+
+/* Solarized light: cream paper, muted ink, blue accent. */
+:root[data-theme='solarized'] {
+  --bg: #fdf6e3;
+  --bg-grad-1: #f3ebd4;
+  --bg-grad-2: #fefaf0;
+  --card: #fffcf2;
+  --card-border: #e6dcc2;
+  --text: #073642;
+  --text-muted: #657b83;
+  --accent: #268bd2;
+  --accent-soft: #dfeaf3;
+  --accent-text: #ffffff;
+  --danger: #dc322f;
+  --shadow: 0 1px 2px rgba(60, 50, 20, 0.05), 0 8px 24px rgba(60, 50, 20, 0.1);
+  --well: #eee8d5;
+  --well-shadow: inset 0 1px 2px rgba(60, 50, 20, 0.1),
+    inset 0 0 0 1px rgba(60, 50, 20, 0.05), 0 1px 0 rgba(255, 255, 255, 0.75);
+  color-scheme: light;
+}
+
 /* Layout tokens for the dashboard's content column. These are not theme
    dependent, so they live outside the palette blocks above. The nav bar is
    full-bleed but uses both to line its contents up with the grid below it. */
 :root {
-  --page-max: 1800px;
-  --page-pad: clamp(14px, 2.5vw, 48px);
+  /* Full-bleed: the grid uses the whole display rather than a centred column.
+     Set a length here (e.g. 1800px) to cap it again on ultrawide monitors — the
+     nav bar's padding formula keeps the bar lined up with the grid either way. */
+  --page-max: 100%;
+  /* Just enough to keep panels off the screen edge. */
+  --page-pad: clamp(10px, 1vw, 20px);
 }
 
 /* ---------------------------------------------------------------------------

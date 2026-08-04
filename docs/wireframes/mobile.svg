@@ -40,7 +40,7 @@
     <text x="40" y="80" font-size="17">James</text>
     <text x="42" y="102" font-size="11" fill="#777">Tue, Jul 22</text>
     <text x="214" y="90" font-size="11" text-anchor="middle">Widgets</text>
-    <text x="257" y="90" font-size="11" text-anchor="middle">Theme</text>
+    <text x="256" y="90" font-size="10" text-anchor="middle">Settings</text>
 
     <g font-size="13">
       <text x="52"  y="160" font-size="14" fill="#aaa">⠿</text><text x="72" y="160">Focus of the Day</text>

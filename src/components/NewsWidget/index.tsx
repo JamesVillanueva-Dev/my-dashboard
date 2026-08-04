@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
 import Widget from '../Widget';
 import Icon from '../Icon';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { useCachedResource } from '../../hooks/useCachedResource';
 import styles from './styles.module.css';
 
 interface Feed {
@@ -20,6 +20,10 @@ const FEEDS: Feed[] = [
 ];
 
 const PROXY = 'https://api.allorigins.win/raw?url=';
+
+/** Headlines older than this are refreshed in the background when the panel is
+ *  shown. The refresh button ignores it and fetches anyway. */
+const TTL = 5 * 60_000;
 
 interface Article {
   title: string;
@@ -50,54 +54,61 @@ function timeAgo(iso: string): string {
  * CORS proxy, parses the XML in-browser with `DOMParser`, and lists the latest
  * headlines with relative timestamps. Includes source tabs, refresh, and a retry
  * on failure. The chosen feed persists in localStorage.
+ *
+ * Each feed is cached separately (see {@link useCachedResource}), so flicking
+ * between the source tabs re-reads a feed you already loaded instead of clearing
+ * the list and fetching it again.
  */
 export default function NewsWidget() {
   const [feedId, setFeedId] = useLocalStorage<string>('news.feed', FEEDS[0].id);
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   const feed = FEEDS.find((f) => f.id === feedId) ?? FEEDS[0];
 
-  const load = useCallback(async () => {
-    setStatus('loading');
-    try {
-      const res = await fetch(PROXY + encodeURIComponent(feed.url));
-      if (!res.ok) throw new Error('bad response');
-      const xml = await res.text();
-      const doc = new DOMParser().parseFromString(xml, 'text/xml');
-      const items = Array.from(doc.querySelectorAll('item, entry')).slice(0, 8);
-      const parsed: Article[] = items.map((item) => {
-        const link =
-          item.querySelector('link')?.textContent?.trim() ||
-          item.querySelector('link')?.getAttribute('href') ||
-          '#';
-        return {
-          title: item.querySelector('title')?.textContent?.trim() ?? 'Untitled',
-          link,
-          date:
-            item.querySelector('pubDate')?.textContent?.trim() ||
-            item.querySelector('published, updated')?.textContent?.trim() ||
-            '',
-        };
-      });
-      if (parsed.length === 0) throw new Error('empty');
-      setArticles(parsed);
-      setStatus('ready');
-    } catch {
-      setStatus('error');
-    }
-  }, [feed.url]);
+  const fetchFeed = async (): Promise<Article[]> => {
+    const res = await fetch(PROXY + encodeURIComponent(feed.url));
+    if (!res.ok) throw new Error('bad response');
+    const xml = await res.text();
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    const items = Array.from(doc.querySelectorAll('item, entry')).slice(0, 8);
+    const parsed: Article[] = items.map((item) => {
+      const link =
+        item.querySelector('link')?.textContent?.trim() ||
+        item.querySelector('link')?.getAttribute('href') ||
+        '#';
+      return {
+        title: item.querySelector('title')?.textContent?.trim() ?? 'Untitled',
+        link,
+        date:
+          item.querySelector('pubDate')?.textContent?.trim() ||
+          item.querySelector('published, updated')?.textContent?.trim() ||
+          '',
+      };
+    });
+    // An empty parse is a failed fetch dressed up as success (a proxy error page
+    // parses fine and yields nothing) — don't cache it.
+    if (parsed.length === 0) throw new Error('empty');
+    return parsed;
+  };
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  const {
+    data: articles,
+    status,
+    revalidating,
+    refresh,
+  } = useCachedResource<Article[]>(`news:${feed.url}`, TTL, fetchFeed);
 
   return (
     <Widget
       title="News"
       className={styles.container}
       action={
-        <button className={styles.refresh} onClick={load} title="Refresh" aria-label="Refresh">
+        <button
+          className={styles.refresh}
+          onClick={refresh}
+          disabled={revalidating}
+          title={revalidating ? 'Refreshing…' : 'Refresh'}
+          aria-label="Refresh"
+        >
           <Icon name="refresh" />
         </button>
       }
@@ -118,12 +129,12 @@ export default function NewsWidget() {
       {status === 'error' && (
         <p>
           Couldn't load this feed.{' '}
-          <button className={styles.retry} onClick={load}>
+          <button className={styles.retry} onClick={refresh}>
             Retry
           </button>
         </p>
       )}
-      {status === 'ready' && (
+      {status === 'ready' && articles && (
         <ul className={styles.list}>
           {articles.map((a, i) => (
             <li key={i}>

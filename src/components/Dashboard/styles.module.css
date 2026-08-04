@@ -11,14 +11,14 @@
 }
 
 /* ---------- Content column ----------
-   Wide by design: this is a dashboard, so panels should fill the display rather
-   than sit in a reading-width column. --page-max only stops things sprawling on
-   ultrawide monitors; raise or drop it for the full width. The nav bar reads
-   both tokens so its contents line up with the grid. */
+   Full-bleed by design: this is a dashboard, so panels fill the display rather
+   than sit in a reading-width column. --page-max is 100% for that; give it a
+   length to cap the column on ultrawide monitors. The nav bar reads both tokens
+   so its contents line up with the grid. */
 .body {
   max-width: var(--page-max);
   margin: 0 auto;
-  padding: 26px var(--page-pad) 40px;
+  padding: 16px var(--page-pad) 28px;
 }
 
 /* ---------- Grid ----------
@@ -31,7 +31,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(288px, 1fr));
   grid-auto-rows: 8px;
-  gap: 18px;
+  gap: 12px;
   align-items: start;
 }
 
@@ -123,9 +123,9 @@
 
 @media (max-width: 560px) {
   .body {
-    padding-block: 18px 32px;
+    padding-block: 12px 24px;
   }
   .body > main {
-    gap: 14px;
+    gap: 10px;
   }
 }

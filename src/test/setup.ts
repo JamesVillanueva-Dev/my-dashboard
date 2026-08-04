@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { vi, beforeEach, afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { clearCache } from '../lib/cache';
 
 // Unmount React trees between tests (RTL auto-cleanup only runs with globals).
 afterEach(cleanup);
@@ -29,4 +30,8 @@ beforeEach(() => {
   );
   localStorage.clear();
   document.documentElement.removeAttribute('data-theme');
+  // The resource cache keeps a module-level memory layer, which `localStorage
+  // .clear()` above does not touch — without this, one test's stubbed response
+  // would serve the next test from cache instead of hitting its own stub.
+  clearCache();
 });

@@ -38,9 +38,12 @@ local storage otherwise**, deferring Google integration to a later phase.
    `string[]` of widget ids; a central registry (`src/lib/registry.tsx`) maps
    ids to components. Widgets are enabled/disabled via a menu and reordered by
    drag-and-drop.
-7. **Theming** ships two palettes (black & yellow default; purple/blue "dark").
-   The OS `prefers-color-scheme` sets the initial value; a manual toggle writes
-   `data-theme` on `<html>`, whose CSS-variable overrides win by specificity.
+7. **Theming** ships a set of named palettes (`src/lib/themes.ts`), each one a
+   complete token set with its own inherent lightness rather than an accent
+   layered over a separate light/dark switch. The settings menu writes the
+   chosen id to `data-theme` on `<html>`, whose CSS-variable overrides win by
+   specificity; the stored preference may instead be `system`, which follows
+   `prefers-color-scheme` and tracks it live.
 
 ## Consequences
 

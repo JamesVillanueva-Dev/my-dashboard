@@ -7,7 +7,7 @@ import { DEFAULT_LAYOUT } from '../../lib/registry';
 describe('Dashboard', () => {
   it('renders every default widget', () => {
     render(<Dashboard />);
-    for (const title of ['Tasks', 'Calendar', 'Weather', 'News', 'Notes', 'Quick Links', 'Spotify']) {
+    for (const title of ['Tasks', 'Calendar', 'Weather', 'News', 'Notes', 'Spotify']) {
       expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument();
     }
   });
@@ -19,13 +19,17 @@ describe('Dashboard', () => {
   });
 
   it('drops retired widget ids from a saved layout instead of crashing', () => {
-    // 'todo' and 'focus' shipped in earlier versions and no longer exist.
-    window.localStorage.setItem('layout', JSON.stringify(['todo', 'notes', 'focus', 'weather']));
+    // 'todo', 'focus' and 'quicklinks' shipped as panels and no longer are one.
+    window.localStorage.setItem(
+      'layout',
+      JSON.stringify(['todo', 'notes', 'focus', 'weather', 'quicklinks']),
+    );
     render(<Dashboard />);
 
     expect(screen.getByRole('heading', { level: 2, name: 'Notes' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Weather' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { level: 2, name: 'To-do' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Quick Links' })).not.toBeInTheDocument();
   });
 
   it('handles network failure gracefully (weather shows an error, not a crash)', async () => {

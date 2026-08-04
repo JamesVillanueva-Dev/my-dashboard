@@ -91,10 +91,12 @@ As a user, I want one-click shortcuts to my sites, so that I can navigate fast.
 As a user, I want to choose the colour theme, so that the dashboard suits me.
 
 **Acceptance criteria**
-- Default black & yellow theme; purple/blue as an alternate.
-- Initial theme follows my operating-system light/dark setting.
-- A header toggle switches themes and remembers my choice.
-- The favicon reflects the active light/dark theme.
+- A choice of colour schemes — three light (White & blue, Rose, Solarized) and
+  four dark (Black & yellow, Purple & blue, Forest, Ocean).
+- I pick one from Appearance in the header's settings menu, and it is remembered.
+- I can instead follow my operating-system light/dark setting, which is the
+  default and updates live when the OS switches.
+- The favicon reflects the active theme's colours.
 
 ### US-9 — Editable greeting (done)
 As a user, I want the dashboard to greet me by name, so that it feels personal.

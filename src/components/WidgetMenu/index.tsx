@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import Icon from '../Icon';
+import { useDismiss } from '../../hooks/useDismiss';
 import { WIDGETS } from '../../lib/registry';
 import styles from './styles.module.css';
 
@@ -31,21 +32,7 @@ export default function WidgetMenu({
   onToggleFocus,
 }: WidgetMenuProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  const ref = useDismiss<HTMLDivElement>(open, () => setOpen(false));
 
   return (
     <div className={styles.container} ref={ref}>
