@@ -1,24 +1,21 @@
+import { useState, type FormEvent } from 'react';
 import Widget from '../Widget';
 import Icon from '../Icon';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useCachedResource } from '../../hooks/useCachedResource';
+import {
+  BUILT_IN_FEEDS,
+  addFeed,
+  hostOf,
+  isDefaultFeeds,
+  makeFeed,
+  normalizeFeeds,
+  removeFeed,
+  type Feed,
+} from '../../lib/feeds';
 import styles from './styles.module.css';
 
-interface Feed {
-  id: string;
-  label: string;
-  url: string;
-}
-
-// Public RSS feeds. Fetched through a free CORS proxy and parsed in-browser.
-const FEEDS: Feed[] = [
-  { id: 'bbc-top', label: 'BBC Top', url: 'https://feeds.bbci.co.uk/news/rss.xml' },
-  { id: 'bbc-world', label: 'World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
-  { id: 'bbc-tech', label: 'Tech', url: 'https://feeds.bbci.co.uk/news/technology/rss.xml' },
-  { id: 'npr', label: 'NPR', url: 'https://feeds.npr.org/1001/rss.xml' },
-  { id: 'hn', label: 'Hacker News', url: 'https://hnrss.org/frontpage' },
-];
-
+// Feeds are fetched through a free CORS proxy and parsed in-browser.
 const PROXY = 'https://api.allorigins.win/raw?url=';
 
 /** Headlines older than this are refreshed in the background when the panel is
@@ -55,16 +52,64 @@ function timeAgo(iso: string): string {
  * headlines with relative timestamps. Includes source tabs, refresh, and a retry
  * on failure. The chosen feed persists in localStorage.
  *
+ * The sources themselves are the user's: the built-in list is only a starting
+ * point, and any of it can be removed or added to from the panel's own manage
+ * view (see `lib/feeds.ts`). That list persists too, so the panel ends up showing
+ * whichever corner of the news the user actually reads.
+ *
  * Each feed is cached separately (see {@link useCachedResource}), so flicking
  * between the source tabs re-reads a feed you already loaded instead of clearing
  * the list and fetching it again.
  */
 export default function NewsWidget() {
-  const [feedId, setFeedId] = useLocalStorage<string>('news.feed', FEEDS[0].id);
+  const [stored, setStored] = useLocalStorage<Feed[]>('news.sources', BUILT_IN_FEEDS);
+  const [feedId, setFeedId] = useLocalStorage<string>('news.feed', BUILT_IN_FEEDS[0].id);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [draftLabel, setDraftLabel] = useState('');
+  const [draftUrl, setDraftUrl] = useState('');
+  const [error, setError] = useState('');
 
-  const feed = FEEDS.find((f) => f.id === feedId) ?? FEEDS[0];
+  const feeds = normalizeFeeds(stored);
+  // A saved tab can name a source that has since been removed; fall through to
+  // whatever is left rather than showing nothing.
+  const feed = feeds.find((f) => f.id === feedId) ?? feeds[0] ?? null;
+  // With no sources at all there is nothing to show but the manage view, so it
+  // is not something the user has to go and find.
+  const managing = manageOpen || feeds.length === 0;
+
+  const addSource = (e: FormEvent) => {
+    e.preventDefault();
+    const added = makeFeed(draftLabel, draftUrl);
+    if (!added) {
+      setError('That doesn’t look like a feed address. Try https://example.com/rss.xml');
+      return;
+    }
+    if (feeds.some((f) => f.url === added.url)) {
+      setError('That source is already in the list.');
+      return;
+    }
+    setStored(addFeed(feeds, added));
+    setFeedId(added.id);
+    setDraftLabel('');
+    setDraftUrl('');
+    setError('');
+  };
+
+  const removeSource = (id: string) => {
+    const next = removeFeed(feeds, id);
+    setStored(next);
+    if (id === feed?.id) setFeedId(next[0]?.id ?? '');
+  };
+
+  const restore = () => {
+    setStored(BUILT_IN_FEEDS);
+    setFeedId(BUILT_IN_FEEDS[0].id);
+    setError('');
+  };
 
   const fetchFeed = async (): Promise<Article[]> => {
+    // Nothing to fetch until there is a source; the manage view is on screen.
+    if (!feed) return [];
     const res = await fetch(PROXY + encodeURIComponent(feed.url));
     if (!res.ok) throw new Error('bad response');
     const xml = await res.text();
@@ -95,56 +140,120 @@ export default function NewsWidget() {
     status,
     revalidating,
     refresh,
-  } = useCachedResource<Article[]>(`news:${feed.url}`, TTL, fetchFeed);
+  } = useCachedResource<Article[]>(feed ? `news:${feed.url}` : 'news:none', TTL, fetchFeed);
 
   return (
     <Widget
       title="News"
       className={styles.container}
       action={
-        <button
-          className={styles.refresh}
-          onClick={refresh}
-          disabled={revalidating}
-          title={revalidating ? 'Refreshing…' : 'Refresh'}
-          aria-label="Refresh"
-        >
-          <Icon name="refresh" />
-        </button>
+        <>
+          <button
+            className={styles.manage}
+            onClick={() => setManageOpen((open) => !open)}
+            aria-expanded={managing}
+            title={managing ? 'Done' : 'Manage sources'}
+            aria-label={managing ? 'Done managing sources' : 'Manage sources'}
+          >
+            <Icon name={managing ? 'check' : 'settings'} />
+          </button>
+          <button
+            className={styles.refresh}
+            onClick={refresh}
+            disabled={revalidating || !feed}
+            title={revalidating ? 'Refreshing…' : 'Refresh'}
+            aria-label="Refresh"
+          >
+            <Icon name="refresh" />
+          </button>
+        </>
       }
     >
-      <div className={styles.tabs}>
-        {FEEDS.map((f) => (
-          <button
-            key={f.id}
-            className={`${styles.tab}${f.id === feedId ? ` ${styles.isActive}` : ''}`}
-            aria-pressed={f.id === feedId}
-            onClick={() => setFeedId(f.id)}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-      {status === 'loading' && <p>Loading headlines…</p>}
-      {status === 'error' && (
-        <p>
-          Couldn't load this feed.{' '}
-          <button className={styles.retry} onClick={refresh}>
-            Retry
-          </button>
-        </p>
-      )}
-      {status === 'ready' && articles && (
-        <ul className={styles.list}>
-          {articles.map((a, i) => (
-            <li key={i}>
-              <a href={a.link} target="_blank" rel="noreferrer">
-                {a.title}
-              </a>
-              {a.date && <span>{timeAgo(a.date)}</span>}
-            </li>
-          ))}
-        </ul>
+      {managing ? (
+        <div className={styles.sources}>
+          {feeds.length === 0 ? (
+            <p>No sources yet. Add one below to start reading.</p>
+          ) : (
+            <ul>
+              {feeds.map((f) => (
+                <li key={f.id}>
+                  <span>{f.label}</span>
+                  <span>{hostOf(f.url)}</span>
+                  <button
+                    className={styles.drop}
+                    onClick={() => removeSource(f.id)}
+                    title={`Remove ${f.label}`}
+                    aria-label={`Remove ${f.label}`}
+                  >
+                    <Icon name="close" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <form onSubmit={addSource}>
+            <input
+              value={draftLabel}
+              onChange={(e) => setDraftLabel(e.target.value)}
+              placeholder="Name (optional)"
+              aria-label="Source name"
+            />
+            <input
+              value={draftUrl}
+              onChange={(e) => setDraftUrl(e.target.value)}
+              placeholder="RSS or Atom feed URL"
+              aria-label="Feed URL"
+            />
+            <button className={styles.add} type="submit">
+              <Icon name="plus" /> Add
+            </button>
+          </form>
+
+          {error && <p role="alert">{error}</p>}
+
+          {!isDefaultFeeds(feeds) && (
+            <button className={styles.restore} onClick={restore}>
+              Restore the default sources
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className={styles.tabs}>
+            {feeds.map((f) => (
+              <button
+                key={f.id}
+                className={`${styles.tab}${f.id === feed?.id ? ` ${styles.isActive}` : ''}`}
+                aria-pressed={f.id === feed?.id}
+                onClick={() => setFeedId(f.id)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          {status === 'loading' && <p>Loading headlines…</p>}
+          {status === 'error' && (
+            <p>
+              Couldn't load this feed.{' '}
+              <button className={styles.retry} onClick={refresh}>
+                Retry
+              </button>
+            </p>
+          )}
+          {status === 'ready' && articles && (
+            <ul className={styles.list}>
+              {articles.map((a, i) => (
+                <li key={i}>
+                  <a href={a.link} target="_blank" rel="noreferrer">
+                    {a.title}
+                  </a>
+                  {a.date && <span>{timeAgo(a.date)}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </Widget>
   );

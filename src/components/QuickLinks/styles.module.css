@@ -75,7 +75,10 @@
   right: 0;
   z-index: 20;
   width: 250px;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100vw - 2 * var(--page-pad));
+  max-height: calc(100dvh - 90px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 12px;
   border: 1px solid var(--card-border);
   border-radius: 12px;
@@ -169,6 +172,23 @@
     right: auto;
     left: 50%;
     transform: translateX(-50%);
-    max-width: calc(100vw - 24px);
+  }
+}
+
+/* Touch: the favicons are the whole row on a phone, so they get a tap target
+   around them, and the remove buttons in the popover get one too. The scroll
+   row keeps its momentum and stops the page scrolling with it at either end. */
+@media (pointer: coarse) {
+  .container > ul {
+    overscroll-behavior-x: contain;
+  }
+  .container > ul a {
+    padding: 10px;
+  }
+  .manage li {
+    padding: 8px 6px;
+  }
+  .manage li button {
+    padding: 8px;
   }
 }

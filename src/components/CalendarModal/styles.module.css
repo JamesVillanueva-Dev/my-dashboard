@@ -28,7 +28,9 @@
   box-shadow: var(--shadow);
   width: 100%;
   max-width: 1080px;
-  max-height: 90vh;
+  /* dvh, not vh: on a phone `vh` measures the viewport as if the address bar
+     were hidden, so a `vh`-capped dialog starts taller than the screen. */
+  max-height: 90dvh;
   overflow: hidden;
 }
 .container > div:focus {
@@ -391,8 +393,66 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
+/* ---------- Phones: the dialog docks to the bottom ----------
+   Same reasoning as the legal dialog — a phone has no room for a margin on four
+   sides, and a sheet reaching the bottom edge puts the month grid under the
+   thumb rather than at the top of the screen. */
+@media (max-width: 560px) {
   .container {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .container > div {
+    max-height: 94dvh;
+    border-width: 1px 0 0;
+    border-radius: var(--radius) var(--radius) 0 0;
+    animation: rise 0.24s cubic-bezier(0.2, 0, 0, 1);
+  }
+
+  /* The month name and four controls cannot share one row at this width without
+     the controls shrinking below what a thumb can hit, so the title takes a
+     line of its own and the buttons keep their size. */
+  .container header {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    padding: 12px 14px;
+  }
+  .container h2 {
+    flex: 1 1 100%;
+    font-size: 1.05rem;
+  }
+
+  /* The last row of the day detail would otherwise sit under the home indicator. */
+  .detail {
+    padding-bottom: calc(18px + var(--safe-bottom));
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(16px);
+  }
+}
+
+/* Touch: the header controls and the close button are the smallest things in
+   the dialog and the ones most often aimed at. */
+@media (pointer: coarse) {
+  .close {
+    width: 44px;
+    height: 44px;
+  }
+  .step {
+    min-width: 44px;
+  }
+  .add {
+    min-height: 40px;
+    padding-inline: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .container,
+  .container > div {
     animation: none;
   }
 }

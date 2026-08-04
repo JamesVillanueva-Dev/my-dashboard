@@ -11,14 +11,19 @@
   font-size: 0.85rem;
 }
 
-/* ---------- Dropdown panel ---------- */
+/* ---------- Dropdown panel ----------
+   Anchored to the trigger's right edge so it opens inwards at every width, and
+   capped in height because seven palettes are taller than a phone in landscape. */
 .container > div {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
   z-index: 20;
   min-width: 232px;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100vw - 2 * var(--page-pad));
+  max-height: calc(100dvh - 90px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--card);
   border: 1px solid var(--card-border);
   border-radius: 12px;
@@ -84,4 +89,24 @@
 .swatch {
   flex: none;
   color: var(--text);
+}
+
+/* The label gives up its room once the nav bar is too tight to hold it; the
+   glyph and the button's `aria-label` carry the meaning from there. */
+@media (max-width: 460px) {
+  .button > span {
+    display: none;
+  }
+}
+
+/* Picking a theme on a phone means hitting one of seven rows in a row of radios. */
+@media (pointer: coarse) {
+  .container label {
+    padding: 10px 8px;
+    font-size: 0.95rem;
+  }
+  .container label input {
+    width: 18px;
+    height: 18px;
+  }
 }

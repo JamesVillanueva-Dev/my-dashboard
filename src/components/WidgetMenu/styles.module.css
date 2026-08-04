@@ -11,14 +11,20 @@
   font-size: 0.85rem;
 }
 
-/* ---------- Dropdown panel ---------- */
+/* ---------- Dropdown panel ----------
+   Anchored to the trigger's right edge so it opens inwards, away from the screen
+   edge, at every width. The height cap is for a phone in landscape, where the
+   viewport is shorter than the list is tall. */
 .container > div {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
   z-index: 20;
   min-width: 220px;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100vw - 2 * var(--page-pad));
+  max-height: calc(100dvh - 90px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--card);
   border: 1px solid var(--card-border);
   border-radius: 12px;
@@ -87,11 +93,23 @@
   font-size: 0.82rem;
 }
 
-@media (max-width: 560px) {
-  /* The trigger now sits at the left edge of the header row instead of the
-     right, so anchor the dropdown from the left or it overflows off-screen. */
-  .container > div {
-    left: 0;
-    right: auto;
+/* The label gives up its room once the nav bar is too tight to hold it; the
+   glyph and the button's `aria-label` carry the meaning from there. */
+@media (max-width: 460px) {
+  .button > span {
+    display: none;
+  }
+}
+
+/* A finger needs a row it can hit, and these are checkboxes — the smallest
+   thing on the panel. */
+@media (pointer: coarse) {
+  .container > div > ul label {
+    padding: 10px 8px;
+    font-size: 0.95rem;
+  }
+  .container > div > ul label input {
+    width: 18px;
+    height: 18px;
   }
 }

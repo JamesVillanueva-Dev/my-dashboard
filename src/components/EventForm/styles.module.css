@@ -130,3 +130,19 @@
   opacity: 0.55;
   cursor: default;
 }
+
+/* Touch: these fields set their own size, which outranks the 16px floor in
+   `src/styles.css` — so they have to opt back into it here, or iOS zooms the
+   whole dialog in the moment a date field is focused and never zooms back out. */
+@media (pointer: coarse) {
+  .container input[type='date'],
+  .container input[type='time'],
+  .container select {
+    font-size: 16px;
+    padding: 10px 11px;
+  }
+  .check input {
+    width: 20px;
+    height: 20px;
+  }
+}

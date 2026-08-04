@@ -26,8 +26,12 @@
   box-shadow: var(--shadow);
   max-width: 620px;
   width: 100%;
-  max-height: 85vh;
+  /* dvh, not vh: on a phone `vh` measures the viewport as if the browser's
+     address bar were hidden, so a `vh`-capped dialog is taller than the screen
+     until the bar scrolls away — and its close button starts off it. */
+  max-height: 85dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Close button — the only button in the dialog. */
@@ -92,4 +96,44 @@
   color: var(--text-muted);
   font-size: 0.82rem;
   font-style: italic;
+}
+
+/* ---------- Phones: the dialog docks to the bottom ----------
+   A centred box keeps a margin on all four edges, which is exactly what a phone
+   has none of, and leaves the content sitting at the top of the screen away
+   from the thumb. Docked, it reads as a sheet pushed up over the page: full
+   width, square along the bottom, as tall as it needs up to nearly the screen. */
+@media (max-width: 560px) {
+  .container {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .container > div {
+    max-width: none;
+    max-height: 92dvh;
+    border-width: 1px 0 0;
+    border-radius: var(--radius) var(--radius) 0 0;
+    animation: rise 0.24s cubic-bezier(0.2, 0, 0, 1);
+  }
+  .container > div > div {
+    padding: 8px 20px 24px;
+    /* The home indicator would otherwise sit over the last line of the document. */
+    padding-bottom: calc(24px + var(--safe-bottom));
+  }
+  .container h2 {
+    font-size: 1.2rem;
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(16px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .container,
+  .container > div {
+    animation: none;
+  }
 }

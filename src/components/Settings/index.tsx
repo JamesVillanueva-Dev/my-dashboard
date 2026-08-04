@@ -49,7 +49,7 @@ export default function Settings() {
         aria-label="Settings"
         title="Settings"
       >
-        <Icon name="settings" /> Settings
+        <Icon name="settings" /> <span>Settings</span>
       </button>
       {open && (
         <div role="menu">

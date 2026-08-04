@@ -1,7 +1,10 @@
 /* The root spans the viewport so the sticky nav bar can run edge to edge. All
    page content is inset by .body instead. */
+/* dvh so the page is exactly the visible height on a phone. With `vh` the
+   dashboard is always taller than the screen by the height of the address bar,
+   which leaves a strip of empty gradient under the footer. */
 .container {
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* Set while a card is being dragged, to suppress text selection everywhere. */
@@ -26,6 +29,8 @@
   max-width: var(--page-max);
   margin: 0 auto;
   padding: 16px var(--page-pad) 28px;
+  /* The page's bottom edge, so this is where the home indicator gets paid for. */
+  padding-bottom: calc(28px + var(--safe-bottom));
 }
 
 /* ---------- Grid ----------
@@ -89,7 +94,8 @@
 
 @media (max-width: 560px) {
   .body {
-    padding-block: 12px 24px;
+    padding-top: 12px;
+    padding-bottom: calc(24px + var(--safe-bottom));
   }
   .body > main {
     gap: 10px;

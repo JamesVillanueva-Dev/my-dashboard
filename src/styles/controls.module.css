@@ -72,3 +72,22 @@
   border: 1px dashed var(--card-border);
   border-radius: var(--radius);
 }
+
+/* ---------------------------------------------------------------------------
+   Touch sizing.
+
+   A finger has no cursor to aim with, so every control it can reach grows to a
+   size it can hit: 44px is the platform figure (Apple 44pt, Android 48dp) and
+   clears the WCAG 2.2 minimum of 24px with room to spare. `.btn` composes
+   `.pill`, so both carry the same class and this covers them together.
+
+   `.link` is deliberately left out. It is an inline word inside a sentence —
+   padding it to 44px would break the line it sits in, and WCAG exempts targets
+   in a run of text for exactly that reason.
+   --------------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  .pill {
+    min-height: 44px;
+    padding-inline: 14px;
+  }
+}

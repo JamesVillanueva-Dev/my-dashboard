@@ -67,6 +67,10 @@
 .frame iframe {
   display: block;
   border: 0;
+  /* The element carries width="100%", but that is a *default* an author style
+     can beat — pin it so the embed can never push the panel wider than a phone. */
+  width: 100%;
+  max-width: 100%;
 }
 
 /* ---------- In-page player (Web Playback SDK) ---------- */
@@ -224,4 +228,38 @@
 .connect {
   composes: link from '../../styles/controls.module.css';
   font-size: inherit;
+}
+
+/* Touch: transport is the one place in the app where a mis-tap is immediately
+   audible, so the controls and the volume slider both grow. */
+@media (pointer: coarse) {
+  /* A pasted Spotify link is far longer than 140px of field, and the panel is
+     one column wide by now — give it the whole line. */
+  .form input {
+    flex-basis: 100%;
+  }
+  .del {
+    padding: 8px 6px;
+  }
+  .transport {
+    gap: 18px;
+  }
+  .transport button:not(.playPause),
+  .volume button {
+    padding: 10px;
+  }
+  /* A 13px thumb is not something a finger can catch mid-scroll. Widening the
+     track's own box gives it a grab area without moving the rail it draws. */
+  .volume input[type='range'] {
+    height: 30px;
+  }
+  .volume input[type='range']::-webkit-slider-thumb {
+    width: 18px;
+    height: 18px;
+    margin-top: -7px;
+  }
+  .volume input[type='range']::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+  }
 }

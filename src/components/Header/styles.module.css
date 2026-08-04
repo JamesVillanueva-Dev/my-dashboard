@@ -2,6 +2,8 @@
    side padding, and — should --page-max ever be capped to a length again — grows
    to match, so the clock and controls stay aligned with the grid below instead
    of drifting to the edges. */
+/* The bar is the top edge of the page, so on a notched phone it is the thing
+   sitting under the status bar — it pays the top inset for the whole layout. */
 .container {
   position: sticky;
   top: 0;
@@ -11,6 +13,7 @@
   justify-content: space-between;
   gap: 16px;
   padding: 10px max(var(--page-pad), calc((100% - var(--page-max)) / 2 + var(--page-pad)));
+  padding-top: calc(10px + var(--safe-top));
   border-bottom: 1px solid var(--card-border);
   background: var(--bg);
 }
@@ -48,12 +51,24 @@
 @media (max-width: 560px) {
   .container {
     padding-block: 8px;
-    gap: 10px;
+    padding-top: calc(8px + var(--safe-top));
+    gap: 8px;
   }
   .container time {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
   }
   .container > div {
-    gap: 8px;
+    gap: 6px;
+  }
+}
+
+/* The bar holds five things and a phone is 375px wide, so at this point the
+   labels on the Widgets and Settings buttons give up their room and each drops
+   to its icon (see those components' own stylesheets). Both keep their
+   `aria-label` and `title`, so what they do is still available to a screen
+   reader and to a long press. */
+@media (max-width: 460px) {
+  .container time {
+    font-size: 1rem;
   }
 }

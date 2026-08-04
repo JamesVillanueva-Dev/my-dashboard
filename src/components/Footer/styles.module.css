@@ -186,3 +186,12 @@
     gap: 20px;
   }
 }
+
+/* These are inline text links, so they keep their size — WCAG exempts targets
+   in a run of text. What they get instead is the spacing exception: enough room
+   between the lines that a thumb cannot hit two of them at once. */
+@media (pointer: coarse) {
+  .group ul {
+    gap: 14px;
+  }
+}

@@ -189,8 +189,26 @@
      Set a length here (e.g. 1800px) to cap it again on ultrawide monitors — the
      nav bar's padding formula keeps the bar lined up with the grid either way. */
   --page-max: 100%;
-  /* Just enough to keep panels off the screen edge. */
-  --page-pad: clamp(10px, 1vw, 20px);
+
+  /* Just enough to keep panels off the screen edge... */
+  --page-gutter: clamp(10px, 1vw, 20px);
+  /* ...and never underneath a rounded corner or a camera cutout. The page is
+     `viewport-fit=cover`, so the display's own insets are ours to pay back.
+     Both sides take the larger inset rather than their own: a phone held in
+     landscape is inset on one side only, and content that shifts off-centre to
+     hug a notch looks broken in a way that a little extra symmetric padding
+     does not. The 0px fallbacks matter — a bare env() on a browser without
+     safe areas would invalidate the whole declaration. */
+  --page-pad: max(
+    var(--page-gutter),
+    env(safe-area-inset-left, 0px),
+    env(safe-area-inset-right, 0px)
+  );
+  /* The vertical insets are asymmetric by nature (status bar, home indicator),
+     so these stay separate and are applied where the page actually meets them:
+     the sticky nav bar at the top, the footer at the bottom. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ---------------------------------------------------------------------------
@@ -220,11 +238,26 @@ body {
     radial-gradient(900px 500px at 0% 0%, var(--bg-grad-2), transparent), var(--bg);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  /* Stop iOS inflating body text when a phone is turned to landscape, which
+     silently breaks every size relationship the layout is built on. */
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 button {
   font-family: inherit;
   cursor: pointer;
+}
+
+/* Safari paints a grey block over any tapped control by default, which fires on
+   scroll-starts as well as taps and reads as a glitch. The app's own :hover and
+   :active states already say a control was pressed. */
+button,
+a,
+label,
+input,
+summary {
+  -webkit-tap-highlight-color: transparent;
 }
 
 input,
@@ -250,4 +283,31 @@ input:focus,
 textarea:focus {
   outline: 2px solid var(--accent-soft);
   border-color: var(--accent);
+}
+
+/* Touch devices get bigger controls throughout, so a finger has something to
+   land on. These are the two rules that have to be global: every text field in
+   the app inherits its size from here, and every one of them is a tap target. */
+@media (pointer: coarse) {
+  /* iOS Safari zooms the page in on any focused field under 16px and does not
+     zoom back out — the fix is the font size itself, not a viewport lock, which
+     would take pinch-zoom away from everyone. Only the focused control is
+     measured, so labels and hints elsewhere can stay small.
+
+     The attribute selectors are repeated from the base rule above deliberately:
+     without them this block is less specific than it and would lose. Component
+     modules that set their own field size have to opt back in the same way. */
+  input,
+  textarea,
+  select,
+  input[type='text'],
+  input[type='datetime-local'] {
+    font-size: 16px;
+  }
+
+  input[type='text'],
+  input[type='datetime-local'],
+  textarea {
+    padding: 10px 12px;
+  }
 }

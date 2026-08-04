@@ -44,7 +44,7 @@ export default function WidgetMenu({
         aria-label="Manage widgets"
         title="Manage widgets"
       >
-        <Icon name="grid" /> Widgets
+        <Icon name="grid" /> <span>Widgets</span>
       </button>
       {open && (
         <div role="menu">

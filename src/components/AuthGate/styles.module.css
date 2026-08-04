@@ -8,8 +8,10 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 100vh;
-  padding: 24px 16px;
+  /* dvh so the card is centred in the screen a phone actually shows, rather
+     than in a viewport that assumes the address bar has scrolled away. */
+  min-height: 100dvh;
+  padding: calc(24px + var(--safe-top)) var(--page-pad) calc(24px + var(--safe-bottom));
   text-align: center;
 }
 

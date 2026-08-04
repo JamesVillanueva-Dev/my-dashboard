@@ -201,6 +201,16 @@
   border-radius: 4px;
 }
 
+/* One column, so a panel is already as wide as the screen and the handle's
+   horizontal axis has nowhere to go — Dashboard clamps the width to the single
+   column that exists. Say so with the cursor rather than implying a drag that
+   cannot happen. */
+@media (max-width: 640px) {
+  .handle {
+    cursor: ns-resize;
+  }
+}
+
 @media (max-width: 560px) {
   .container {
     padding: 15px;
