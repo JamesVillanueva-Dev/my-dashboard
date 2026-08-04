@@ -80,10 +80,11 @@ src/
 │   ├── googleAuth.ts         in-memory OAuth token handling
 │   └── clerkAuth.ts          Clerk key + "is auth enabled?" check
 └── components/
-    ├── Dashboard/            the grid: layout, drag-to-reorder, footer
+    ├── Dashboard/            the grid: layout, drag-to-reorder
     ├── AuthGate/             optional Clerk sign-in gate + storage scope
     ├── Header/               clock, quick links, settings
     ├── QuickLinks/           bookmark shortcuts in the nav bar
+    ├── Footer/               identity, source credits, legal links
     ├── UserMenu/             Clerk avatar menu (hidden when auth is off)
     ├── WidgetMenu/           enable/disable widgets
     ├── Widget/               card shell every widget renders into (+ chrome.ts)

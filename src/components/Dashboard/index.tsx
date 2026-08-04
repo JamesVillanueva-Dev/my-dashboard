@@ -11,6 +11,7 @@ import { WidgetChromeProvider } from '../Widget/chrome';
 import Header from '../Header';
 import Greeting from '../Greeting';
 import TodayPanel from '../TodayPanel';
+import Footer from '../Footer';
 import WidgetMenu from '../WidgetMenu';
 import { DashboardDataProvider } from '../../hooks/DashboardDataProvider';
 import { DEFAULT_LAYOUT, nextSize, widgetById, type WidgetSize } from '../../lib/registry';
@@ -343,16 +344,7 @@ export default function Dashboard() {
             </main>
           )}
 
-          <footer>
-            <nav aria-label="Legal">
-              <button onClick={() => setLegal('privacy')}>Privacy Policy</button>
-              <span aria-hidden="true">·</span>
-              <button onClick={() => setLegal('terms')}>Terms of Service</button>
-            </nav>
-            <span>
-              Weather by Open-Meteo · Headlines via public RSS · Your data stays in this browser
-            </span>
-          </footer>
+          <Footer onOpenLegal={setLegal} />
         </div>
 
         <LegalModal doc={legal} onClose={() => setLegal(null)} />

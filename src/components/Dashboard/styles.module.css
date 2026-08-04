@@ -78,31 +78,6 @@
   border: 0;
 }
 
-/* ---------- Footer ---------- */
-.body > footer {
-  margin-top: 28px;
-  text-align: center;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-.body > footer nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.body > footer button {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--accent);
-  text-decoration: underline;
-  font-size: 0.8rem;
-}
-
 /* Below roughly three columns' worth of room, a `wide` panel cannot have its
    three columns. Step the caps down rather than letting the grid overflow. */
 @media (max-width: 1000px) {
