@@ -53,12 +53,19 @@ sharing a browser don't see each other's dashboards. The first account to sign i
 inherits any data saved before auth was switched on. Sign out from the avatar menu
 in the header. See [ADR 0003](docs/adr/0003-clerk-authentication.md).
 
-Signing in also **restores your dashboard**. Layout, panel sizes, theme, tasks,
-notes, quick links, and your saved music sources are mirrored into your Clerk
-account, pulled down before the page paints and pushed back as you change things.
-Sign in on a new device — or in a browser that clears site data on exit — and your
+Signing in also **restores your dashboard**. Theme, tasks, notes, quick links,
+your name, and your saved music sources are mirrored into your Clerk account,
+pulled down before the page paints and pushed back as you change things. Sign in
+on a new device — or in a browser that clears site data on exit — and your
 dashboard comes with you. Still no backend: Clerk's user metadata is written
 straight from the browser. See [ADR 0008](docs/adr/0008-account-synced-dashboard-state.md).
+
+**Layout is kept separately for desktop and mobile.** Panel order, widget sizes,
+and the daily-focus toggle are saved per device shape, so a three-column desktop
+arrangement and a phone layout never overwrite each other. Everything else is
+shared — a note written on your phone is on your PC. A device counts as mobile if
+it has a touch-first pointer, so resizing a desktop window narrow won't switch you
+into the phone's layout.
 
 Two limits worth knowing:
 
@@ -131,7 +138,7 @@ src/
 │   └── useProfileSync.ts     pulls/pushes the dashboard to the Clerk account
 ├── lib/
 │   ├── registry.tsx          catalogue of available widgets
-│   ├── profileSync.ts        which keys follow the account, and conflict rules
+│   ├── profileSync.ts        shared vs per-device keys, and conflict rules
 │   ├── themes.ts             the colour schemes offered in settings
 │   ├── spotifyAuth.ts        Spotify OAuth (PKCE), opt-in
 │   ├── cache.ts              stale-while-revalidate store behind the hook above

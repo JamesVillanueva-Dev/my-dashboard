@@ -1,4 +1,4 @@
-# ADR 0008: Dashboard state follows the account, via Clerk user metadata
+# ADR 0008: Dashboard state follows the account, with layout kept per device
 
 - **Status:** Accepted
 - **Date:** 2026-08-04
@@ -29,8 +29,28 @@ the device, reachable without a server of ours.
 **Mirror the user-authored subset of `localStorage` into Clerk's
 `unsafeMetadata`, pulling on sign-in and pushing on change.**
 
-1. **An allowlist, not "everything".** `SYNCED_KEYS` names what travels. Two
-   exclusions carry real weight:
+0. **Layout is per form factor; content is shared.** A three-column desktop
+   arrangement is not a phone layout, and syncing them as one value means each
+   device overwrites the other on every visit. So the snapshot splits: a shared
+   core, plus a slice per form factor holding `DEVICE_KEYS` — panel order, widget
+   sizes, and the daily-focus toggle. Everything a user *authored* — notes,
+   tasks, links, saved sources — stays shared, because a note written on a phone
+   that did not exist on the PC would be a bug, not a feature.
+
+   Only layout is duplicated, which matters against the 8KB cap below: an id list
+   and a small map cost little, whereas duplicating content would nearly halve
+   the room available for it.
+
+   The form factor is `pointer: coarse`, the query the touch styles already use.
+   It describes the *device*, so narrowing a desktop window cannot flip you into
+   the phone's layout and start saving over it — which a width breakpoint would.
+
+   A push republishes every other form factor's slice verbatim. The account holds
+   one metadata blob, so a phone that saved only its own arrangement would delete
+   the PC's.
+
+1. **An allowlist, not "everything".** `SHARED_KEYS` and `DEVICE_KEYS` name what
+   travels. Two exclusions carry real weight:
    - **`cache:*`** — cached weather and headlines. Public, refetchable, and
      individually large enough to exhaust the metadata budget.
    - **`gcal.syncToken`** — Google's incremental-sync cursor. It records what
@@ -86,6 +106,8 @@ the device, reachable without a server of ours.
 
 - Signing in on any device or browser restores the dashboard. This is what
   users assume signing in already did.
+- A phone and a PC each keep the arrangement that suits their screen, while
+  still sharing one set of notes, tasks and saved sources.
 - Survives a browser that clears site data on exit, which `localStorage` alone
   never could.
 - No backend, so ADR 0001 still holds.
@@ -97,7 +119,12 @@ the device, reachable without a server of ours.
   the visible error rather than a silent one — but it does mean the Notes widget
   can outgrow sync while the rest of the dashboard keeps working.
 - **Last-write-wins loses edits.** Two devices changed while offline, and the
-  older one's changes are gone. Documented, not solved.
+  older one's changes are gone. Because a push republishes the other slice from
+  whatever remote copy it last saw, a losing device can also have its *layout*
+  reverted, not just its content. Documented, not solved.
+- **Only two form factors.** A tablet is whatever `pointer: coarse` says it is,
+  which lumps it in with phones. Splitting further would multiply layouts against
+  a fixed byte budget for a distinction few users would notice.
 - **The pull reads metadata Clerk already delivered**, so it costs no round trip
   — but it is therefore only as fresh as Clerk's session. A device that has been
   open for hours pulls what it was handed at sign-in.

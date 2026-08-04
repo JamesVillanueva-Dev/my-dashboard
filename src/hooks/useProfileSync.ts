@@ -6,11 +6,14 @@ import {
   SYNCED_KEYS,
   apply,
   collect,
+  detectFormFactor,
   markLocal,
   measure,
+  merge,
   overBudget,
   readSnapshot,
   resolve,
+  type FormFactor,
   type ProfileSnapshot,
 } from '../lib/profileSync';
 import { onStorageWrite } from './useLocalStorage';
@@ -33,6 +36,15 @@ export interface SyncUser {
   id: string;
   unsafeMetadata: unknown;
   update: (params: { unsafeMetadata: Record<string, unknown> }) => Promise<unknown>;
+}
+
+/**
+ * What this browser's synced state looks like, for "did anything really change?"
+ * Covers the shared core and this device's layout, but not other devices' —
+ * those are carried through untouched and can never be a local edit.
+ */
+function fingerprintOf(snapshot: ProfileSnapshot): string {
+  return JSON.stringify([snapshot.data, snapshot.devices]);
 }
 
 /** Formats an over-budget snapshot into something a person can act on. */
@@ -80,15 +92,18 @@ export function useProfileSync(user: SyncUser | null): ProfileSync {
    */
   const lastSynced = useRef<string | null>(null);
 
-  const push = useCallback(async (current: SyncUser, baseline: string) => {
-    const data = collect(current.id).data;
-    const fingerprint = JSON.stringify(data);
+  const push = useCallback(async (current: SyncUser, formFactor: FormFactor, baseline: string) => {
+    const local = collect(current.id, formFactor);
+    const fingerprint = fingerprintOf(local);
     // Nothing actually differs from what the account holds; don't touch the
     // stamp and don't spend a write.
     if (fingerprint === (lastSynced.current ?? baseline)) return;
 
     const at = Date.now();
-    const snapshot: ProfileSnapshot = { v: 1, updatedAt: at, data };
+    // Republish the other form factor's layout verbatim — the account holds one
+    // blob, so a push that forgot it would delete the other device's arrangement.
+    const remote = readSnapshot(current.unsafeMetadata, formFactor);
+    const snapshot: ProfileSnapshot = { ...merge(local, remote), updatedAt: at };
     const culprits = overBudget(snapshot);
     if (culprits.length > 0) {
       setStatus('error');
@@ -115,19 +130,25 @@ export function useProfileSync(user: SyncUser | null): ProfileSync {
 
   // Settle local against the account, before children render. See the note above
   // on why this is an initializer and not an effect.
-  const [initial] = useState<{ action: 'push' | 'pull' | 'idle'; baseline: string }>(() => {
-    if (!user) return { action: 'idle', baseline: '' };
-    const local = collect(user.id);
-    const remote = readSnapshot(user.unsafeMetadata);
+  const [initial] = useState<{
+    action: 'push' | 'pull' | 'idle';
+    baseline: string;
+    formFactor: FormFactor;
+  }>(() => {
+    const formFactor = detectFormFactor();
+    if (!user) return { action: 'idle', baseline: '', formFactor };
+
+    const local = collect(user.id, formFactor);
+    const remote = readSnapshot(user.unsafeMetadata, formFactor);
     const action = resolve(local, remote);
 
-    if (action === 'pull' && remote) apply(user.id, remote);
+    if (action === 'pull' && remote) apply(user.id, remote, formFactor);
     // A first-ever push still needs a stamp, or every later comparison ties.
     if (action === 'push' && !local.updatedAt) markLocal(user.id);
 
     // Whatever we settled on is the shared baseline, so the mount-time writes
     // that follow are correctly seen as "no change".
-    return { action, baseline: JSON.stringify(collect(user.id).data) };
+    return { action, baseline: fingerprintOf(collect(user.id, formFactor)), formFactor };
   });
 
   // This browser won, so the account needs catching up. Forced past the no-op
@@ -138,7 +159,7 @@ export function useProfileSync(user: SyncUser | null): ProfileSync {
   // the dashboard in the same commit that mounted it.
   useEffect(() => {
     if (!user || initial.action !== 'push') return;
-    queueMicrotask(() => void push(user, ''));
+    queueMicrotask(() => void push(user, initial.formFactor, ''));
   }, [user, initial, push]);
 
   // Steady state: a synced write schedules a push once the dashboard goes quiet.
@@ -149,7 +170,10 @@ export function useProfileSync(user: SyncUser | null): ProfileSync {
     const unsubscribe = onStorageWrite((key) => {
       if (!synced.has(key)) return;
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => void push(user, initial.baseline), DEBOUNCE_MS);
+      timer.current = setTimeout(
+        () => void push(user, initial.formFactor, initial.baseline),
+        DEBOUNCE_MS,
+      );
     });
 
     return () => {

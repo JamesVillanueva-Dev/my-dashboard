@@ -42,9 +42,10 @@ describe('useProfileSync — signed out', () => {
 describe('useProfileSync — hydration', () => {
   it('pulls the account’s dashboard into an empty browser before widgets mount', async () => {
     const remote: ProfileSnapshot = {
-      v: 1,
+      v: 2,
       updatedAt: 900,
       data: { 'youtube.sources': '[{"id":"1","label":"From my account"}]' },
+      devices: {},
     };
     const user = fakeUser({ [METADATA_KEY]: remote });
 
@@ -70,7 +71,7 @@ describe('useProfileSync — hydration', () => {
     localStorage.setItem(at('notes.text'), '"newer local"');
     markLocal(ID, 9000);
     const user = fakeUser({
-      [METADATA_KEY]: { v: 1, updatedAt: 100, data: { 'notes.text': '"older remote"' } },
+      [METADATA_KEY]: { v: 2, updatedAt: 100, data: { 'notes.text': '"older remote"' }, devices: {} },
     });
 
     renderHook(() => useProfileSync(user));
@@ -88,6 +89,74 @@ describe('useProfileSync — hydration', () => {
     renderHook(() => useProfileSync(user));
 
     expect(localStorage.getItem(at('notes.text'))).toBe('"local"');
+  });
+});
+
+describe('useProfileSync — desktop and mobile', () => {
+  /** Makes `detectFormFactor()` report a touch device for this test. */
+  function asMobile() {
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) => ({ matches: query.includes('coarse') }) as MediaQueryList,
+    );
+  }
+
+  it('takes the mobile layout, not the desktop one, on a phone', () => {
+    const user = fakeUser({
+      [METADATA_KEY]: {
+        v: 2,
+        updatedAt: 900,
+        data: {},
+        devices: {
+          desktop: { data: { layout: '["reminders","calendar","news"]' } },
+          mobile: { data: { layout: '["reminders"]' } },
+        },
+      },
+    });
+    asMobile();
+
+    renderHook(() => useProfileSync(user));
+
+    expect(localStorage.getItem(at('layout'))).toBe('["reminders"]');
+  });
+
+  it('does not delete the desktop layout when a phone saves its own', async () => {
+    // The account as a PC left it.
+    const user = fakeUser({
+      [METADATA_KEY]: {
+        v: 2,
+        updatedAt: 100,
+        data: {},
+        devices: { desktop: { data: { layout: '["reminders","calendar","news"]' } } },
+      },
+    });
+    // This phone has a newer arrangement of its own.
+    localStorage.setItem(at('layout'), '["notes"]');
+    markLocal(ID, 9000);
+    asMobile();
+
+    renderHook(() => useProfileSync(user));
+
+    await waitFor(() => expect(user.update).toHaveBeenCalled());
+    const saved = stored(user);
+    expect(saved.devices.mobile?.data['layout']).toBe('["notes"]');
+    // The whole point of the split.
+    expect(saved.devices.desktop?.data['layout']).toBe('["reminders","calendar","news"]');
+  });
+
+  it('still shares content across both', async () => {
+    const user = fakeUser({
+      [METADATA_KEY]: {
+        v: 2,
+        updatedAt: 900,
+        data: { 'notes.text': '"written on the PC"' },
+        devices: { desktop: { data: { layout: '["notes"]' } } },
+      },
+    });
+    asMobile();
+
+    renderHook(() => useProfileSync(user));
+
+    expect(localStorage.getItem(at('notes.text'))).toBe('"written on the PC"');
   });
 });
 
