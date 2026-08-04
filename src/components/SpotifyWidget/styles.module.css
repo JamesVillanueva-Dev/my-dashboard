@@ -69,6 +69,147 @@
   border: 0;
 }
 
+/* ---------- In-page player (Web Playback SDK) ---------- */
+
+/* Only rendered when a Premium device is live; otherwise the embed above shows. */
+.player {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--well);
+  box-shadow: var(--well-shadow);
+}
+
+/* Now playing: album art beside the track/artist stack. */
+.now {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.now img {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  flex: none;
+  object-fit: cover;
+}
+.now > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* Long titles truncate rather than wrapping the card out of shape. */
+.now strong,
+.now span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.now strong {
+  font-size: 0.95rem;
+}
+.now span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+/* Secondary transport and the volume icon share one bare-icon treatment.
+   `:not(.playPause)` matters: without it this selector outranks the `.playPause`
+   class below and silently cancels the filled accent it composes in. */
+.transport button:not(.playPause),
+.volume button {
+  background: none;
+  border: none;
+  padding: 4px;
+  color: var(--text);
+  font-size: 1.15rem;
+  line-height: 1;
+  display: inline-flex;
+  border-radius: 8px;
+}
+.transport button:not(.playPause):hover,
+.volume button:hover {
+  color: var(--accent);
+}
+
+/* The primary control, so it gets the filled accent treatment. */
+.playPause {
+  composes: btn from '../../styles/controls.module.css';
+  border-radius: 999px;
+  padding: 9px;
+  font-size: 1.25rem;
+  display: inline-flex;
+  line-height: 1;
+}
+.playPause:hover {
+  color: var(--accent-text);
+}
+
+/* ---------- Volume ---------- */
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* Percentage readout, fixed width so the slider doesn't jump as it changes. */
+.volume span {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  min-width: 34px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.volume input[type='range'] {
+  flex: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  height: 18px;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+}
+.volume input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--card-border);
+}
+.volume input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--card-border);
+}
+.volume input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -4.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+.volume input[type='range']::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+}
+.volume input[type='range']:focus-visible {
+  outline: 2px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+
 /* Shown when every source has been removed. */
 .empty {
   composes: empty from '../../styles/controls.module.css';
@@ -77,4 +218,10 @@
 .hint {
   composes: muted small from '../../styles/controls.module.css';
   margin: 10px 0 0;
+}
+
+/* Inline "Connect Spotify Premium" / "Disconnect" actions inside a hint line. */
+.connect {
+  composes: link from '../../styles/controls.module.css';
+  font-size: inherit;
 }

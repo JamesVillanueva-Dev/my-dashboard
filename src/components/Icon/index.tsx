@@ -163,6 +163,41 @@ const ICONS = {
   resize: <path d="M12 4v16M8 9l-4 3 4 3M16 9l4 3-4 3" />,
   chevronLeft: <path d="m15 18-6-6 6-6" />,
   chevronRight: <path d="m9 18 6-6-6-6" />,
+
+  /* ---------- Media transport (Spotify player) ---------- */
+  play: <path d="M7 4.5v15l12-7.5-12-7.5Z" />,
+  pause: (
+    <>
+      <rect x="6" y="4" width="4" height="16" rx="1" />
+      <rect x="14" y="4" width="4" height="16" rx="1" />
+    </>
+  ),
+  skipBack: (
+    <>
+      <path d="M19 5v14L9 12l10-7Z" />
+      <path d="M5 5v14" />
+    </>
+  ),
+  skipForward: (
+    <>
+      <path d="M5 5v14l10-7L5 5Z" />
+      <path d="M19 5v14" />
+    </>
+  ),
+  /* Speaker with two arcs; the muted variant swaps them for a cross. */
+  volume: (
+    <>
+      <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+    </>
+  ),
+  volumeMute: (
+    <>
+      <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+      <path d="m16 9 5 6M21 9l-5 6" />
+    </>
+  ),
   plus: <path d="M5 12h14M12 5v14" />,
   check: <path d="M20 6 9 17l-5-5" />,
   refresh: (

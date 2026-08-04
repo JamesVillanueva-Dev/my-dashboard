@@ -118,6 +118,22 @@ layout fits how I work.
 - I can reset to the default layout.
 - If I remove everything, I get a friendly empty state pointing to the menu.
 
+### US-16 — Music (done)
+As a user, I want music on the dashboard, so that I can start a playlist without
+leaving the page.
+
+**Acceptance criteria**
+- I save Spotify sources (playlist, album, track, artist, episode, show) by
+  pasting a share link, and switch between them with tabs.
+- Sources and my current selection persist.
+- With no setup, playback uses Spotify's embedded player.
+- If I configure a Spotify app and connect a **Premium** account, the panel
+  becomes a real player with a **volume slider**, mute, and play/pause/next/
+  previous; my volume level is remembered.
+- On a free account — or without the setup — it falls back to the embedded
+  player and says why. Spotify's embed cannot be volume-controlled from the
+  page, so the slider only appears with the real player.
+
 ---
 
 ## Epic: Trust & robustness

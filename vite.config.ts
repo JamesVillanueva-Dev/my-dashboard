@@ -25,6 +25,7 @@ export default defineConfig({
     env: {
       VITE_CLERK_PUBLISHABLE_KEY: '',
       VITE_GOOGLE_CLIENT_ID: '',
+      VITE_SPOTIFY_CLIENT_ID: '',
     },
   },
 })

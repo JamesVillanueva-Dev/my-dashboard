@@ -55,6 +55,28 @@ Note that Clerk authenticates you; it does **not** sync your data. Signing in on
 different device gives you an empty dashboard, because widgets still read from that
 browser's `localStorage`.
 
+### Optional: in-page Spotify player
+
+The Spotify panel uses Spotify's iframe embed by default, which works with no
+setup but cannot be volume-controlled — a cross-origin frame is closed to the
+host page, and Spotify's iFrame API exposes no volume method.
+
+Setting a `VITE_SPOTIFY_CLIENT_ID` swaps in a real Web Playback SDK device with
+its own volume slider and transport controls:
+
+```bash
+# .env.local
+VITE_SPOTIFY_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Create an app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
+and register every redirect URI you use — Spotify matches them exactly, so local
+dev and the deployed site each need their own entry.
+
+This needs **Spotify Premium**; Spotify does not allow in-page playback on free
+accounts. Without a key, without connecting, or on a free account, the panel
+keeps the embedded player. See [ADR 0006](docs/adr/0006-spotify-in-page-player.md).
+
 ## Project structure
 
 Every component lives in one flat `src/components/` directory, each in its own
@@ -71,10 +93,12 @@ src/
 │   ├── useCachedResource.ts  cached, refreshable network reads
 │   ├── useCalendarSync.ts    drives the optional Google Calendar sync
 │   ├── useTheme.ts           colour-scheme preference + data-theme/favicon
-│   └── useDismiss.ts         outside-click / Escape dismissal for popovers
+│   ├── useDismiss.ts         outside-click / Escape dismissal for popovers
+│   └── useSpotifyPlayer.ts   optional Web Playback SDK device + volume
 ├── lib/
 │   ├── registry.tsx          catalogue of available widgets
 │   ├── themes.ts             the colour schemes offered in settings
+│   ├── spotifyAuth.ts        Spotify OAuth (PKCE), opt-in
 │   ├── cache.ts              stale-while-revalidate store behind the hook above
 │   ├── gcalSync.ts           Google Calendar reconciliation
 │   ├── googleAuth.ts         in-memory OAuth token handling
@@ -115,4 +139,5 @@ npm run create:component -- EventsCard --no-test
 - [ADR 0001 — Client-only dashboard architecture](docs/adr/0001-client-only-dashboard-architecture.md)
 - [ADR 0002 — Google Calendar integration](docs/adr/0002-google-calendar-integration.md)
 - [ADR 0003 — Clerk authentication and per-user local data](docs/adr/0003-clerk-authentication.md)
+- [ADR 0006 — Opt-in Spotify in-page player](docs/adr/0006-spotify-in-page-player.md)
 - [User stories](docs/user-stories.md) · [Wireframes](docs/wireframes.md)
