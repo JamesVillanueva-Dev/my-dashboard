@@ -72,44 +72,83 @@ describe('Dashboard', () => {
     expect(screen.queryByRole('heading', { level: 2, name: 'Notes' })).not.toBeInTheDocument();
   });
 
-  it('cycles a panel through the sizes and persists the choice', async () => {
+  it('widens a panel with the arrow keys and persists the new width', async () => {
     const user = userEvent.setup();
     render(<Dashboard />);
 
-    // Weather ships as compact.
-    const resize = screen.getByRole('button', { name: /resize weather/i });
-    expect(resize).toHaveAccessibleName(/currently compact/i);
+    // Weather ships one column wide.
+    const handle = screen.getByRole('button', { name: /^resize weather/i });
+    expect(handle).toHaveAccessibleName(/1 column wide/i);
 
-    await user.click(resize);
-    expect(screen.getByRole('button', { name: /resize weather/i })).toHaveAccessibleName(
-      /currently standard/i,
+    handle.focus();
+    await user.keyboard('{ArrowRight}{ArrowRight}');
+
+    expect(screen.getByRole('button', { name: /^resize weather/i })).toHaveAccessibleName(
+      /3 columns wide/i,
     );
     expect(JSON.parse(localStorage.getItem('widget.sizes')!)).toMatchObject({
-      weather: 'standard',
+      weather: { cols: 3, height: null },
     });
+    expect(screen.getByText(/weather resized to 3 columns wide/i)).toBeInTheDocument();
+  });
 
-    // compact -> standard -> wide -> back to compact.
-    await user.click(screen.getByRole('button', { name: /resize weather/i }));
-    await user.click(screen.getByRole('button', { name: /resize weather/i }));
-    expect(screen.getByRole('button', { name: /resize weather/i })).toHaveAccessibleName(
-      /currently compact/i,
+  it('will not narrow a panel past a single column', async () => {
+    const user = userEvent.setup();
+    render(<Dashboard />);
+
+    screen.getByRole('button', { name: /^resize weather/i }).focus();
+    await user.keyboard('{ArrowLeft}{ArrowLeft}');
+
+    expect(screen.getByRole('button', { name: /^resize weather/i })).toHaveAccessibleName(
+      /1 column wide/i,
+    );
+  });
+
+  it('pins a height with the arrow keys, then fits it back to the content', async () => {
+    const user = userEvent.setup();
+    render(<Dashboard />);
+
+    const handle = screen.getByRole('button', { name: /^resize weather/i });
+    expect(handle).toHaveAccessibleName(/height fits the content/i);
+
+    handle.focus();
+    await user.keyboard('{ArrowDown}');
+    // jsdom lays nothing out, so the panel measures 0 tall and the first press
+    // lands on the floor rather than one step above it.
+    expect(screen.getByRole('button', { name: /^resize weather/i })).toHaveAccessibleName(
+      /120 pixels tall/i,
+    );
+
+    // Enter unpins, the keyboard equivalent of double-clicking the handle.
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('button', { name: /^resize weather/i })).toHaveAccessibleName(
+      /height fits the content/i,
+    );
+  });
+
+  it('reads back the named widths saved before panels were freely resizable', () => {
+    localStorage.setItem('widget.sizes', JSON.stringify({ weather: 'wide' }));
+    render(<Dashboard />);
+
+    expect(screen.getByRole('button', { name: /^resize weather/i })).toHaveAccessibleName(
+      /3 columns wide/i,
     );
   });
 
   it('restores default sizes on reset', async () => {
-    localStorage.setItem('widget.sizes', JSON.stringify({ weather: 'wide' }));
+    localStorage.setItem('widget.sizes', JSON.stringify({ weather: { cols: 4, height: 400 } }));
     const user = userEvent.setup();
     render(<Dashboard />);
 
-    expect(screen.getByRole('button', { name: /resize weather/i })).toHaveAccessibleName(
-      /currently wide/i,
+    expect(screen.getByRole('button', { name: /^resize weather/i })).toHaveAccessibleName(
+      /4 columns wide, 400 pixels tall/i,
     );
 
     await user.click(screen.getByRole('button', { name: /manage widgets/i }));
     await user.click(screen.getByRole('button', { name: /reset layout and sizes/i }));
 
-    expect(screen.getByRole('button', { name: /resize weather/i })).toHaveAccessibleName(
-      /currently compact/i,
+    expect(screen.getByRole('button', { name: /^resize weather/i })).toHaveAccessibleName(
+      /1 column wide, height fits the content/i,
     );
   });
 

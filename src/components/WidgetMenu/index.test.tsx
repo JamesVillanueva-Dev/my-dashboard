@@ -108,7 +108,7 @@ describe('WidgetMenu', () => {
 
     open();
 
-    expect(screen.getByText(/Resize a panel from the/)).toBeInTheDocument();
+    expect(screen.getByText(/Drag a panel's bottom-right corner/)).toBeInTheDocument();
   });
 
   describe('dismissal', () => {

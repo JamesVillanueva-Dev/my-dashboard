@@ -10,7 +10,17 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  /* Anchors the corner resize handle, and the grid item's --h sizes this box. */
+  position: relative;
   transition: background 0.18s, box-shadow 0.18s, border-color 0.18s;
+}
+
+/* Once the height is pinned by a drag the card no longer grows with its content,
+   so the body takes the leftover room and scrolls whatever does not fit. */
+.container.isPinned > div {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* Tier 3: reference material you glance at. Tighter padding and a smaller type
@@ -34,6 +44,13 @@
 .container.isDragging {
   background: var(--card);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28), 0 4px 10px rgba(0, 0, 0, 0.18);
+  border-color: var(--accent);
+  transition: none;
+}
+
+/* A panel being resized stays in place; only its edge lights up, so the accent
+   border reads as the thing you are dragging. */
+.container.isResizing {
   border-color: var(--accent);
   transition: none;
 }
@@ -120,9 +137,8 @@
   cursor: grabbing;
 }
 
-/* ---------- Resize and remove buttons ----------
-   Both stay out of the way until the panel is hovered, matching the grip. */
-.resize,
+/* ---------- Remove button ----------
+   Stays out of the way until the panel is hovered, matching the grip. */
 .remove {
   background: none;
   border: none;
@@ -133,23 +149,56 @@
   opacity: 0;
   transition: opacity 0.15s, color 0.15s;
 }
-.container:hover .resize,
 .container:hover .remove {
   opacity: 0.6;
-}
-.resize:hover,
-.resize:focus-visible {
-  opacity: 1;
-  color: var(--accent);
 }
 .remove:hover {
   opacity: 1;
   color: var(--danger);
 }
-/* Keyboard users need to see these even without hover. */
-.resize:focus-visible,
+/* Keyboard users need to see this even without hover. */
 .remove:focus-visible {
   opacity: 1;
+}
+
+/* ---------- Resize handle ----------
+   Sits in the corner both axes meet at, because one drag sets width and height
+   together. Quiet until hover, like the other controls. */
+.handle {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  color: var(--text-muted);
+  opacity: 0;
+  touch-action: none;
+  transition: opacity 0.15s, color 0.15s;
+}
+/* Two strokes meeting at the corner — the shape of the box being dragged, drawn
+   without an icon so it can hug the padding edge exactly. */
+.handle::after {
+  content: '';
+  position: absolute;
+  inset: 5px 4px 4px 5px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  border-bottom-right-radius: 3px;
+}
+.container:hover .handle {
+  opacity: 0.55;
+}
+.handle:hover,
+.handle:focus-visible,
+.container.isResizing .handle {
+  opacity: 1;
+  color: var(--accent);
+}
+.handle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 4px;
 }
 
 @media (max-width: 560px) {
@@ -158,19 +207,23 @@
   }
 }
 
-/* Touch devices have no :hover to reveal the remove button, so show it faintly
-   and give both controls a larger tap target. */
+/* Touch devices have no :hover to reveal the controls, so show them faintly and
+   give each a larger tap target. */
 @media (hover: none) {
   .grip,
-  .resize,
-  .remove {
+  .remove,
+  .handle {
     opacity: 0.55;
   }
 }
 @media (pointer: coarse) {
   .grip,
-  .resize,
   .remove {
     padding: 8px;
+  }
+  /* The handle is absolutely positioned, so it grows rather than pads. */
+  .handle {
+    width: 30px;
+    height: 30px;
   }
 }

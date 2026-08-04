@@ -75,7 +75,9 @@ export default function WidgetMenu({
               </li>
             ))}
           </ul>
-          <p className={styles.note}>Resize a panel from the ⟷ button in its header.</p>
+          <p className={styles.note}>
+            Drag a panel's bottom-right corner to resize it, or use the arrow keys.
+          </p>
 
           <button className={styles.reset} onClick={onReset}>
             Reset layout and sizes

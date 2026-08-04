@@ -1,31 +1,67 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_LAYOUT,
-  SIZE_COLUMNS,
+  MAX_COLS,
+  MAX_HEIGHT,
+  MIN_COLS,
+  MIN_HEIGHT,
   WIDGETS,
-  WIDGET_SIZES,
-  nextSize,
+  clampCols,
+  clampHeight,
+  normalizeSize,
   widgetById,
-  type WidgetSize,
 } from './registry';
 
-describe('nextSize', () => {
-  it('cycles through every size and wraps back to the start', () => {
-    const seen: WidgetSize[] = [];
-    let size: WidgetSize = 'compact';
-    for (let i = 0; i < WIDGET_SIZES.length; i++) {
-      seen.push(size);
-      size = nextSize(size);
-    }
-    expect(seen).toEqual(WIDGET_SIZES);
-    // A full lap returns to where it started, so the resize button never dead-ends.
-    expect(size).toBe('compact');
+describe('clampCols', () => {
+  it('rounds a dragged fraction of a column to the nearest whole one', () => {
+    expect(clampCols(2.4)).toBe(2);
+    expect(clampCols(2.6)).toBe(3);
+  });
+
+  it('never goes below one column or above the stored ceiling', () => {
+    expect(clampCols(-3)).toBe(MIN_COLS);
+    expect(clampCols(99)).toBe(MAX_COLS);
+  });
+
+  it('caps at the columns the grid actually has, so a panel cannot overflow', () => {
+    expect(clampCols(5, 3)).toBe(3);
+    // A single-column grid still has room for a one-column panel.
+    expect(clampCols(4, 1)).toBe(1);
+    // A grid measured as having no columns must not clamp widths away to zero.
+    expect(clampCols(2, 0)).toBe(1);
   });
 });
 
-describe('SIZE_COLUMNS', () => {
-  it('gives every size a column count, widening down the scale', () => {
-    expect(WIDGET_SIZES.map((s) => SIZE_COLUMNS[s])).toEqual([1, 2, 3]);
+describe('clampHeight', () => {
+  it('keeps a dragged height within the usable range', () => {
+    expect(clampHeight(300)).toBe(300);
+    expect(clampHeight(10)).toBe(MIN_HEIGHT);
+    expect(clampHeight(9999)).toBe(MAX_HEIGHT);
+  });
+});
+
+describe('normalizeSize', () => {
+  it('reads a stored size back', () => {
+    expect(normalizeSize({ cols: 3, height: 240 }, 1)).toEqual({ cols: 3, height: 240 });
+  });
+
+  it('translates the named widths saved before panels were freely resizable', () => {
+    expect(normalizeSize('compact', 2)).toEqual({ cols: 1, height: null });
+    expect(normalizeSize('standard', 1)).toEqual({ cols: 2, height: null });
+    expect(normalizeSize('wide', 1)).toEqual({ cols: 3, height: null });
+  });
+
+  it("falls back to the widget's default width when there is nothing stored", () => {
+    expect(normalizeSize(undefined, 2)).toEqual({ cols: 2, height: null });
+    expect(normalizeSize('hero', 2)).toEqual({ cols: 2, height: null });
+  });
+
+  it('repairs a stored size that is out of range or the wrong shape', () => {
+    expect(normalizeSize({ cols: 99, height: 5 }, 2)).toEqual({
+      cols: MAX_COLS,
+      height: MIN_HEIGHT,
+    });
+    expect(normalizeSize({ height: 'tall' }, 2)).toEqual({ cols: 2, height: null });
   });
 });
 
@@ -42,11 +78,11 @@ describe('WIDGETS', () => {
     expect(ids).not.toContain('quicklinks');
   });
 
-  it('gives every widget a title, an icon, and a renderer', () => {
+  it('gives every widget a title, an icon, a default width, and a renderer', () => {
     for (const w of WIDGETS) {
       expect(w.title).toBeTruthy();
       expect(w.icon).toBeTruthy();
-      expect(WIDGET_SIZES).toContain(w.size);
+      expect(w.cols).toBe(clampCols(w.cols));
       expect(typeof w.render).toBe('function');
     }
   });

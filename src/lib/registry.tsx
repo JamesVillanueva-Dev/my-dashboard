@@ -8,32 +8,71 @@ import NotesWidget from '../components/NotesWidget';
 import SpotifyWidget from '../components/SpotifyWidget';
 
 /**
- * How wide a panel is, in grid columns.
+ * How big a panel is. Both axes are set by dragging the handle in the panel's
+ * bottom-right corner, and the choice persists per widget.
  *
- * - `compact` — one column. Reference material you glance at; also gets tighter
- *   padding and a smaller type scale.
- * - `standard` — two columns. A surface you act on.
- * - `wide` — three columns, for a panel with a lot to say.
+ * The two axes are not symmetrical, because the dashboard is a column grid:
+ * width can only be a whole number of columns, so a horizontal drag snaps;
+ * height is free, so a vertical drag is continuous.
  *
- * The registry value is only the *default*: every panel can be resized from its
- * header, and the choice persists per widget. There is no `hero` size — the lead
- * zone is `TodayPanel`, part of the dashboard frame rather than this catalogue.
+ * A one-column panel also gets tighter padding and a smaller type scale, so
+ * reference material you only glance at never competes with a panel you act on.
  */
-export type WidgetSize = 'compact' | 'standard' | 'wide';
+export interface WidgetSize {
+  /** Width in grid columns. Clamped to the columns the grid actually has. */
+  cols: number;
+  /** Pinned height in px, or `null` to grow with the content. */
+  height: number | null;
+}
 
-/** The order the header's resize control cycles through. */
-export const WIDGET_SIZES: WidgetSize[] = ['compact', 'standard', 'wide'];
+/** Narrowest a panel can be dragged: one column. */
+export const MIN_COLS = 1;
+/**
+ * Widest a panel can be dragged. The grid rarely fits this many columns; it is
+ * the ceiling for the *stored* width, so a panel sized on a wide monitor keeps
+ * its intent after the window shrinks and grows again.
+ */
+export const MAX_COLS = 6;
 
-/** Columns each size occupies in the dashboard grid. */
-export const SIZE_COLUMNS: Record<WidgetSize, number> = {
-  compact: 1,
-  standard: 2,
-  wide: 3,
-};
+/** Shortest a panel can be dragged, in px — below this the header crowds out the body. */
+export const MIN_HEIGHT = 120;
+/** Tallest a panel can be dragged, in px. */
+export const MAX_HEIGHT = 1200;
 
-/** The next size in the cycle, wrapping back to the start. */
-export function nextSize(size: WidgetSize): WidgetSize {
-  return WIDGET_SIZES[(WIDGET_SIZES.indexOf(size) + 1) % WIDGET_SIZES.length];
+/** Columns each pre-resize size name occupied, for reading older saved layouts. */
+const LEGACY_COLUMNS: Record<string, number> = { compact: 1, standard: 2, wide: 3 };
+
+/** Confines a dragged column count to what the grid can show. */
+export function clampCols(cols: number, max: number = MAX_COLS): number {
+  return Math.min(Math.max(Math.round(cols), MIN_COLS), Math.max(MIN_COLS, Math.min(max, MAX_COLS)));
+}
+
+/** Confines a dragged height to the usable range. */
+export function clampHeight(height: number): number {
+  return Math.min(Math.max(Math.round(height), MIN_HEIGHT), MAX_HEIGHT);
+}
+
+/**
+ * Reads one entry out of the persisted size map.
+ *
+ * Panels used to be sized by a button that cycled three named widths, so a saved
+ * map from an older version holds strings where this one holds shapes. Those are
+ * translated to their column count rather than discarded, and anything else falls
+ * back to the widget's registry default.
+ *
+ * @param stored - The raw persisted value for this widget, if any.
+ * @param cols - The widget's default width, used when the value is missing or junk.
+ */
+export function normalizeSize(stored: unknown, cols: number): WidgetSize {
+  if (typeof stored === 'string') return { cols: LEGACY_COLUMNS[stored] ?? cols, height: null };
+  if (stored && typeof stored === 'object') {
+    const { cols: c, height: h } = stored as Partial<WidgetSize>;
+    return {
+      cols: clampCols(typeof c === 'number' && Number.isFinite(c) ? c : cols),
+      height: typeof h === 'number' && Number.isFinite(h) ? clampHeight(h) : null,
+    };
+  }
+  return { cols: clampCols(cols), height: null };
 }
 
 /** A dashboard widget that can be enabled, disabled, and reordered. */
@@ -44,8 +83,8 @@ export interface WidgetDef {
   title: string;
   /** Icon shown beside the label in the menu and the widget header. */
   icon: IconName;
-  /** Default width — see {@link WidgetSize}. The user can override it per panel. */
-  size: WidgetSize;
+  /** Default width in grid columns. The user can resize any panel from its corner. */
+  cols: number;
   /** Renders the widget. */
   render: () => ReactNode;
 }
@@ -55,8 +94,8 @@ export interface WidgetDef {
  * The dashboard's saved layout references these by `id`; anything present here
  * but absent from the saved layout shows up in the menu as available to add.
  *
- * Standard-size widgets lead, so the default layout reads top-down in order of
- * how much of your attention the panel deserves.
+ * Wider widgets lead, so the default layout reads top-down in order of how much
+ * of your attention the panel deserves.
  *
  * Three ids are deliberately absent and will be filtered out of any saved layout
  * that still contains them:
@@ -65,12 +104,12 @@ export interface WidgetDef {
  * - `quicklinks` — moved into the nav bar, where navigation is always in reach.
  */
 export const WIDGETS: WidgetDef[] = [
-  { id: 'reminders', title: 'Tasks', icon: 'checkSquare', size: 'standard', render: () => <RemindersWidget /> },
-  { id: 'calendar', title: 'Calendar', icon: 'calendar', size: 'standard', render: () => <CalendarWidget /> },
-  { id: 'weather', title: 'Weather', icon: 'cloudSun', size: 'compact', render: () => <WeatherWidget /> },
-  { id: 'news', title: 'News', icon: 'newspaper', size: 'standard', render: () => <NewsWidget /> },
-  { id: 'notes', title: 'Notes', icon: 'note', size: 'compact', render: () => <NotesWidget /> },
-  { id: 'spotify', title: 'Spotify', icon: 'music', size: 'compact', render: () => <SpotifyWidget /> },
+  { id: 'reminders', title: 'Tasks', icon: 'checkSquare', cols: 2, render: () => <RemindersWidget /> },
+  { id: 'calendar', title: 'Calendar', icon: 'calendar', cols: 2, render: () => <CalendarWidget /> },
+  { id: 'weather', title: 'Weather', icon: 'cloudSun', cols: 1, render: () => <WeatherWidget /> },
+  { id: 'news', title: 'News', icon: 'newspaper', cols: 2, render: () => <NewsWidget /> },
+  { id: 'notes', title: 'Notes', icon: 'note', cols: 1, render: () => <NotesWidget /> },
+  { id: 'spotify', title: 'Spotify', icon: 'music', cols: 1, render: () => <SpotifyWidget /> },
 ];
 
 /** Default layout: every widget, in catalogue order. */

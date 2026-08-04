@@ -9,10 +9,17 @@ import type { WidgetSize } from '../../lib/registry';
 export interface WidgetChrome {
   /** Stable id of the widget instance, used for reordering and removal. */
   id: string;
-  /** Current width of this panel, which also drives its density. */
+  /** Current width and height of this panel; the width also drives its density. */
   size: WidgetSize;
-  /** Cycles the panel to the next width. */
-  onResize: () => void;
+  /** Begins a pointer drag from the corner handle, resizing on both axes at once. */
+  onResizeStart: (e: PointerEvent, id: string) => void;
+  /**
+   * Arrow-key resizing from the corner handle — the keyboard equivalent of that
+   * drag, since a pointer drag is otherwise the only way to set a size.
+   */
+  onResizeKeyDown: (e: KeyboardEvent, id: string) => void;
+  /** Unpins the height so the panel goes back to growing with its content. */
+  onFitHeight: (id: string) => void;
   /** Removes (disables) this widget from the dashboard. */
   onRemove: () => void;
   /** Begins a pointer-based drag from this widget's handle. */
@@ -24,6 +31,8 @@ export interface WidgetChrome {
   onGripKeyDown: (e: KeyboardEvent, id: string) => void;
   /** Whether this widget is the one currently being dragged. */
   isDragging: boolean;
+  /** Whether this widget is the one currently being resized. */
+  isResizing: boolean;
 }
 
 const WidgetChromeContext = createContext<WidgetChrome | null>(null);

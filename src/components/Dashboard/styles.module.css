@@ -10,6 +10,13 @@
   cursor: grabbing;
 }
 
+/* Same, for a resize drag — the pointer leaves the small corner handle almost
+   immediately, so the cursor has to be held from up here. */
+.container.isResizing {
+  user-select: none;
+  cursor: nwse-resize;
+}
+
 /* ---------- Content column ----------
    Full-bleed by design: this is a dashboard, so panels fill the display rather
    than sit in a reading-width column. --page-max is 100% for that; give it a
@@ -35,29 +42,23 @@
   align-items: start;
 }
 
-/* ---------- Grid item (the draggable wrapper around each widget) ---------- */
+/* ---------- Grid item (the draggable wrapper around each widget) ----------
+   Both custom properties are written from Dashboard as the panel is resized:
+   --cols is its width in whole grid columns, already capped to the columns on
+   screen, and --h is its dragged height, absent while it grows with its content.
+   The fallbacks are what a panel looks like for the frame before that runs. */
 .item {
   min-width: 0;
+  grid-column: span var(--cols, 1);
   will-change: transform;
+}
+.item > * {
+  height: var(--h, auto);
 }
 .item.isDragging {
   z-index: 100;
   position: relative;
   cursor: grabbing;
-}
-
-/* ---------- Widths ----------
-   Set per panel from the widget menu or the header's resize control, and capped
-   at the breakpoints below: an item spanning more columns than the grid actually
-   has would create implicit columns and overflow the page. */
-.compact {
-  grid-column: span 1;
-}
-.standard {
-  grid-column: span 2;
-}
-.wide {
-  grid-column: span 3;
 }
 
 /* ---------- Empty state ---------- */
@@ -78,21 +79,11 @@
   border: 0;
 }
 
-/* Below roughly three columns' worth of room, a `wide` panel cannot have its
-   three columns. Step the caps down rather than letting the grid overflow. */
-@media (max-width: 1000px) {
-  .wide {
-    grid-column: span 2;
-  }
-}
-
+/* Narrower panels than this stop being readable, so below it the grid drops to a
+   single column and Dashboard caps every span at 1 to match. */
 @media (max-width: 640px) {
   .body > main {
     grid-template-columns: 1fr;
-  }
-  .standard,
-  .wide {
-    grid-column: span 1;
   }
 }
 

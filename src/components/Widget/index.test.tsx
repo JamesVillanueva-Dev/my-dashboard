@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import Widget from './index';
 import { WidgetChromeProvider, type WidgetChrome } from './chrome';
 import styles from './styles.module.css';
@@ -8,12 +8,15 @@ import styles from './styles.module.css';
 function chrome(over: Partial<WidgetChrome> = {}): WidgetChrome {
   return {
     id: 'weather',
-    size: 'standard',
-    onResize: vi.fn(),
+    size: { cols: 2, height: null },
+    onResizeStart: vi.fn(),
+    onResizeKeyDown: vi.fn(),
+    onFitHeight: vi.fn(),
     onRemove: vi.fn(),
     onGrab: vi.fn(),
     onGripKeyDown: vi.fn(),
     isDragging: false,
+    isResizing: false,
     ...over,
   };
 }
@@ -102,27 +105,66 @@ describe('Widget', () => {
       expect(
         screen.getByRole('button', { name: 'Reorder Weather. Use the arrow keys to move it.' }),
       ).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: 'Resize Weather. Currently standard.' }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Resize Weather/ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Remove Weather widget' })).toBeInTheDocument();
     });
 
-    it('cycles the width when resize is clicked', () => {
+    it('starts a resize drag from the corner handle, passing the widget id', () => {
       const { chrome } = renderInGrid();
 
-      fireEvent.click(screen.getByRole('button', { name: /^Resize/ }));
+      fireEvent.pointerDown(screen.getByRole('button', { name: /^Resize/ }));
 
-      expect(chrome.onResize).toHaveBeenCalledTimes(1);
+      expect(chrome.onResizeStart).toHaveBeenCalledWith(expect.anything(), 'weather');
     });
 
-    it('names the next width in the resize tooltip', () => {
-      renderInGrid({ size: 'compact' });
+    it('forwards arrow keys from the handle, so resizing works without a pointer', () => {
+      const { chrome } = renderInGrid();
 
-      expect(screen.getByRole('button', { name: /^Resize/ })).toHaveAttribute(
-        'title',
-        'Width: compact. Click to make it standard.',
+      fireEvent.keyDown(screen.getByRole('button', { name: /^Resize/ }), { key: 'ArrowRight' });
+
+      expect(chrome.onResizeKeyDown).toHaveBeenCalledWith(expect.anything(), 'weather');
+    });
+
+    it('fits the height to the content when the handle is double-clicked', () => {
+      const { chrome } = renderInGrid({ size: { cols: 2, height: 300 } });
+
+      fireEvent.doubleClick(screen.getByRole('button', { name: /^Resize/ }));
+
+      expect(chrome.onFitHeight).toHaveBeenCalledWith('weather');
+    });
+
+    it('states both dimensions on the handle, so its size is readable without sight', () => {
+      renderInGrid({ size: { cols: 1, height: 300 } });
+      expect(screen.getByRole('button', { name: /^Resize/ })).toHaveAccessibleName(
+        /1 column wide, 300 pixels tall/,
       );
+
+      const auto = renderInGrid({ size: { cols: 3, height: null } });
+      expect(
+        within(auto.container).getByRole('button', { name: /^Resize/ }),
+      ).toHaveAccessibleName(/3 columns wide, height fits the content/);
+    });
+
+    it('keeps the resize handle reachable by keyboard', () => {
+      renderInGrid();
+
+      expect(screen.getByRole('button', { name: /^Resize/ })).toHaveAttribute('tabindex', '0');
+    });
+
+    it('lets its body scroll only once the height is pinned', () => {
+      const { container } = renderInGrid({ size: { cols: 2, height: 300 } });
+      expect(container.querySelector('section')).toHaveClass(styles.isPinned);
+
+      const auto = renderInGrid();
+      expect(auto.container.querySelector('section')).not.toHaveClass(styles.isPinned);
+    });
+
+    it('marks itself as being resized only while it is the panel under the pointer', () => {
+      const { container } = renderInGrid({ isResizing: true });
+      expect(container.querySelector('section')).toHaveClass(styles.isResizing);
+
+      const still = renderInGrid();
+      expect(still.container.querySelector('section')).not.toHaveClass(styles.isResizing);
     });
 
     it('removes the widget when remove is clicked', () => {
@@ -155,14 +197,14 @@ describe('Widget', () => {
       expect(screen.getByRole('button', { name: /^Reorder/ })).toHaveAttribute('tabindex', '0');
     });
 
-    it('marks itself compact at the smallest width, for the tighter type scale', () => {
-      const { container } = renderInGrid({ size: 'compact' });
+    it('marks itself compact at one column wide, for the tighter type scale', () => {
+      const { container } = renderInGrid({ size: { cols: 1, height: null } });
 
       expect(container.querySelector('section')).toHaveClass(styles.isCompact);
     });
 
-    it('is not compact at the other widths', () => {
-      const { container } = renderInGrid({ size: 'wide' });
+    it('is not compact once it has been widened', () => {
+      const { container } = renderInGrid({ size: { cols: 3, height: null } });
 
       expect(container.querySelector('section')).not.toHaveClass(styles.isCompact);
     });

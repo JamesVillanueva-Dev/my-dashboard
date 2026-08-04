@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import Icon, { type IconName } from '../Icon';
-import { nextSize } from '../../lib/registry';
 import { useWidgetChrome } from './chrome';
 import styles from './styles.module.css';
 
@@ -28,19 +27,24 @@ interface WidgetProps {
  * container so individual widgets only render their own content.
  *
  * When rendered inside the dashboard grid it reads {@link useWidgetChrome} to show
- * a drag handle (for reordering) and a remove button (to disable the widget), and
- * to style itself as lifted while being dragged. Rendered outside the grid, those
- * controls are simply absent.
+ * a drag handle (for reordering), a remove button (to disable the widget), and a
+ * corner handle (to resize it on both axes), and to style itself as lifted while
+ * being dragged. Rendered outside the grid, those controls are simply absent.
  *
  * @param props - See {@link WidgetProps}.
  */
 export default function Widget({ title, icon, action, className, children }: WidgetProps) {
   const chrome = useWidgetChrome();
+  // A pinned height is a fixed box, so the body has to scroll inside it; left to
+  // grow, the panel is exactly as tall as its content and never needs to.
+  const pinned = chrome?.size.height != null;
   const classes = [
     styles.container,
     className,
-    chrome?.size === 'compact' && styles.isCompact,
+    chrome?.size.cols === 1 && styles.isCompact,
     chrome?.isDragging && styles.isDragging,
+    chrome?.isResizing && styles.isResizing,
+    pinned && styles.isPinned,
   ]
     .filter(Boolean)
     .join(' ');
@@ -70,28 +74,34 @@ export default function Widget({ title, icon, action, className, children }: Wid
         <div>
           {action}
           {chrome && (
-            <>
-              <button
-                className={styles.resize}
-                onClick={chrome.onResize}
-                title={`Width: ${chrome.size}. Click to make it ${nextSize(chrome.size)}.`}
-                aria-label={`Resize ${title}. Currently ${chrome.size}.`}
-              >
-                <Icon name="resize" />
-              </button>
-              <button
-                className={styles.remove}
-                onClick={chrome.onRemove}
-                title={`Remove ${title}`}
-                aria-label={`Remove ${title} widget`}
-              >
-                <Icon name="close" />
-              </button>
-            </>
+            <button
+              className={styles.remove}
+              onClick={chrome.onRemove}
+              title={`Remove ${title}`}
+              aria-label={`Remove ${title} widget`}
+            >
+              <Icon name="close" />
+            </button>
           )}
         </div>
       </header>
       <div>{children}</div>
+      {chrome && (
+        <span
+          className={styles.handle}
+          onPointerDown={(e) => chrome.onResizeStart(e, chrome.id)}
+          onKeyDown={(e) => chrome.onResizeKeyDown(e, chrome.id)}
+          onDoubleClick={() => chrome.onFitHeight(chrome.id)}
+          title="Drag to resize, or use the arrow keys. Double-click to fit the height to the content."
+          aria-label={`Resize ${title}. ${chrome.size.cols} ${
+            chrome.size.cols === 1 ? 'column' : 'columns'
+          } wide, ${
+            pinned ? `${chrome.size.height} pixels tall` : 'height fits the content'
+          }. Use the arrow keys to resize.`}
+          role="button"
+          tabIndex={0}
+        />
+      )}
     </section>
   );
 }
