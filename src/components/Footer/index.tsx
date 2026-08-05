@@ -1,4 +1,3 @@
-import Icon from '../Icon';
 import type { LegalDoc } from '../LegalModal';
 import styles from './styles.module.css';
 
@@ -6,7 +5,8 @@ import styles from './styles.module.css';
 interface Source {
   /** The service's name. */
   label: string;
-  /** What it powers, shown after the name. */
+  /** What it powers. Carried on the item's `title` rather than set in type — the
+   *  annotation is worth having on hover, not worth a column. */
   role: string;
   /** Home page, when there is a meaningful one to link to. */
   href?: string;
@@ -32,73 +32,69 @@ interface FooterProps {
 }
 
 /**
- * The page's closing band: what this app is, the third-party services it reads
- * from, and the legal documents.
+ * The page's closing band: what this app is, what it talks to, and the legal
+ * documents — in two quiet rows.
  *
- * Deliberately quiet — muted text, no card, no accent fills beyond the mark and
- * the badge glyph. It reads as the floor of the page rather than one more panel
- * competing with the grid above it, which is the whole reason the separating
- * rule fades out at both ends instead of running edge to edge.
+ * Everything here is type and spacing. No card, no accent fills, no icons, no
+ * section labels: the footer should read as the floor of the page rather than
+ * one more panel competing with the grid above it, which is also why the
+ * separating rule fades out at both ends instead of running edge to edge.
  *
- * The attributions are not decoration: the Privacy Policy names these same
+ * The attributions are not decoration. The Privacy Policy names these same
  * services as the only places a request leaves the browser for, so the footer is
- * where that claim is visible without opening the document.
+ * where that claim stays visible without opening the document — which is why
+ * they survived the strip-back as a middot run rather than being dropped.
  *
  * @param props - See {@link FooterProps}.
  */
 export default function Footer({ onOpenLegal }: FooterProps) {
   return (
     <footer className={styles.container}>
-      <div className={styles.brand}>
-        <p className={styles.name}>
-          <span>
-            <Icon name="grid" />
-          </span>
-          Dashboard
-        </p>
-        <p>Your day in one place — no account, no server, nothing to sign up for.</p>
-        {/* This badge once read "Everything stays in this browser", and was
-            weakened when mail ranking started calling Anthropic. That call is
-            gone (ADR 0010) — but the stronger claim is still not restored,
-            because it was already overclaiming before mail existed: signing in
-            mirrors your dashboard to Clerk (ADR 0008), and "use my location"
-            sends coordinates to Open-Meteo. What is written here is true
-            unconditionally, which is the bar for a badge nobody clicks. */}
-        <p className={styles.badge}>
-          <Icon name="shield" />
-          No analytics, no ads, no tracking
-        </p>
-      </div>
+      <p className={styles.brand}>
+        <strong>Dashboard</strong>
+        <span>Your day in one place</span>
+      </p>
 
-      <nav className={styles.group} aria-label="Data sources">
-        <p>Sources</p>
-        <ul>
-          {SOURCES.map((s) => (
-            <li key={s.label}>
-              {s.href ? (
-                <a href={s.href} target="_blank" rel="noreferrer">
-                  {s.label}
-                </a>
-              ) : (
-                <span>{s.label}</span>
-              )}
-              <span>{s.role}</span>
+      {/* This line once read "Everything stays in this browser", and was weakened
+          when mail ranking started calling Anthropic. That call is gone
+          (ADR 0010) — but the stronger claim is still not restored, because it
+          was already overclaiming before mail existed: signing in mirrors your
+          dashboard to Clerk (ADR 0008), and "use my location" sends coordinates
+          to Open-Meteo. What is written here is true unconditionally, which is
+          the bar for a claim nobody clicks. */}
+      <p className={styles.promise}>No analytics, no ads, no tracking</p>
+
+      {/* One row holding both runs, so they sit shoulder to shoulder at desktop
+          and stack on a phone. A positional selector on `.container` would do
+          the same job far more fragilely. */}
+      <div className={styles.meta}>
+        <nav aria-label="Data sources">
+          <ul>
+            {SOURCES.map((s) => (
+              <li key={s.label}>
+                {s.href ? (
+                  <a href={s.href} target="_blank" rel="noreferrer" title={s.role}>
+                    {s.label}
+                  </a>
+                ) : (
+                  <span title={s.role}>{s.label}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <nav aria-label="Legal">
+          <ul>
+            <li>
+              <button onClick={() => onOpenLegal('privacy')}>Privacy Policy</button>
             </li>
-          ))}
-        </ul>
-      </nav>
-
-      <nav className={styles.group} aria-label="Legal">
-        <p>Legal</p>
-        <ul>
-          <li>
-            <button onClick={() => onOpenLegal('privacy')}>Privacy Policy</button>
-          </li>
-          <li>
-            <button onClick={() => onOpenLegal('terms')}>Terms of Service</button>
-          </li>
-        </ul>
-      </nav>
+            <li>
+              <button onClick={() => onOpenLegal('terms')}>Terms of Service</button>
+            </li>
+          </ul>
+        </nav>
+      </div>
     </footer>
   );
 }

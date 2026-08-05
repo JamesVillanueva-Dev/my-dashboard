@@ -1,22 +1,19 @@
 /* footer
-   The closing band of the page. Three columns at desktop — identity, sources,
-   legal — collapsing to a single column on a phone. Everything is drawn from
+   The closing band of the page, in two rows: identity, then the link runs.
+   Type and spacing only — no card, no fills, no icons. Everything is drawn from
    the theme tokens, so it follows all six palettes without a per-theme rule. */
 
 .container {
   position: relative;
   margin-top: 44px;
-  padding-top: 26px;
-  display: grid;
-  /* The link groups take only the width their labels need and settle against
-     the right edge; the identity block takes the rest and caps itself. Sizing
-     all three in fractions would stretch four short links across half an
-     ultrawide display, which is what the full-bleed page would otherwise do. */
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 24px 64px;
-  align-items: start;
-  font-size: 0.8rem;
-  line-height: 1.55;
+  padding-top: 22px;
+  display: flex;
+  flex-direction: column;
+  /* Tight within the identity row; the wider gap before the links is the only
+     thing separating the two rows now that nothing is boxed. */
+  gap: 4px;
+  font-size: 0.78rem;
+  line-height: 1.6;
   color: var(--text-muted);
 }
 
@@ -41,99 +38,71 @@
   margin: 0;
 }
 
-/* ---------- Identity ---------- */
+/* ---------- Row one: identity ---------- */
 .brand {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 11px;
-  max-width: 46ch;
-  text-wrap: balance;
+  flex-wrap: wrap;
+  align-items: baseline;
 }
 
-/* Class-heavy selectors so these outrank the `.container p` reset above. */
-.brand .name {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.95rem;
-  font-weight: 650;
+.brand strong {
+  font-size: 0.85rem;
+  font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--text);
 }
 
-/* The mark: the same glyph the widget menu uses, in a soft accent tile. Small
-   enough to read as a signature rather than a logo. */
-.name > span {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 0.95rem;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+/* The middot lives in CSS rather than the markup so the tagline can be reworded
+   or removed without leaving a stray separator behind. */
+.brand span::before {
+  content: '·';
+  margin: 0 8px;
+  opacity: 0.55;
 }
 
-/* The local-first claim, given a pill so it reads as a badge of fact rather
-   than one more line of small print. */
-.brand .badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 12px 5px 10px;
-  border: 1px solid var(--card-border);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--card) 55%, transparent);
-  font-size: 0.74rem;
-}
-.badge svg {
-  flex: none;
-  font-size: 0.95rem;
-  color: var(--accent);
+.promise {
+  opacity: 0.85;
 }
 
-/* ---------- Link groups ---------- */
-/* Section label ("Sources", "Legal"). */
-.group p {
-  font-size: 0.68rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  opacity: 0.8;
+/* ---------- Row two: the link runs ---------- */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px 32px;
+  margin-top: 14px;
 }
 
-.group ul {
+.meta ul {
   list-style: none;
-  /* The label's spacing lives here so it cannot fight the `.container p` reset. */
-  margin: 11px 0 0;
+  margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  row-gap: 6px;
 }
 
-.group li {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+/* Separator between items, not around them — so a wrapped run never starts or
+   ends on a dangling dot. */
+.meta li + li::before {
+  content: '·';
+  margin: 0 9px;
+  opacity: 0.5;
 }
-/* The source or document name, whether it links out or not... */
-.group li > :first-child {
-  color: var(--text);
-}
-/* ...and the trailing note saying what it powers. */
-.group li > span:last-child {
-  font-size: 0.72rem;
+
+/* A source with no home page is plain text, and stays muted on purpose: the
+   contrast difference does the work a cursor change would, so it reads as "not
+   a link" before you reach for it. Do not level this up to match the links. */
+.meta li > span {
   color: var(--text-muted);
-  opacity: 0.85;
 }
 
 /* Links and the legal buttons are the same control in two markup shapes: a
    quiet label that picks up the accent and an underline on hover. */
-.group a,
-.group button {
+.meta a,
+.meta button {
   padding: 0;
   border: none;
   background: none;
@@ -146,44 +115,39 @@
   text-underline-offset: 3px;
   transition: color 0.15s, text-decoration-color 0.15s;
 }
-.group a:hover,
-.group button:hover {
+.meta a:hover,
+.meta button:hover {
   color: var(--accent);
   text-decoration-color: currentColor;
 }
-.group a:focus-visible,
-.group button:focus-visible {
+.meta a:focus-visible,
+.meta button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
   border-radius: 4px;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .group a,
-  .group button {
+  .meta a,
+  .meta button {
     transition: none;
   }
 }
 
 /* ---------- Responsive ---------- */
-/* Two columns of links under a full-width identity block: the tagline needs the
-   room more than the four short link labels do. */
-@media (max-width: 860px) {
-  .container {
-    grid-template-columns: 1fr 1fr;
-    gap: 22px 32px;
-  }
-  .brand {
-    grid-column: 1 / -1;
+/* Below the point where both runs fit on one line, stack them left-aligned
+   rather than letting `space-between` strand the legal links mid-row. */
+@media (max-width: 720px) {
+  .meta {
+    flex-direction: column;
+    gap: 8px;
   }
 }
 
 @media (max-width: 560px) {
   .container {
     margin-top: 32px;
-    padding-top: 22px;
-    grid-template-columns: 1fr;
-    gap: 20px;
+    padding-top: 18px;
   }
 }
 
@@ -191,7 +155,10 @@
    in a run of text. What they get instead is the spacing exception: enough room
    between the lines that a thumb cannot hit two of them at once. */
 @media (pointer: coarse) {
-  .group ul {
-    gap: 14px;
+  .meta ul {
+    row-gap: 14px;
+  }
+  .meta li + li::before {
+    margin: 0 12px;
   }
 }

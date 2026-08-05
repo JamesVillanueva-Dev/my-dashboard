@@ -7,7 +7,21 @@ describe('Footer', () => {
   it('names the app and its local-first promise', () => {
     render(<Footer onOpenLegal={vi.fn()} />);
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Your day in one place')).toBeInTheDocument();
     expect(screen.getByText(/no analytics, no ads, no tracking/i)).toBeInTheDocument();
+  });
+
+  it('keeps what each service powers on hover, having dropped it from the type', () => {
+    render(<Footer onOpenLegal={vi.fn()} />);
+    expect(screen.getByRole('link', { name: 'Gmail' })).toHaveAttribute('title', 'mail, read-only');
+    expect(screen.getByText('Public RSS')).toHaveAttribute('title', 'headlines');
+  });
+
+  it('draws its separators in CSS, so no stray middot survives in the text', () => {
+    // The runs are built from lists; a dot typed into the markup would outlive
+    // the item next to it.
+    render(<Footer onOpenLegal={vi.fn()} />);
+    expect(screen.queryByText('·')).not.toBeInTheDocument();
   });
 
   it('credits the third-party services, linking the ones with a home page', () => {
