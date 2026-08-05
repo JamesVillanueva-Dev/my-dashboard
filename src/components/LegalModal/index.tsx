@@ -5,7 +5,7 @@ import styles from './styles.module.css';
 /** Which legal document to show, or `null` for none. */
 export type LegalDoc = 'privacy' | 'terms' | null;
 
-const LAST_UPDATED = 'July 22, 2026';
+const LAST_UPDATED = 'August 4, 2026';
 
 /** The Privacy Policy body. Describes the app's actual, local-first behaviour. */
 function PrivacyPolicy() {
@@ -16,16 +16,25 @@ function PrivacyPolicy() {
 
       <h3>The short version</h3>
       <p>
-        This dashboard runs entirely in your browser. It has no user accounts and no
-        server that stores your data. Everything you enter stays on your device.
+        This dashboard runs in your browser and we operate no server of our own. By
+        default nothing you enter leaves your device. Two optional features change
+        that, and both are off until you turn them on: signing in mirrors your
+        dashboard to your account so it follows you between devices, and the Mail
+        panel sends message headers to Claude to rank them. Everything that leaves,
+        and where it goes, is listed below.
       </p>
 
       <h3>What we store, and where</h3>
       <p>
         Your notes, reminders, to-dos, quick links, focus text, chosen widgets and
         layout, display name, theme, and weather location are saved in your browser's{' '}
-        <code>localStorage</code>. They never leave your device through us and are
-        removed if you clear your browser data.
+        <code>localStorage</code>, and are removed if you clear your browser data.
+      </p>
+      <p>
+        If you sign in, that same list is also mirrored into your account as Clerk
+        user metadata, so a second device restores it. Credentials are never part of
+        that copy. Sign-out leaves the local copy in place; deleting the account
+        removes the stored one.
       </p>
 
       <h3>Third-party services we contact</h3>
@@ -51,6 +60,18 @@ function PrivacyPolicy() {
         <li>
           <strong>Spotify</strong> — the optional music player, off unless you add
           that panel yourself.
+        </li>
+        <li>
+          <strong>Gmail</strong> — read-only, and only if you add the Mail panel
+          and connect your account. It is read as metadata: sender, subject, and
+          Gmail's own short preview. Message bodies are never requested.
+        </li>
+        <li>
+          <strong>Anthropic</strong> — the Mail panel sends those same three
+          fields to Claude to rank which messages matter most, using an API key
+          you supply. This is the one place your own content leaves this browser,
+          it happens only while that panel is switched on, and message bodies are
+          not part of it.
         </li>
       </ul>
       <p>
@@ -93,9 +114,18 @@ function TermsOfService() {
 
       <h3>Your data &amp; responsibility</h3>
       <p>
-        Your data is stored only in your browser. You are responsible for it,
-        including any loss from clearing browser data, browser limits, or device
-        issues. Keep your own backups of anything important.
+        Your data is stored in your browser, and in your account if you sign in.
+        You are responsible for it, including any loss from clearing browser data,
+        browser limits, or device issues. Keep your own backups of anything
+        important.
+      </p>
+      <h3>API keys you supply</h3>
+      <p>
+        The Mail panel runs on an Anthropic API key you provide. Requests it makes
+        are billed to your account, and you are responsible for that usage and for
+        keeping the key safe. Anything entered in a browser can be read by other
+        code running on the page — treat a key used here as exposed, and revoke it
+        if you have any doubt.
       </p>
 
       <h3>Third-party content</h3>

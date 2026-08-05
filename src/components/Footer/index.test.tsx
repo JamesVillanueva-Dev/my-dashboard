@@ -7,7 +7,7 @@ describe('Footer', () => {
   it('names the app and its local-first promise', () => {
     render(<Footer onOpenLegal={vi.fn()} />);
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByText(/stays in this browser/i)).toBeInTheDocument();
+    expect(screen.getByText(/no analytics, no ads, no tracking/i)).toBeInTheDocument();
   });
 
   it('credits the third-party services, linking the ones with a home page', () => {

@@ -75,6 +75,12 @@ const ICONS = {
       <circle cx="18" cy="16" r="3" />
     </>
   ),
+  mail: (
+    <>
+      <rect x="2" y="5" width="20" height="14" rx="2.5" />
+      <path d="m3 7 8.15 5.6a1.5 1.5 0 0 0 1.7 0L21 7" />
+    </>
+  ),
   video: (
     <>
       <rect x="2" y="5" width="20" height="14" rx="4.5" />

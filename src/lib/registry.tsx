@@ -7,6 +7,7 @@ import NewsWidget from '../components/NewsWidget';
 import NotesWidget from '../components/NotesWidget';
 import SpotifyWidget from '../components/SpotifyWidget';
 import YouTubeWidget from '../components/YouTubeWidget';
+import MailWidget from '../components/MailWidget';
 
 /**
  * How big a panel is. Both axes are set by dragging the handle in the panel's
@@ -117,6 +118,17 @@ export const WIDGETS: WidgetDef[] = [
   { id: 'news', title: 'News', icon: 'newspaper', cols: 2, render: () => <NewsWidget /> },
   { id: 'notes', title: 'Notes', icon: 'note', cols: 1, render: () => <NotesWidget /> },
   { id: 'youtube', title: 'YouTube', icon: 'video', cols: 2, render: () => <YouTubeWidget /> },
+  {
+    id: 'mail',
+    title: 'Mail',
+    icon: 'mail',
+    cols: 2,
+    // Off until switched on: it needs a Google client id *and* an Anthropic API
+    // key, and it is the one panel that sends anything to a model — not
+    // something to turn on for someone without their say-so (ADR 0009).
+    defaultOff: true,
+    render: () => <MailWidget />,
+  },
   {
     id: 'spotify',
     title: 'Spotify',

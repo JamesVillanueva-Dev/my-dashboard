@@ -83,6 +83,42 @@ copying it to another device would make it skip events.
 Without a Clerk key there is no account, and the dashboard runs entirely from
 `localStorage` exactly as before.
 
+### Optional: the Mail panel (Gmail + Claude)
+
+The **Mail** panel shows the three messages most worth your attention, chosen by
+Claude with a one-line reason each. It's off by default — add it from the
+**Widgets** menu. It needs `VITE_GOOGLE_CLIENT_ID` (Gmail is read through the same
+OAuth client as Calendar, so enable the Gmail API on that project) plus an
+Anthropic API key.
+
+**Only message metadata is read.** Gmail is queried with `format=metadata`, so it
+returns sender, subject, and its own ~100-character preview and does not include
+message bodies — they are never fetched, and so cannot be sent anywhere.
+
+**The API key never goes in the bundle.** Two ways to supply one:
+
+- `VITE_ANTHROPIC_API_KEY` in `.env.local` for local use. It is deliberately
+  **not** wired into `.github/workflows/deploy.yml`.
+- Pasted into the panel on the deployed site, kept in `sessionStorage` for that
+  tab only and never synced to your account.
+
+> **Do not add it as a repository variable or secret.** Anything `VITE_`-prefixed
+> is inlined into `dist/assets/*.js`, which GitHub Pages serves publicly — the
+> deploy workflow greps the bundle for the other keys precisely because they end
+> up in there. A Clerk publishable key and a Google client id are public by
+> design; an Anthropic key is a bearer credential and would be readable by
+> anyone.
+
+Either way the key is reachable by any code running on the page — that is what
+`dangerouslyAllowBrowser` means, and only a server-side proxy would fix it. Use a
+key you can scope and rotate. See
+[ADR 0009](docs/adr/0009-claude-ranked-mail.md).
+
+Ranking is cached for 15 minutes and refreshed on demand, because unlike every
+other panel here a refresh costs money. `gmail.readonly` is a Google *restricted*
+scope: fine for a project in testing mode with your own listed users, but
+publishing it would require Google's verification and a security assessment.
+
 ### Music: YouTube by default, Spotify opt-in
 
 The **YouTube** panel is the music player a fresh dashboard shows. Paste any
@@ -139,6 +175,9 @@ src/
 ├── lib/
 │   ├── registry.tsx          catalogue of available widgets
 │   ├── profileSync.ts        shared vs per-device keys, and conflict rules
+│   ├── gmail.ts              read-only inbox metadata (never message bodies)
+│   ├── importantMail.ts      asks Claude which three messages matter
+│   ├── anthropicKey.ts       where the API key may come from, and may not
 │   ├── themes.ts             the colour schemes offered in settings
 │   ├── spotifyAuth.ts        Spotify OAuth (PKCE), opt-in
 │   ├── cache.ts              stale-while-revalidate store behind the hook above
@@ -162,6 +201,7 @@ src/
     ├── TodoWidget/
     ├── NewsWidget/
     ├── NotesWidget/
+    ├── MailWidget/
     ├── SpotifyWidget/
     └── YouTubeWidget/
 ```
@@ -185,4 +225,5 @@ npm run create:component -- EventsCard --no-test
 - [ADR 0006 — Opt-in Spotify in-page player](docs/adr/0006-spotify-in-page-player.md)
 - [ADR 0007 — YouTube as the default music panel](docs/adr/0007-youtube-as-the-default-music-panel.md)
 - [ADR 0008 — Account-synced dashboard state](docs/adr/0008-account-synced-dashboard-state.md)
+- [ADR 0009 — Claude-ranked mail](docs/adr/0009-claude-ranked-mail.md)
 - [User stories](docs/user-stories.md) · [Wireframes](docs/wireframes.md)

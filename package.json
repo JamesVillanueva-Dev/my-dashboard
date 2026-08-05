@@ -13,6 +13,7 @@
     "create:component": "node scripts/create-component.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@clerk/clerk-react": "^5.61.9",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"

@@ -16,6 +16,8 @@ const SOURCES: Source[] = [
   { label: 'Public RSS', role: 'headlines' },
   { label: 'YouTube', role: 'player', href: 'https://www.youtube.com' },
   { label: 'Spotify', role: 'optional player', href: 'https://open.spotify.com' },
+  { label: 'Gmail', role: 'mail, read-only', href: 'https://mail.google.com' },
+  { label: 'Claude', role: 'mail ranking', href: 'https://claude.com' },
 ];
 
 /** Props for {@link Footer}. */
@@ -52,7 +54,7 @@ export default function Footer({ onOpenLegal }: FooterProps) {
         <p>Your day in one place — no account, no server, nothing to sign up for.</p>
         <p className={styles.badge}>
           <Icon name="shield" />
-          Everything stays in this browser
+          No analytics, no ads, no tracking
         </p>
       </div>
 

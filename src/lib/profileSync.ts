@@ -90,6 +90,11 @@ export const SHARED_KEYS = [
   'gcal.calendarId',
   'gcal.connected',
   'gcal.view.connected',
+  // Whether the user has connected Gmail. The Anthropic API key the mail panel
+  // also needs is deliberately absent — it never passes through
+  // `useLocalStorage` at all (see `anthropicKey.ts`), so it cannot reach this
+  // list by accident, and a credential must never enter synced storage.
+  'mail.connected',
 ] as const;
 
 /** Every key this module moves, shared and per-device alike. */

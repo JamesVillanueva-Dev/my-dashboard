@@ -6,12 +6,28 @@
  * SPAs. The access token lives only in this module's memory for the tab's
  * lifetime — it is never written to `localStorage` — and expires after ~1 hour,
  * at which point a silent re-request renews it while the Google session is live.
+ *
+ * Tokens are tracked **per scope**, each with its own GIS client. A single client
+ * covering every scope would mean anyone connecting their calendar was also asked
+ * to hand over their mail, which is both a worse consent prompt and more access
+ * than the feature needs. Scopes are requested only when the feature that needs
+ * them is switched on (ADR 0009).
  */
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 
 /** Full Calendar scope — needed to create the dedicated calendar and its events. */
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar';
+
+/**
+ * Read-only Gmail scope, for the mail panel.
+ *
+ * Google classes this as a **restricted** scope: an app that requests it from
+ * the general public needs Google's verification and a third-party security
+ * assessment. A project left in testing mode may use it with its own listed test
+ * users, which is the mode this dashboard is built for.
+ */
+export const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
 interface TokenResponse {
   access_token?: string;
@@ -62,60 +78,92 @@ function loadGis(): Promise<OAuth2> {
   return gisPromise;
 }
 
-let accessToken: string | null = null;
-let tokenExpiry = 0; // epoch ms
-let tokenClient: TokenClient | null = null;
-let pending: { resolve: (t: string) => void; reject: (e: Error) => void } | null = null;
+/** Everything held for one OAuth scope. */
+interface ScopeState {
+  token: string | null;
+  /** Epoch ms. */
+  expiry: number;
+  client: TokenClient | null;
+  pending: { resolve: (t: string) => void; reject: (e: Error) => void } | null;
+}
 
-async function ensureClient(): Promise<TokenClient> {
-  if (tokenClient) return tokenClient;
+const states = new Map<string, ScopeState>();
+
+function stateFor(scope: string): ScopeState {
+  let state = states.get(scope);
+  if (!state) {
+    state = { token: null, expiry: 0, client: null, pending: null };
+    states.set(scope, state);
+  }
+  return state;
+}
+
+async function ensureClient(scope: string): Promise<TokenClient> {
+  const state = stateFor(scope);
+  if (state.client) return state.client;
   const oauth2 = await loadGis();
-  tokenClient = oauth2.initTokenClient({
+  state.client = oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID as string,
-    scope: CALENDAR_SCOPE,
+    scope,
     callback: (resp) => {
-      const p = pending;
-      pending = null;
+      const p = state.pending;
+      state.pending = null;
       if (resp.error || !resp.access_token) {
         p?.reject(new Error(resp.error || 'No access token returned'));
         return;
       }
-      accessToken = resp.access_token;
-      tokenExpiry = Date.now() + (resp.expires_in ?? 3600) * 1000;
-      p?.resolve(accessToken);
+      state.token = resp.access_token;
+      state.expiry = Date.now() + (resp.expires_in ?? 3600) * 1000;
+      p?.resolve(resp.access_token);
     },
     error_callback: (err) => {
-      const p = pending;
-      pending = null;
+      const p = state.pending;
+      state.pending = null;
       p?.reject(new Error(err.message || err.type || 'Google authorization was cancelled'));
     },
   });
-  return tokenClient;
+  return state.client;
 }
 
 /**
- * Resolves a valid Calendar access token, requesting one if the cached token is
- * missing or near expiry.
+ * Resolves a valid access token for `scope`, requesting one if the cached token
+ * is missing or near expiry.
  *
  * @param interactive - Pass `true` for the first request in a session; it may
  *   open a Google consent popup, so it MUST be triggered by a user gesture
  *   (e.g. a button click). Pass `false` for background refreshes, which reuse
  *   the existing Google session silently and reject if that is not possible.
- * @returns A bearer access token for `https://www.googleapis.com/calendar/v3`.
+ * @param scope - Which OAuth scope to authorize. Defaults to
+ *   {@link CALENDAR_SCOPE}, so existing calendar callers are unchanged.
+ * @returns A bearer access token good for that scope's Google API.
  */
-export async function getAccessToken(interactive: boolean): Promise<string> {
+export async function getAccessToken(
+  interactive: boolean,
+  scope: string = CALENDAR_SCOPE,
+): Promise<string> {
   if (!hasGoogleClientId()) throw new Error('Missing VITE_GOOGLE_CLIENT_ID');
-  if (accessToken && Date.now() < tokenExpiry - 60_000) return accessToken;
+  const state = stateFor(scope);
+  if (state.token && Date.now() < state.expiry - 60_000) return state.token;
 
-  const client = await ensureClient();
+  const client = await ensureClient(scope);
   return new Promise<string>((resolve, reject) => {
-    pending = { resolve, reject };
+    state.pending = { resolve, reject };
     client.requestAccessToken({ prompt: interactive ? 'consent' : '' });
   });
 }
 
-/** Forgets the in-memory token (used when disconnecting). */
-export function clearAccessToken(): void {
-  accessToken = null;
-  tokenExpiry = 0;
+/**
+ * Forgets a cached token (used when disconnecting).
+ *
+ * @param scope - The scope to forget. Omit to forget every scope — but prefer
+ *   naming one: disconnecting the calendar should not silently revoke the mail
+ *   panel's access, and vice versa.
+ */
+export function clearAccessToken(scope?: string): void {
+  const forget = (state: ScopeState) => {
+    state.token = null;
+    state.expiry = 0;
+  };
+  if (scope === undefined) states.forEach(forget);
+  else forget(stateFor(scope));
 }
