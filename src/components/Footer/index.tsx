@@ -23,7 +23,6 @@ const SOURCES: Source[] = [
   { label: 'YouTube', role: 'player', href: 'https://www.youtube.com' },
   { label: 'Spotify', role: 'optional player', href: 'https://open.spotify.com' },
   { label: 'Gmail', role: 'mail, read-only', href: 'https://mail.google.com' },
-  { label: 'Claude', role: 'mail ranking', href: 'https://claude.com' },
 ];
 
 /** Props for {@link Footer}. */
@@ -58,6 +57,13 @@ export default function Footer({ onOpenLegal }: FooterProps) {
           Dashboard
         </p>
         <p>Your day in one place — no account, no server, nothing to sign up for.</p>
+        {/* This badge once read "Everything stays in this browser", and was
+            weakened when mail ranking started calling Anthropic. That call is
+            gone (ADR 0010) — but the stronger claim is still not restored,
+            because it was already overclaiming before mail existed: signing in
+            mirrors your dashboard to Clerk (ADR 0008), and "use my location"
+            sends coordinates to Open-Meteo. What is written here is true
+            unconditionally, which is the bar for a badge nobody clicks. */}
         <p className={styles.badge}>
           <Icon name="shield" />
           No analytics, no ads, no tracking

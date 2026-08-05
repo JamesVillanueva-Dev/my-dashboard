@@ -39,7 +39,7 @@ export interface CacheEntry<T> {
  * ignored rather than parsed, so a deploy that changes what a widget stores
  * cannot hand it data it no longer understands.
  */
-const VERSION = 1;
+const VERSION = 2;
 
 /**
  * Prefix for the `localStorage` slots.

@@ -11,7 +11,7 @@
  * covering every scope would mean anyone connecting their calendar was also asked
  * to hand over their mail, which is both a worse consent prompt and more access
  * than the feature needs. Scopes are requested only when the feature that needs
- * them is switched on (ADR 0009).
+ * them is switched on (ADR 0010).
  */
 
 /** The GIS client library, loaded on demand rather than in `index.html`. */

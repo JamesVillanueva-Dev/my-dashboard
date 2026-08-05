@@ -6,7 +6,13 @@ import type { MailSummary } from '../../lib/gmail';
 import type { RankedMail } from '../../lib/importantMail';
 
 const { state } = vi.hoisted(() => ({
-  state: { configured: true, fetchInbox: vi.fn(), rankMail: vi.fn() },
+  state: {
+    configured: true,
+    fetchInbox: vi.fn(),
+    fetchProfileEmail: vi.fn(),
+    fetchKnownSenders: vi.fn(),
+    rankMail: vi.fn(),
+  },
 }));
 
 vi.mock('../../lib/googleAuth', () => ({
@@ -18,6 +24,8 @@ vi.mock('../../lib/gmail', async (importOriginal) => ({
   // Keep the real `senderName` — the widget's display of it is worth testing.
   ...(await importOriginal<typeof import('../../lib/gmail')>()),
   fetchInbox: (interactive: boolean) => state.fetchInbox(interactive),
+  fetchProfileEmail: () => state.fetchProfileEmail(),
+  fetchKnownSenders: (messages: MailSummary[]) => state.fetchKnownSenders(messages),
 }));
 vi.mock('../../lib/importantMail', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/importantMail')>()),
@@ -31,27 +39,38 @@ const message = (id: string, over: Partial<MailSummary> = {}): MailSummary => ({
   snippet: 'preview',
   receivedAt: Date.now(),
   unread: true,
+  to: ['you@example.com'],
+  cc: [],
+  deliveredTo: [],
+  listHeaders: false,
+  autoHeaders: false,
+  threaded: false,
+  labels: { important: false, starred: false, updates: false, forums: false },
   ...over,
 });
 
 const ranked = (ids: string[]): RankedMail[] =>
-  ids.map((id) => ({ message: message(id), reason: `because ${id}` }));
+  ids.map((id) => ({
+    message: message(id),
+    reason: `because ${id}`,
+    score: 42.5,
+    signals: [
+      { key: 'to', phrase: 'addressed to you', tier: 2, points: 14, factor: 1 },
+      { key: 'bulk', phrase: '', tier: 3, points: 0, factor: 0.25 },
+    ],
+  }));
 
 /** Marks Gmail as already connected, as a returning user would be. */
 function connected() {
   window.localStorage.setItem('mail.connected', JSON.stringify(true));
 }
 
-/** Supplies a pasted API key, as if one had been saved earlier this session. */
-function withKey() {
-  window.sessionStorage.setItem('anthropic.apiKey', 'sk-ant-testkey123456');
-}
-
 beforeEach(() => {
   state.configured = true;
   state.fetchInbox.mockReset().mockResolvedValue([message('a')]);
-  state.rankMail.mockReset().mockResolvedValue(ranked(['a', 'b', 'c']));
-  window.sessionStorage.clear();
+  state.fetchProfileEmail.mockReset().mockResolvedValue('you@example.com');
+  state.fetchKnownSenders.mockReset().mockResolvedValue(new Set<string>());
+  state.rankMail.mockReset().mockReturnValue(ranked(['a', 'b', 'c']));
 });
 
 describe('MailWidget — setup states', () => {
@@ -61,44 +80,21 @@ describe('MailWidget — setup states', () => {
     expect(screen.getByText(/VITE_GOOGLE_CLIENT_ID/)).toBeInTheDocument();
   });
 
-  it('asks for an Anthropic key before anything else, and says where it goes', () => {
+  it('needs nothing but Gmail — there is no key to ask for', () => {
     render(<MailWidget />);
 
-    expect(screen.getByLabelText('Anthropic API key')).toBeInTheDocument();
-    expect(screen.getByText(/never saved to your account/i)).toBeInTheDocument();
-    expect(screen.getByText(/message bodies are not/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Connect Gmail' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/api key/i)).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/sk-ant/i)).not.toBeInTheDocument();
   });
 
-  it('keeps the key field as a password input, not plain text', () => {
+  it('says where the mail goes before asking to read it', () => {
     render(<MailWidget />);
-    expect(screen.getByLabelText('Anthropic API key')).toHaveAttribute('type', 'password');
+    expect(screen.getByText(/scored here in your browser/i)).toBeInTheDocument();
+    expect(screen.getByText(/nothing is sent anywhere/i)).toBeInTheDocument();
   });
 
-  it('rejects something that is not an Anthropic key', async () => {
-    const user = userEvent.setup();
-    render(<MailWidget />);
-
-    await user.type(screen.getByLabelText('Anthropic API key'), 'hunter2');
-    await user.click(screen.getByRole('button', { name: 'Save key' }));
-
-    expect(screen.getByText(/start with/i)).toBeInTheDocument();
-    expect(window.sessionStorage.getItem('anthropic.apiKey')).toBeNull();
-  });
-
-  it('stores an accepted key in sessionStorage, never localStorage', async () => {
-    const user = userEvent.setup();
-    render(<MailWidget />);
-
-    await user.type(screen.getByLabelText('Anthropic API key'), 'sk-ant-abcdefgh12345');
-    await user.click(screen.getByRole('button', { name: 'Save key' }));
-
-    expect(window.sessionStorage.getItem('anthropic.apiKey')).toBe('sk-ant-abcdefgh12345');
-    // localStorage would be swept into the account-synced snapshot (ADR 0008).
-    expect(JSON.stringify(window.localStorage)).not.toContain('sk-ant-');
-  });
-
-  it('offers to connect Gmail once a key is present', async () => {
-    withKey();
+  it('connects Gmail on the button', async () => {
     const user = userEvent.setup();
     render(<MailWidget />);
 
@@ -109,11 +105,10 @@ describe('MailWidget — setup states', () => {
     await waitFor(() => expect(window.localStorage.getItem('mail.connected')).toBe('true'));
   });
 
-  it('touches neither Gmail nor Claude before Connect is clicked', async () => {
+  it('touches Gmail not at all before Connect is clicked', async () => {
     // The cached-resource hook runs its loader on mount regardless of its key,
-    // so without an explicit guard the panel would read the user's mail and
-    // spend their Anthropic credit before they ever asked it to.
-    withKey();
+    // so without an explicit guard the panel would read the user's mail before
+    // they ever asked it to.
     render(<MailWidget />);
 
     await screen.findByRole('button', { name: 'Connect Gmail' });
@@ -121,16 +116,7 @@ describe('MailWidget — setup states', () => {
     expect(state.rankMail).not.toHaveBeenCalled();
   });
 
-  it('does not call Claude when there is no key, even once connected', async () => {
-    connected();
-    render(<MailWidget />);
-
-    await screen.findByLabelText('Anthropic API key');
-    expect(state.rankMail).not.toHaveBeenCalled();
-  });
-
   it('reports a refused Google consent instead of looking connected', async () => {
-    withKey();
     state.fetchInbox.mockImplementationOnce(async () => {
       throw new Error('access_denied');
     });
@@ -145,9 +131,8 @@ describe('MailWidget — setup states', () => {
 });
 
 describe('MailWidget — ranked mail', () => {
-  it('shows the picks with Claude’s reason and a link into Gmail', async () => {
+  it('shows the picks with their reason and a link into Gmail', async () => {
     connected();
-    withKey();
     render(<MailWidget />);
 
     expect(await screen.findByText('Subject a')).toBeInTheDocument();
@@ -162,54 +147,68 @@ describe('MailWidget — ranked mail', () => {
 
   it('ranks from a fetch that does not prompt for consent again', async () => {
     connected();
-    withKey();
     render(<MailWidget />);
 
     await screen.findByText('Subject a');
     expect(state.fetchInbox).toHaveBeenCalledWith(false);
   });
 
+  it('scores against the signed-in address and the senders you have written to', async () => {
+    connected();
+    state.fetchKnownSenders.mockResolvedValue(new Set(['a@example.com']));
+    render(<MailWidget />);
+
+    await screen.findByText('Subject a');
+    const [, context] = state.rankMail.mock.calls[0];
+    expect(context.self).toBe('you@example.com');
+    expect(context.knownSenders).toEqual(new Set(['a@example.com']));
+  });
+
+  it('exposes the full arithmetic on hover, which is the point of scoring locally', async () => {
+    connected();
+    render(<MailWidget />);
+
+    await screen.findByText('Subject a');
+    const item = screen.getByText('Subject a').closest('li');
+    expect(item).toHaveAttribute('title', 'score 42.5 — to +14, bulk ×0.25');
+  });
+
   it('says so when nothing needs attention', async () => {
     connected();
-    withKey();
-    state.rankMail.mockResolvedValue([]);
+    state.rankMail.mockReturnValue([]);
     render(<MailWidget />);
 
     expect(await screen.findByText(/nothing in the last week needs you/i)).toBeInTheDocument();
   });
 
-  it('surfaces a ranking failure with a retry rather than an empty panel', async () => {
+  it('surfaces a read failure with a retry rather than an empty panel', async () => {
     connected();
-    withKey();
-    state.rankMail.mockImplementation(async () => {
-      throw new Error('401');
+    state.fetchInbox.mockImplementation(async () => {
+      throw new Error('403');
     });
     render(<MailWidget />);
 
-    expect(await screen.findByText(/couldn.t rank your mail/i)).toBeInTheDocument();
+    expect(await screen.findByText(/couldn.t read your mail/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
-  it('discloses that ranking is done by Claude, and that bodies stay put', async () => {
+  it('discloses that scoring happens here, and how to see why', async () => {
     connected();
-    withKey();
     render(<MailWidget />);
 
     await screen.findByText('Subject a');
-    expect(screen.getByText(/ranked by claude/i)).toBeInTheDocument();
-    expect(screen.getByText(/bodies stay in gmail/i)).toBeInTheDocument();
+    expect(screen.getByText(/scored in this browser/i)).toBeInTheDocument();
+    expect(screen.getByText(/hover a pick for why/i)).toBeInTheDocument();
   });
 
-  it('can forget a pasted key, dropping back to the prompt', async () => {
+  it('offers a refresh that costs nothing to take', async () => {
     connected();
-    withKey();
     const user = userEvent.setup();
     render(<MailWidget />);
 
     await screen.findByText('Subject a');
-    await user.click(screen.getByRole('button', { name: 'Forget API key' }));
+    await user.click(screen.getByRole('button', { name: 'Refresh mail now' }));
 
-    await waitFor(() => expect(screen.getByLabelText('Anthropic API key')).toBeInTheDocument());
-    expect(window.sessionStorage.getItem('anthropic.apiKey')).toBeNull();
+    await waitFor(() => expect(state.fetchInbox.mock.calls.length).toBeGreaterThan(1));
   });
 });

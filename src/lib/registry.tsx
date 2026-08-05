@@ -123,9 +123,10 @@ export const WIDGETS: WidgetDef[] = [
     title: 'Mail',
     icon: 'mail',
     cols: 2,
-    // Off until switched on: it needs a Google client id *and* an Anthropic API
-    // key, and it is the one panel that sends anything to a model — not
-    // something to turn on for someone without their say-so (ADR 0009).
+    // Off until switched on. It no longer needs an API key (ADR 0010), but
+    // `gmail.readonly` is a Google *restricted* scope and reading someone's
+    // inbox is the most invasive thing this app can do — not something to turn
+    // on for them without their say-so.
     defaultOff: true,
     render: () => <MailWidget />,
   },

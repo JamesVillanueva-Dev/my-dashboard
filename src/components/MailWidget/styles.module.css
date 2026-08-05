@@ -2,21 +2,12 @@
    `.container` is the root, handed to the shared <Widget> shell, which puts it
    on the card element — so every rule below can be scoped to it. */
 
-/* Header actions: refresh, and forgetting a pasted key. */
+/* Header action: re-read the inbox. */
 .toggle {
   composes: pill from '../../styles/controls.module.css';
 }
 
 /* ---------- Setup states ---------- */
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.container .form input {
-  width: 100%;
-}
-
 .add {
   composes: btn from '../../styles/controls.module.css';
   align-self: flex-start;
@@ -73,8 +64,8 @@
   margin: 2px 0 0;
 }
 
-/* Claude's one-line justification — the reason this panel exists at all, so it
-   takes the accent rather than the muted treatment the sender line uses. */
+/* The one-line justification — the reason this panel exists at all, so it takes
+   the accent rather than the muted treatment the sender line uses. */
 .reason {
   margin: 4px 0 0;
   font-size: 0.82rem;

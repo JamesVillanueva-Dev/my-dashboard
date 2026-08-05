@@ -10,7 +10,7 @@ export type LegalDoc = 'privacy' | 'terms' | null;
  * claim about when these terms last moved, so leaving it stale is a lie about
  * the document rather than a cosmetic slip.
  */
-const LAST_UPDATED = 'August 4, 2026';
+const LAST_UPDATED = 'August 5, 2026';
 
 /** The Privacy Policy body. Describes the app's actual, local-first behaviour. */
 function PrivacyPolicy() {
@@ -22,10 +22,9 @@ function PrivacyPolicy() {
       <h3>The short version</h3>
       <p>
         This dashboard runs in your browser and we operate no server of our own. By
-        default nothing you enter leaves your device. Two optional features change
-        that, and both are off until you turn them on: signing in mirrors your
-        dashboard to your account so it follows you between devices, and the Mail
-        panel sends message headers to Claude to rank them. Everything that leaves,
+        default nothing you enter leaves your device. One optional feature changes
+        that, and it is off until you turn it on: signing in mirrors your dashboard
+        to your account so it follows you between devices. Everything that leaves,
         and where it goes, is listed below.
       </p>
 
@@ -68,15 +67,10 @@ function PrivacyPolicy() {
         </li>
         <li>
           <strong>Gmail</strong> — read-only, and only if you add the Mail panel
-          and connect your account. It is read as metadata: sender, subject, and
-          Gmail's own short preview. Message bodies are never requested.
-        </li>
-        <li>
-          <strong>Anthropic</strong> — the Mail panel sends those same three
-          fields to Claude to rank which messages matter most, using an API key
-          you supply. This is the one place your own content leaves this browser,
-          it happens only while that panel is switched on, and message bodies are
-          not part of it.
+          and connect your account. It is read as metadata: sender, recipients, a
+          few routing headers, and Gmail's own short preview. Message bodies are
+          never requested. Which messages matter is worked out in your browser,
+          so none of this is sent on anywhere.
         </li>
       </ul>
       <p>
@@ -124,15 +118,6 @@ function TermsOfService() {
         browser limits, or device issues. Keep your own backups of anything
         important.
       </p>
-      <h3>API keys you supply</h3>
-      <p>
-        The Mail panel runs on an Anthropic API key you provide. Requests it makes
-        are billed to your account, and you are responsible for that usage and for
-        keeping the key safe. Anything entered in a browser can be read by other
-        code running on the page — treat a key used here as exposed, and revoke it
-        if you have any doubt.
-      </p>
-
       <h3>Third-party content</h3>
       <p>
         Weather, news headlines, and link icons come from third-party services. We

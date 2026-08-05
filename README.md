@@ -83,41 +83,44 @@ copying it to another device would make it skip events.
 Without a Clerk key there is no account, and the dashboard runs entirely from
 `localStorage` exactly as before.
 
-### Optional: the Mail panel (Gmail + Claude)
+### Optional: the Mail panel (Gmail)
 
-The **Mail** panel shows the three messages most worth your attention, chosen by
-Claude with a one-line reason each. It's off by default — add it from the
-**Widgets** menu. It needs `VITE_GOOGLE_CLIENT_ID` (Gmail is read through the same
-OAuth client as Calendar, so enable the Gmail API on that project) plus an
-Anthropic API key.
+The **Mail** panel shows the three messages most worth your attention, with a
+one-line reason each. It's off by default — add it from the **Widgets** menu. It
+needs only `VITE_GOOGLE_CLIENT_ID` (Gmail is read through the same OAuth client
+as Calendar, so enable the Gmail API on that project). No API key, no account, no
+third party.
 
 **Only message metadata is read.** Gmail is queried with `format=metadata`, so it
-returns sender, subject, and its own ~100-character preview and does not include
-message bodies — they are never fetched, and so cannot be sent anywhere.
+returns headers and its own ~100-character preview and does not include message
+bodies — they are never fetched. Ranking happens in your browser, so nothing read
+here is sent anywhere at all.
 
-**The API key never goes in the bundle.** Two ways to supply one:
+**How it picks.** Every candidate gets a score, `Σ points × Π factors`, and only
+messages above a floor are shown — so an inbox of newsletters correctly produces
+nothing rather than a best-of-a-bad-lot. Roughly:
 
-- `VITE_ANTHROPIC_API_KEY` in `.env.local` for local use. It is deliberately
-  **not** wired into `.github/workflows/deploy.yml`.
-- Pasted into the panel on the deployed site, kept in `sessionStorage` for that
-  tab only and never synced to your account.
+- **Points** for a star (+25), Gmail's own `IMPORTANT` flag (+18), being in `To`
+  (+14) especially as the sole recipient (+8), being part of a thread (+10), and
+  for what the message asks: action required (+12), a direct request (+10), a
+  question in the subject (+8), a deadline (+8). Unread is worth only +6 — a read
+  message you have been avoiding may be the one you owe.
+- **Factors** that no amount of points can out-add: a mailing-list or automated
+  message is scaled to ×0.25, marketing language to ×0.5, and age decays gently
+  from ×1.0 to ×0.6 across the week. Nothing is ever picked for being newest.
+- **The exception that matters:** transactional language cancels the automation
+  penalty, so a failed-payment alert from `no-reply@` still surfaces — unless
+  marketing language is present too, which is how "your trial expires, 30% off"
+  stays buried.
 
-> **Do not add it as a repository variable or secret.** Anything `VITE_`-prefixed
-> is inlined into `dist/assets/*.js`, which GitHub Pages serves publicly — the
-> deploy workflow greps the bundle for the other keys precisely because they end
-> up in there. A Clerk publishable key and a Google client id are public by
-> design; an Anthropic key is a bearer credential and would be readable by
-> anyone.
+Hover any pick to see the full arithmetic that produced it. The weights live at
+the top of `src/lib/importantMail.ts` and are meant to be argued with. See
+[ADR 0010](docs/adr/0010-heuristic-mail-ranking.md).
 
-Either way the key is reachable by any code running on the page — that is what
-`dangerouslyAllowBrowser` means, and only a server-side proxy would fix it. Use a
-key you can scope and rotate. See
-[ADR 0009](docs/adr/0009-claude-ranked-mail.md).
-
-Ranking is cached for 15 minutes and refreshed on demand, because unlike every
-other panel here a refresh costs money. `gmail.readonly` is a Google *restricted*
-scope: fine for a project in testing mode with your own listed users, but
-publishing it would require Google's verification and a security assessment.
+Ranking is cached for 5 minutes and refreshed on demand — cheap, since the only
+cost is a Gmail read. `gmail.readonly` is a Google *restricted* scope: fine for a
+project in testing mode with your own listed users, but publishing it would
+require Google's verification and a security assessment.
 
 ### Music: YouTube by default, Spotify opt-in
 
@@ -176,8 +179,7 @@ src/
 │   ├── registry.tsx          catalogue of available widgets
 │   ├── profileSync.ts        shared vs per-device keys, and conflict rules
 │   ├── gmail.ts              read-only inbox metadata (never message bodies)
-│   ├── importantMail.ts      asks Claude which three messages matter
-│   ├── anthropicKey.ts       where the API key may come from, and may not
+│   ├── importantMail.ts      scores which three messages matter, and why
 │   ├── themes.ts             the colour schemes offered in settings
 │   ├── spotifyAuth.ts        Spotify OAuth (PKCE), opt-in
 │   ├── cache.ts              stale-while-revalidate store behind the hook above
@@ -225,5 +227,6 @@ npm run create:component -- EventsCard --no-test
 - [ADR 0006 — Opt-in Spotify in-page player](docs/adr/0006-spotify-in-page-player.md)
 - [ADR 0007 — YouTube as the default music panel](docs/adr/0007-youtube-as-the-default-music-panel.md)
 - [ADR 0008 — Account-synced dashboard state](docs/adr/0008-account-synced-dashboard-state.md)
-- [ADR 0009 — Claude-ranked mail](docs/adr/0009-claude-ranked-mail.md)
+- [ADR 0009 — Claude-ranked mail](docs/adr/0009-claude-ranked-mail.md) *(superseded)*
+- [ADR 0010 — Heuristic mail ranking](docs/adr/0010-heuristic-mail-ranking.md)
 - [User stories](docs/user-stories.md) · [Wireframes](docs/wireframes.md)

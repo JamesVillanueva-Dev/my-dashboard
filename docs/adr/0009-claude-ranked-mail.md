@@ -1,6 +1,6 @@
 # ADR 0009: Claude ranks the inbox, on metadata only, with a key that is never bundled
 
-- **Status:** Accepted
+- **Status:** Superseded by [ADR 0010](0010-heuristic-mail-ranking.md)
 - **Date:** 2026-08-04
 - **Deciders:** Project owner
 
