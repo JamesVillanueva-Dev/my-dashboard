@@ -15,8 +15,11 @@ import type { Reminder } from './gcalSync';
 
 /** The shape the retired To-do widget persisted under the `todos` key. */
 export interface LegacyTodo {
+  /** The old widget's local id, which the merged reminder keeps behind a prefix. */
   id: string;
+  /** What the row said. */
   text: string;
+  /** Completion, carried across so a finished todo does not come back unticked. */
   done: boolean;
 }
 

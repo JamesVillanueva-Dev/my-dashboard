@@ -20,10 +20,19 @@ export interface CachedResource<T> {
   refresh: () => void;
 }
 
+/**
+ * The hook's internal state, held as one object so a key change can swap every
+ * field atomically. Splitting these into separate `useState` calls would let a
+ * render see the new key beside the previous key's data.
+ */
 interface State<T> {
+  /** The key this state describes, so a stale response can be discarded. */
   key: string;
+  /** Latest value for `key`, or `null` before the first success. */
   data: T | null;
+  /** As {@link CachedResource.status}. */
   status: CachedResource<T>['status'];
+  /** As {@link CachedResource.revalidating}. */
   revalidating: boolean;
 }
 

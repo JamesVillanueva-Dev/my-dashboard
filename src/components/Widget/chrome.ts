@@ -35,8 +35,17 @@ export interface WidgetChrome {
   isResizing: boolean;
 }
 
+/**
+ * The context the chrome travels in. Kept private: everything outside goes
+ * through {@link WidgetChromeProvider} or {@link useWidgetChrome}, so `null` —
+ * a widget rendered outside the grid — is handled in one place.
+ */
 const WidgetChromeContext = createContext<WidgetChrome | null>(null);
 
+/**
+ * Supplies the chrome to one widget's subtree. The dashboard grid wraps each
+ * panel in this; nothing else should.
+ */
 export const WidgetChromeProvider = WidgetChromeContext.Provider;
 
 /**

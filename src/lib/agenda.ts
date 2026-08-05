@@ -16,6 +16,7 @@
 import { dayKey, type CalendarEvent } from './gcalEvents';
 import type { Reminder } from './gcalSync';
 
+/** One day in ms — the unit for every window this module measures. */
 const DAY_MS = 86_400_000;
 
 /** Where an agenda item came from. Drives its icon and whether it can be ticked. */
@@ -25,9 +26,11 @@ export type AgendaSource = 'event' | 'task';
 export interface AgendaItem {
   /** Unique across sources — ids can collide between a calendar and the task list. */
   key: string;
+  /** Which widget owns it — decides the icon and whether it can be ticked. */
   source: AgendaSource;
   /** Id of the owning record, for writing a completion back to its widget. */
   id: string;
+  /** What the row reads: the event's summary or the task's text. */
   title: string;
   /** Start as epoch ms; local midnight for all-day events. */
   start: number;

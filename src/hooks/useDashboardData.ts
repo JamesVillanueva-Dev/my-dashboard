@@ -35,6 +35,13 @@ export interface DashboardData {
   now: number;
 }
 
+/**
+ * The context {@link DashboardData} travels in.
+ *
+ * Exported for `DashboardDataProvider`, which is the only thing that should ever
+ * supply it. Consumers go through {@link useDashboardData}, which turns the
+ * `null` default — meaning "no provider above me" — into a thrown error.
+ */
 export const DashboardDataContext = createContext<DashboardData | null>(null);
 
 /**

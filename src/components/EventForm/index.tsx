@@ -17,8 +17,11 @@ interface EventFormProps {
   saving: boolean;
   /** Validation or API error to show, or '' for none. */
   error: string;
+  /** Submit. Receives the edited draft; validation is the caller's job. */
   onSave: (draft: EventDraft) => void;
+  /** Delete the event. Only reachable when `editing`, and only on a second click. */
   onDelete: () => void;
+  /** Close without saving. */
   onCancel: () => void;
 }
 

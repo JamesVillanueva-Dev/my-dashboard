@@ -13,6 +13,7 @@
 
 import { getAccessToken } from './googleAuth';
 
+/** Google Calendar API v3 root. */
 const API = 'https://www.googleapis.com/calendar/v3';
 
 /** How far ahead the agenda looks. */
@@ -40,7 +41,9 @@ export interface CalendarEvent {
   end: number;
   /** True for date-only events, which sort above timed ones. */
   allDay: boolean;
+  /** Free text as the user typed it — a room, an address, a meeting link. */
   location?: string;
+  /** The event's notes, shown in the detail view. */
   description?: string;
   /** Link to the event in Google Calendar. */
   htmlLink?: string;
@@ -60,15 +63,21 @@ export interface CalendarEvent {
 
 /** The bits of a calendar list entry an event carries with it. */
 export interface CalendarMeta {
+  /** The calendar's display name. */
   title?: string;
+  /** Its colour as `#rrggbb`. */
   color?: string;
+  /** Whether the user may edit events on it. */
   canWrite?: boolean;
 }
 
 /** A calendar the user can file an event under. */
 export interface CalendarOption {
+  /** Google's calendar id — usually an address, and the value we send back. */
   id: string;
+  /** Display name, falling back to the id when Google sends no summary. */
   title: string;
+  /** Its colour as `#rrggbb`. */
   color?: string;
   /** The user's main calendar — the default target for a new event. */
   primary: boolean;
@@ -78,6 +87,7 @@ export interface CalendarOption {
 
 /** What {@link fetchRange} returns: the events, and where they can be filed. */
 export interface RangeResult {
+  /** Every visible event in the window, already sorted. */
   events: CalendarEvent[];
   /** Every calendar in the list, selected or not, for the event form's picker. */
   calendars: CalendarOption[];
@@ -89,28 +99,51 @@ export interface DayGroup {
   key: string;
   /** "Today" / "Tomorrow" / "Thu 14". */
   label: string;
+  /** That day's events, in the order the agenda lists them. */
   events: CalendarEvent[];
 }
 
+/**
+ * The fields this module reads from Google's `calendarList` resource. Only a
+ * subset: everything the API sends that nothing here uses is left undeclared
+ * rather than mirrored, so the type says what we actually depend on.
+ */
 interface RawCalendar {
+  /** Calendar id, used as the path segment when listing its events. */
   id: string;
+  /** Display name. Absent on some shared calendars, hence the id fallback. */
   summary?: string;
+  /** Ticked in the user's Google Calendar. Absent means visible — see {@link fetchRange}. */
   selected?: boolean;
+  /** The account's own calendar, offered as the default target for a new event. */
   primary?: boolean;
+  /** `#rrggbb`, which becomes the colour of the event's chip. */
   backgroundColor?: string;
+  /** `owner` / `writer` / `reader` / `freeBusyReader` — see {@link canWrite}. */
   accessRole?: string;
 }
 
+/** The fields this module reads from Google's `events` resource. */
 interface RawEvent {
+  /** Absent on malformed recurrences, which {@link toEvent} drops. */
   id?: string;
+  /** `cancelled` marks a deleted occurrence, which is not shown. */
   status?: string;
+  /** The title. Blank or absent becomes "(no title)". */
   summary?: string;
+  /** Free text — a room, an address, a meeting link. */
   location?: string;
+  /** The event's notes. */
   description?: string;
+  /** Permalink to the event in Google Calendar. */
   htmlLink?: string;
+  /** Present on an occurrence of a recurring event; it is the series' id. */
   recurringEventId?: string;
+  /** `dateTime` for a timed event, `date` for an all-day one — never both. */
   start?: { dateTime?: string; date?: string };
+  /** As `start`. Exclusive, so an all-day event ends at the next midnight. */
   end?: { dateTime?: string; date?: string };
+  /** Scanned for the user's own row, to hide invitations they have declined. */
   attendees?: { self?: boolean; responseStatus?: string }[];
 }
 
@@ -119,6 +152,17 @@ function canWrite(cal: RawCalendar): boolean {
   return cal.accessRole === 'owner' || cal.accessRole === 'writer';
 }
 
+/**
+ * Bearer-authenticated GET against the Calendar API.
+ *
+ * @param token - OAuth access token from {@link getAccessToken}.
+ * @param path - Path below {@link API}, including any query string. Callers
+ *   encode their own path segments — calendar ids are email addresses.
+ * @returns The parsed JSON body.
+ * @throws If the response status is not 2xx. The status is in the message, and
+ *   {@link fetchRange} uses that to drop one unreadable calendar rather than
+ *   failing the whole agenda.
+ */
 async function api<T>(token: string, path: string): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     headers: { Authorization: `Bearer ${token}` },

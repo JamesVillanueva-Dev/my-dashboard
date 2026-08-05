@@ -30,7 +30,9 @@ export const SPOTIFY_SCOPES = [
   'user-modify-playback-state',
 ].join(' ');
 
+/** Spotify's consent screen — where {@link beginAuth} sends the browser. */
 const AUTHORIZE_URL = 'https://accounts.spotify.com/authorize';
+/** Where an authorization code (or a refresh token) is traded for an access token. */
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
 
 /** Keys under which the flow's state is held for the tab. */
@@ -63,12 +65,21 @@ export function redirectUri(): string {
 
 /** A token as persisted for the tab. */
 interface StoredToken {
+  /** Bearer token for the Web API and the playback SDK. */
   accessToken: string;
+  /** Trades for a fresh access token. Spotify does not always send one. */
   refreshToken?: string;
   /** Epoch ms after which the access token should be refreshed. */
   expiresAt: number;
 }
 
+/**
+ * The tab's stored session, or `null` if there is none.
+ *
+ * `sessionStorage`, not `localStorage`: the session dies with the tab, matching
+ * how the Google token is held for a tab's lifetime only. Unreadable or
+ * malformed storage reads as "not connected" rather than throwing.
+ */
 function readToken(): StoredToken | null {
   try {
     const raw = window.sessionStorage.getItem(TOKEN_KEY);
@@ -78,6 +89,11 @@ function readToken(): StoredToken | null {
   }
 }
 
+/**
+ * Persists the session for the tab, or clears it.
+ *
+ * @param token - The session to store; `null` disconnects.
+ */
 function writeToken(token: StoredToken | null): void {
   try {
     if (token) window.sessionStorage.setItem(TOKEN_KEY, JSON.stringify(token));
@@ -135,13 +151,30 @@ export async function beginAuth(): Promise<void> {
 
 /** Shape of Spotify's token endpoint response. */
 interface TokenResponse {
+  /** The access token. Absent on failure, which is how failure is detected. */
   access_token?: string;
+  /** Only sent on some grants — a refresh may return none, keeping the old one. */
   refresh_token?: string;
+  /** Lifetime in seconds; an hour is assumed when absent. */
   expires_in?: number;
+  /** OAuth error code. */
   error?: string;
+  /** Human-readable reason, preferred for the message shown to the user. */
   error_description?: string;
 }
 
+/**
+ * Posts to the token endpoint and shapes the reply into a {@link StoredToken}.
+ *
+ * Shared by both grants — the authorization code exchange and the refresh — which
+ * differ only in the body they send. No client secret is involved: this is PKCE,
+ * so the app stays client-only (ADR 0002).
+ *
+ * @param body - Grant-specific fields; `client_id` is added here.
+ * @returns The new session, with `expiresAt` resolved to an absolute time.
+ * @throws If the request fails or comes back without an access token, carrying
+ *   Spotify's own description where there is one.
+ */
 async function exchange(body: Record<string, string>): Promise<StoredToken> {
   const res = await fetch(TOKEN_URL, {
     method: 'POST',

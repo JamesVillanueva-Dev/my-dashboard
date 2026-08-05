@@ -11,6 +11,7 @@
 
 import { GMAIL_SCOPE, getAccessToken } from './googleAuth';
 
+/** Gmail API v1 root, already scoped to the signed-in user. */
 const API = 'https://gmail.googleapis.com/gmail/v1/users/me';
 
 /**
@@ -34,6 +35,7 @@ export interface MailSummary {
   id: string;
   /** Display name and address from the `From` header, as Gmail formatted it. */
   from: string;
+  /** The `Subject` header, or '' when the message has none. */
   subject: string;
   /** Gmail's own ~100-character preview. Never the body. */
   snippet: string;
@@ -45,10 +47,18 @@ export interface MailSummary {
 
 /** The shape Gmail returns for `format=metadata`. */
 interface GmailMessage {
+  /** Absent only on a malformed response; such messages are dropped. */
   id?: string;
+  /** Gmail's own preview text. */
   snippet?: string;
+  /** Epoch ms as a string — Gmail sends it that way. */
   internalDate?: string;
+  /** Gmail's labels; only `UNREAD` is read. */
   labelIds?: string[];
+  /**
+   * Headers only. `format=metadata` means there is no `body` here to read — see
+   * the note at the top of this file.
+   */
   payload?: { headers?: { name?: string; value?: string }[] };
 }
 

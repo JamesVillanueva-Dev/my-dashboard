@@ -36,9 +36,16 @@ export interface RankedMail {
 
 /** The JSON the model is constrained to return. */
 interface RankingResponse {
+  /** Chosen messages, most important first, each `id` echoed from the prompt. */
   picks: { id: string; reason: string }[];
 }
 
+/**
+ * The tool schema Claude's reply is validated against, mirroring
+ * {@link RankingResponse}. Constraining the output this way is what lets the
+ * caller trust the shape without parsing prose. The `description` on each field
+ * is part of the prompt as far as the model is concerned.
+ */
 const SCHEMA = {
   type: 'object',
   properties: {
@@ -65,6 +72,12 @@ const SCHEMA = {
   additionalProperties: false,
 } as const;
 
+/**
+ * The system prompt: what "important" means here, and the standing instruction
+ * that message contents are data rather than directions. That last paragraph is
+ * the defence against prompt injection from an email — the model is reading
+ * text written by strangers, and any of it could ask to be ranked first.
+ */
 const SYSTEM = `You triage a busy inbox. Given recent messages, pick the ${TOP_N} that most deserve the recipient's attention right now and say why in one line each.
 
 Important means it needs something from the recipient — a decision, a reply, an action, or awareness of something time-sensitive. Weigh what the message asks for, not who sent it: a newsletter from a person is still a newsletter, and an automated alert about a failing payment still matters.

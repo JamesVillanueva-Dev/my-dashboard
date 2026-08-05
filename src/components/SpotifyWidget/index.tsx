@@ -17,6 +17,7 @@ interface Source {
   sid: string;
 }
 
+/** The Spotify entities a source can point at — everything its embed supports. */
 type SpotifyType = 'track' | 'album' | 'playlist' | 'artist' | 'episode' | 'show';
 
 // "Today's Top Hits" — a public editorial playlist, so the widget plays something

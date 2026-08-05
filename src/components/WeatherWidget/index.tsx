@@ -5,20 +5,33 @@ import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useCachedResource } from '../../hooks/useCachedResource';
 import styles from './styles.module.css';
 
+/** A saved location, as returned by Open-Meteo's geocoding search. */
 interface Place {
+  /** What the search matched, shown as the widget's subtitle. */
   name: string;
+  /** Degrees north. */
   latitude: number;
+  /** Degrees east. */
   longitude: number;
 }
 
+/** One place's forecast, reduced to the figures the widget renders. */
 interface Weather {
+  /** Current temperature, °C. */
   temp: number;
+  /** Apparent temperature, °C — what it feels like with wind and humidity. */
   feelsLike: number;
+  /** Relative humidity, %. */
   humidity: number;
+  /** Wind speed, km/h. */
   wind: number;
+  /** Current conditions as a WMO code; resolve it through {@link desc}. */
   code: number;
+  /** Today's high, °C. */
   todayMax: number;
+  /** Today's low, °C. */
   todayMin: number;
+  /** The multi-day strip: `YYYY-MM-DD`, conditions, and that day's range. */
   daily: { date: string; code: number; max: number; min: number }[];
 }
 
@@ -61,6 +74,7 @@ const WMO: Record<number, [IconName, string]> = {
  */
 const desc = (code: number): [IconName, string] => WMO[code] ?? ['thermometer', 'Unknown'];
 
+/** Where the widget points before anyone has searched for somewhere else. */
 const DEFAULT_PLACE: Place = {
   name: 'San Diego',
   latitude: 32.7157,

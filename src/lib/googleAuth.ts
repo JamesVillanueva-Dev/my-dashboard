@@ -14,6 +14,7 @@
  * them is switched on (ADR 0009).
  */
 
+/** The GIS client library, loaded on demand rather than in `index.html`. */
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 
 /** Full Calendar scope — needed to create the dedicated calendar and its events. */
@@ -29,15 +30,27 @@ export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar';
  */
 export const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
 
+/** What GIS hands the callback once the user has been through the consent flow. */
 interface TokenResponse {
+  /** The access token. Absent when the request failed. */
   access_token?: string;
+  /** Lifetime in seconds; Google issues an hour. Assumed when absent. */
   expires_in?: number;
+  /** OAuth error code, set instead of a token when consent was refused. */
   error?: string;
 }
+/** The per-scope client GIS builds for us; the handle we ask for tokens with. */
 interface TokenClient {
+  /**
+   * Starts a token request, resolving through the `callback` given at init —
+   * it returns nothing itself. `prompt: ''` asks Google to skip the consent
+   * screen if it can, which is what makes a silent renewal silent.
+   */
   requestAccessToken: (opts?: { prompt?: string }) => void;
 }
+/** The slice of the GIS global this module uses. */
 interface OAuth2 {
+  /** Builds a {@link TokenClient} bound to one scope and one pair of callbacks. */
   initTokenClient(config: {
     client_id: string;
     scope: string;
@@ -59,7 +72,18 @@ export function hasGoogleClientId(): boolean {
   return typeof GOOGLE_CLIENT_ID === 'string' && GOOGLE_CLIENT_ID.length > 0;
 }
 
+/** In-flight (or settled) script load, so concurrent callers share one `<script>`. */
 let gisPromise: Promise<OAuth2> | null = null;
+
+/**
+ * Injects the GIS script on first use and resolves once its global is up.
+ *
+ * Loaded here rather than from `index.html` so that a dashboard with no Google
+ * feature switched on never talks to Google at all.
+ *
+ * @returns The GIS `oauth2` namespace.
+ * @throws If the script fails to load, or loads without exposing `oauth2`.
+ */
 function loadGis(): Promise<OAuth2> {
   if (window.google?.accounts?.oauth2) return Promise.resolve(window.google.accounts.oauth2);
   if (gisPromise) return gisPromise;
@@ -80,15 +104,24 @@ function loadGis(): Promise<OAuth2> {
 
 /** Everything held for one OAuth scope. */
 interface ScopeState {
+  /** The current access token, in memory only — never persisted. */
   token: string | null;
   /** Epoch ms. */
   expiry: number;
+  /** This scope's GIS client, built once and reused. */
   client: TokenClient | null;
+  /**
+   * The caller waiting on an in-flight request. GIS reports back through a
+   * callback rather than a promise, so the settle functions are parked here for
+   * it to find. Exactly one request is outstanding per scope at a time.
+   */
   pending: { resolve: (t: string) => void; reject: (e: Error) => void } | null;
 }
 
+/** Token state per scope, keyed by the scope URL. */
 const states = new Map<string, ScopeState>();
 
+/** The state for a scope, created empty on first mention. */
 function stateFor(scope: string): ScopeState {
   let state = states.get(scope);
   if (!state) {
@@ -98,6 +131,15 @@ function stateFor(scope: string): ScopeState {
   return state;
 }
 
+/**
+ * The GIS client for one scope, building it on first use.
+ *
+ * The callbacks are wired here rather than per request because GIS fixes them at
+ * init: both settle whatever caller is parked in `state.pending` and, on
+ * success, record the token and its expiry against the scope.
+ *
+ * @param scope - The OAuth scope this client requests.
+ */
 async function ensureClient(scope: string): Promise<TokenClient> {
   const state = stateFor(scope);
   if (state.client) return state.client;

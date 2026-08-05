@@ -17,6 +17,7 @@ export type EditorMode = 'none' | 'new' | 'edit';
 
 /** What {@link useEventEditor} exposes to the month view. */
 export interface EventEditor {
+  /** Which form is open, if any; see {@link EditorMode}. */
   mode: EditorMode;
   /** The form's starting values; null when {@link mode} is `'none'`. */
   draft: EventDraft | null;

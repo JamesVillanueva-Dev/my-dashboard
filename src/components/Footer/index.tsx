@@ -4,6 +4,7 @@ import styles from './styles.module.css';
 
 /** A live service the dashboard reads from, and what it feeds. */
 interface Source {
+  /** The service's name. */
   label: string;
   /** What it powers, shown after the name. */
   role: string;
@@ -11,6 +12,11 @@ interface Source {
   href?: string;
 }
 
+/**
+ * Every service the dashboard can reach out to. This list and the Privacy
+ * Policy's are the same claim, so anything added here that makes a network
+ * request belongs in that document too.
+ */
 const SOURCES: Source[] = [
   { label: 'Open-Meteo', role: 'weather', href: 'https://open-meteo.com' },
   { label: 'Public RSS', role: 'headlines' },

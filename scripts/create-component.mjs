@@ -20,6 +20,7 @@ import { createInterface } from 'node:readline/promises';
 import { join, relative, sep } from 'node:path';
 import { stdin, stdout, argv, exit } from 'node:process';
 
+/** The one components folder. Everything is created flat inside it. */
 const COMPONENTS = join('src', 'components');
 
 /** Parses `argv` into `{ name, test }`. */
@@ -53,6 +54,14 @@ function toKebab(name) {
   return name.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 }
 
+/**
+ * The component itself. Carries the conventions a new file is expected to keep:
+ * a documented props interface, a docblock on the component, and `.container` on
+ * the root element.
+ *
+ * @param name - PascalCase component name.
+ * @returns Contents for `index.tsx`.
+ */
 const indexTsx = (name) => `import styles from './styles.module.css';
 
 /** Props for {@link ${name}}. */
@@ -75,6 +84,13 @@ export default function ${name}({ title }: ${name}Props) {
 }
 `;
 
+/**
+ * The stylesheet, opening with `.container` so the root class exists from the
+ * start and the descendant-selector convention is stated where it applies.
+ *
+ * @param name - PascalCase component name.
+ * @returns Contents for `styles.module.css`.
+ */
 const stylesCss = (name) => `/* ${toKebab(name)}
    \`.container\` is the root. Prefer descendant selectors (\`.container h2\`)
    over adding a className to every inner element. */
@@ -84,6 +100,13 @@ const stylesCss = (name) => `/* ${toKebab(name)}
 }
 `;
 
+/**
+ * A starter render test, so a new component arrives with a passing test rather
+ * than a gap someone has to notice.
+ *
+ * @param name - PascalCase component name.
+ * @returns Contents for `index.test.tsx`.
+ */
 const testTsx = (name) => `import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import ${name} from './index';
@@ -95,6 +118,10 @@ describe('${name}', () => {
   });
 });
 `;
+
+// ---------------------------------------------------------------------------
+// Run: resolve a name, refuse anything the conventions reject, then write.
+// ---------------------------------------------------------------------------
 
 const opts = parseArgs(argv.slice(2));
 
@@ -118,6 +145,8 @@ if (await exists(dir)) fail(`${dir} already exists.`);
 
 await mkdir(dir, { recursive: true });
 
+// `[filename, contents]` pairs, written together so a half-scaffolded folder is
+// not left behind if one of them fails.
 const files = [
   ['index.tsx', indexTsx(opts.name)],
   ['styles.module.css', stylesCss(opts.name)],

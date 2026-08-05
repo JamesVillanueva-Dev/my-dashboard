@@ -28,6 +28,7 @@
 
 /** A stored result and when it was stored. */
 export interface CacheEntry<T> {
+  /** The cached payload, exactly as the fetcher returned it. */
   value: T;
   /** Epoch ms at which `value` was written. */
   at: number;
@@ -50,7 +51,17 @@ const VERSION = 1;
  */
 const PREFIX = 'cache:';
 
+/**
+ * The in-memory tier, read before `localStorage`. It survives a remount but not
+ * a reload, and spares every widget a JSON parse on each render pass.
+ */
 const memory = new Map<string, CacheEntry<unknown>>();
+
+/**
+ * Requests currently in flight, keyed the same way. This is what makes two
+ * widgets asking for one feed at the same moment cost a single fetch: the second
+ * caller is handed the first caller's promise.
+ */
 const inflight = new Map<string, Promise<unknown>>();
 
 /** Reads an entry from `localStorage`, ignoring anything unreadable or stale-shaped. */

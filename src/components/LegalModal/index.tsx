@@ -5,6 +5,11 @@ import styles from './styles.module.css';
 /** Which legal document to show, or `null` for none. */
 export type LegalDoc = 'privacy' | 'terms' | null;
 
+/**
+ * Dates both documents. Bump it whenever their wording changes — the date is a
+ * claim about when these terms last moved, so leaving it stale is a lie about
+ * the document rather than a cosmetic slip.
+ */
 const LAST_UPDATED = 'August 4, 2026';
 
 /** The Privacy Policy body. Describes the app's actual, local-first behaviour. */

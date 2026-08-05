@@ -38,7 +38,9 @@ export interface DayCell {
 
 /** Half-open window covering everything the grid can display. */
 export interface MonthRange {
+  /** Local midnight of the grid's first cell, epoch ms — inclusive. */
   timeMin: number;
+  /** Local midnight after the grid's last cell, epoch ms — exclusive. */
   timeMax: number;
 }
 

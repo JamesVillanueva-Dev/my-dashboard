@@ -26,6 +26,7 @@ export type SyncStatus = 'off' | 'idle' | 'saving' | 'error';
 
 /** The account-sync state a component can render. */
 export interface ProfileSync {
+  /** What the sync is doing now; see {@link SyncStatus}. */
   status: SyncStatus;
   /** Human-readable failure, or `null`. */
   error: string | null;
@@ -33,8 +34,15 @@ export interface ProfileSync {
 
 /** The subset of Clerk's user object this hook needs, so tests need not fake all of it. */
 export interface SyncUser {
+  /** Clerk's user id. A change means a different account signed in. */
   id: string;
+  /**
+   * Where the snapshot lives. Typed `unknown` because it is whatever was last
+   * written — possibly by an older version of the app — and has to be validated
+   * before use rather than trusted.
+   */
   unsafeMetadata: unknown;
+  /** Writes the metadata back to Clerk. Resolves once the account is updated. */
   update: (params: { unsafeMetadata: Record<string, unknown> }) => Promise<unknown>;
 }
 

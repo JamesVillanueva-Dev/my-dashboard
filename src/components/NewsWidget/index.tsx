@@ -22,9 +22,13 @@ const PROXY = 'https://api.allorigins.win/raw?url=';
  *  shown. The refresh button ignores it and fetches anyway. */
 const TTL = 5 * 60_000;
 
+/** One headline, as parsed out of a feed's `<item>`/`<entry>`. */
 interface Article {
+  /** Headline text. */
   title: string;
+  /** Where the story lives; opened in a new tab. */
   link: string;
+  /** The raw `<pubDate>`/`<published>` string, formatted for display by `ago`. */
   date: string;
 }
 

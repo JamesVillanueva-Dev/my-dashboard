@@ -8,22 +8,34 @@ import {
   isConnected,
 } from '../lib/spotifyAuth';
 
+/** The Web Playback SDK, loaded on demand by {@link loadSdk}. */
 const SDK_SRC = 'https://sdk.scdn.co/spotify-player.js';
+/** Spotify Web API root, used for the transport calls the SDK does not cover. */
 const API = 'https://api.spotify.com/v1';
 
 /* ---------- Minimal typings for the Web Playback SDK global ---------- */
 
+/** A track as the SDK reports it, before {@link NowPlaying} flattens it. */
 interface SdkTrack {
+  /** Track title. */
   name: string;
+  /** Every credited artist; the widget joins them into one line. */
   artists: { name: string }[];
+  /** Cover art in several sizes; the first entry is the one displayed. */
   album: { images: { url: string }[] };
 }
+/** A playback state change, pushed by the SDK whenever anything moves. */
 interface SdkState {
+  /** Whether playback is currently paused. */
   paused: boolean;
+  /** Position within the track, ms. */
   position: number;
+  /** Track length, ms. */
   duration: number;
+  /** Where the current track lives; `null` before anything has played. */
   track_window: { current_track: SdkTrack | null };
 }
+/** The methods this hook calls on an SDK player instance. */
 interface SdkPlayer {
   connect(): Promise<boolean>;
   disconnect(): void;
@@ -34,7 +46,13 @@ interface SdkPlayer {
   nextTrack(): Promise<void>;
   previousTrack(): Promise<void>;
 }
+/** The `window.Spotify` global the SDK script installs. */
 interface SpotifyGlobal {
+  /**
+   * Constructs a playback device. `name` is what the user sees in Spotify
+   * Connect, and `getOAuthToken` is called back whenever the SDK needs a fresh
+   * token — which is why token renewal is not this hook's problem.
+   */
   Player: new (options: {
     name: string;
     getOAuthToken: (cb: (token: string) => void) => void;
@@ -48,6 +66,7 @@ declare global {
   }
 }
 
+/** In-flight (or settled) script load, so remounts do not add a second `<script>`. */
 let sdkPromise: Promise<SpotifyGlobal> | null = null;
 
 /** Loads the Web Playback SDK once per page, resolving its global. */
@@ -72,8 +91,11 @@ function loadSdk(): Promise<SpotifyGlobal> {
 
 /** The now-playing track, flattened for display. */
 export interface NowPlaying {
+  /** Track title. */
   name: string;
+  /** Every credited artist, comma-joined. */
   artist: string;
+  /** Cover art URL, or `null` when the track has no artwork. */
   art: string | null;
 }
 
@@ -90,6 +112,7 @@ export type PlayerStatus = 'off' | 'disconnected' | 'connecting' | 'ready' | 'er
 
 /** What {@link useSpotifyPlayer} returns. */
 export interface SpotifyPlayer {
+  /** Where the player is in its lifecycle; see {@link PlayerStatus}. */
   status: PlayerStatus;
   /** Human-readable failure, when `status` is `error`. */
   error: string | null;
@@ -99,12 +122,17 @@ export interface SpotifyPlayer {
   deviceId: string | null;
   /** The current track, or null when nothing has played yet. */
   track: NowPlaying | null;
+  /** Whether playback is paused. `true` before anything has played. */
   paused: boolean;
   /** Volume in 0–1. Persisted, and applied whenever a device becomes ready. */
   volume: number;
+  /** Sets the volume on the device and persists it for next time. */
   setVolume: (value: number) => void;
+  /** Play/pause. No-op unless a device is ready. */
   togglePlay: () => void;
+  /** Skips to the next track in Spotify's queue. */
   next: () => void;
+  /** Skips back, however Spotify's SDK chooses to interpret that. */
   previous: () => void;
   /** Sends the user to Spotify's consent screen. Must be a user gesture. */
   connect: () => void;

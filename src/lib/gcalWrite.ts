@@ -24,6 +24,7 @@
 import { getAccessToken } from './googleAuth';
 import { dayKey, localMidnight, type CalendarEvent } from './gcalEvents';
 
+/** Google Calendar API v3 root. */
 const API = 'https://www.googleapis.com/calendar/v3';
 /** Length of a new event, in minutes, before the user touches the times. */
 const DEFAULT_DURATION_MIN = 60;
@@ -32,7 +33,9 @@ const DEFAULT_DURATION_MIN = 60;
 export interface EventDraft {
   /** Calendar the event lives on, or should move to. */
   calendarId: string;
+  /** Event summary. Empty is allowed; Google shows "(no title)". */
   title: string;
+  /** Whether the event covers whole days rather than a span of clock time. */
   allDay: boolean;
   /** `YYYY-MM-DD`. */
   startDate: string;
@@ -42,22 +45,41 @@ export interface EventDraft {
   endDate: string;
   /** `HH:mm`, ignored when {@link allDay}. */
   endTime: string;
+  /** Free text — a room, an address, a meeting link. */
   location: string;
+  /** The event's notes. */
   description: string;
 }
 
 /** Identifies an existing event for update/delete. */
 export interface EventRef {
+  /** The calendar it currently lives on, which is part of its address. */
   calendarId: string;
+  /** Google's event id, unique within that calendar. */
   eventId: string;
 }
 
+/**
+ * An API failure carrying its HTTP status, so a delete can tell "already gone"
+ * (404/410) from a real failure.
+ */
 interface ApiError extends Error {
+  /** HTTP status of the failed response. */
   code?: number;
 }
 
+/** Path segments here are calendar ids and event ids, so this is used a lot. */
 const enc = encodeURIComponent;
 
+/**
+ * Bearer-authenticated JSON call against the Calendar API.
+ *
+ * @param token - OAuth access token from {@link getAccessToken}.
+ * @param path - Path below {@link API}; segments pre-encoded with {@link enc}.
+ * @param init - Extra `fetch` options; any headers here win over the defaults.
+ * @returns The parsed JSON body, or `null` for the 204 a DELETE returns.
+ * @throws {@link ApiError} with `code` set, on any non-2xx response.
+ */
 async function api<T>(token: string, path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     ...init,

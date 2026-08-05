@@ -3,12 +3,17 @@ import Icon from '../Icon';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import styles from './styles.module.css';
 
+/** One bookmark in the bar. */
 interface Link {
+  /** Stable React key. Timestamp plus a random suffix — a bare timestamp collides. */
   id: string;
+  /** What the chip reads, and its `title` when the row is scrolled. */
   label: string;
+  /** Absolute URL, normalised to carry a scheme when it was saved. */
   url: string;
 }
 
+/** The bookmarks a dashboard starts with, before anyone edits the list. */
 const DEFAULTS: Link[] = [
   { id: '1', label: 'Gmail', url: 'https://mail.google.com' },
   { id: '2', label: 'Calendar', url: 'https://calendar.google.com' },

@@ -9,9 +9,13 @@ interface StatStripProps {
 
 /** One figure, plus whether a non-zero value is a problem worth colouring. */
 interface Stat {
+  /** Stable React key. */
   key: string;
+  /** The word after the number ("overdue", "left"); written for a plural. */
   label: string;
+  /** The count. Zero drops the stat from the strip entirely. */
   value: number;
+  /** Colour this one when it is non-zero — reserved for things that are late. */
   urgent?: boolean;
 }
 

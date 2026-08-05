@@ -39,14 +39,21 @@ export interface Reminder {
 
 /** The subset of a Google Calendar event resource we read. */
 export interface GEvent {
+  /** Google's event id — what a synced reminder stores in `eventId`. */
   id: string;
-  status?: string; // 'confirmed' | 'cancelled' | ...
+  /** `confirmed` | `cancelled` | …; `cancelled` is a remote deletion. */
+  status?: string;
+  /** Event title ↔ reminder text. */
   summary?: string;
-  updated?: string; // RFC3339
+  /** RFC3339 timestamp of the last remote edit; the clock in last-write-wins. */
+  updated?: string;
+  /** `dateTime` for a timed event, `date` for an all-day one. */
   start?: { dateTime?: string; date?: string };
+  /** As `start`. Written on push, ignored on pull — only the start maps back. */
   end?: { dateTime?: string; date?: string };
 }
 
+/** Google Calendar API v3 root. */
 const API = 'https://www.googleapis.com/calendar/v3';
 /** Title of the dedicated calendar we create and sync against. */
 export const CALENDAR_SUMMARY = 'Dashboard Reminders';
@@ -163,10 +170,26 @@ export function pendingPushes(local: Reminder[]): PendingPushes {
 // Calendar REST calls
 // ---------------------------------------------------------------------------
 
+/**
+ * An API failure carrying its HTTP status, which the sync path branches on: 410
+ * means the sync token expired, 404/410 on a delete means the event is already
+ * gone. A plain `Error` would force those decisions back onto string matching.
+ */
 interface ApiError extends Error {
+  /** HTTP status of the failed response. */
   code?: number;
 }
 
+/**
+ * Bearer-authenticated JSON call against the Calendar API.
+ *
+ * @param token - OAuth access token from {@link getAccessToken}.
+ * @param path - Path below {@link API}, including any query string. Callers
+ *   encode their own path segments — calendar ids are email addresses.
+ * @param init - Extra `fetch` options; any headers here win over the defaults.
+ * @returns The parsed JSON body, or `null` for the 204 a DELETE returns.
+ * @throws {@link ApiError} with `code` set, on any non-2xx response.
+ */
 async function api<T>(token: string, path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     ...init,
@@ -201,8 +224,11 @@ export async function findOrCreateCalendar(token: string): Promise<string> {
 
 /** Result of an incremental list: events plus the next token, or a resync flag. */
 export interface Changes {
+  /** The changed events, including cancellations when a token was used. */
   items: GEvent[];
+  /** Token to pass to the next call. Absent if Google did not issue one. */
   nextSyncToken?: string;
+  /** The token expired (410): discard it and list again from scratch. */
   needFullResync: boolean;
 }
 
@@ -253,6 +279,13 @@ export async function listChanges(
   }
 }
 
+/**
+ * Creates the event backing a reminder that has never been pushed.
+ *
+ * @returns The new event id to store on the reminder, and its `updated` stamp as
+ *   epoch ms — recorded as `remoteUpdated` so the next pull does not read our
+ *   own write back as a remote edit.
+ */
 async function insertEvent(
   token: string,
   calendarId: string,
@@ -265,6 +298,14 @@ async function insertEvent(
   return { id: ev.id, updated: ev.updated ? Date.parse(ev.updated) : Date.now() };
 }
 
+/**
+ * Writes a locally edited reminder onto its existing event. A PATCH rather than
+ * a PUT, so fields the dashboard does not model are left as the user set them in
+ * Google Calendar.
+ *
+ * @param r - Must already have an `eventId`; {@link pendingPushes} guarantees it.
+ * @returns The event's new `updated` stamp as epoch ms.
+ */
 async function patchEvent(
   token: string,
   calendarId: string,
@@ -278,6 +319,11 @@ async function patchEvent(
   return { updated: ev.updated ? Date.parse(ev.updated) : Date.now() };
 }
 
+/**
+ * Deletes the event behind a removed reminder. Succeeds when the event is
+ * already gone, so a delete that was pushed but not recorded — a tab closed
+ * mid-sync — does not wedge the queue on every subsequent run.
+ */
 async function deleteEvent(token: string, calendarId: string, eventId: string): Promise<void> {
   try {
     await api<null>(
@@ -298,16 +344,24 @@ async function deleteEvent(token: string, calendarId: string, eventId: string): 
 
 /** Inputs to {@link runSync}. */
 export interface SyncInput {
+  /** `true` may open the Google consent popup, so it needs a user gesture. */
   interactive: boolean;
+  /** The local list, as it stands before this cycle. */
   reminders: Reminder[];
+  /** Id of the dedicated calendar; looked up and created when absent. */
   calendarId?: string;
+  /** Token from the previous cycle. Absent means pull the initial window. */
   syncToken?: string;
+  /** Epoch ms, injected so the reconcile step is testable. */
   now: number;
 }
 /** Result of {@link runSync}: the new state to persist. */
 export interface SyncResult {
+  /** The reconciled list, with pushed rows no longer `dirty`. */
   reminders: Reminder[];
+  /** The calendar synced against — worth persisting when it was just created. */
   calendarId: string;
+  /** Token for the next cycle. Absent means the next one pulls in full. */
   syncToken?: string;
 }
 
