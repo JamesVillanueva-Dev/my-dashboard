@@ -209,6 +209,20 @@
      the sticky nav bar at the top, the footer at the bottom. */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* One height for every control in the nav bar: the widget and settings
+     buttons, the quick-link chips, the + beside them, and the avatar. They are
+     five different components, so the size they share has to be a token — left
+     to their own padding they came out at five slightly different heights. */
+  --control-h: 34px;
+}
+
+/* A finger needs 44px (Apple 44pt, Android 48dp) — the figure the shared pill
+   grows to on touch as well. */
+@media (pointer: coarse) {
+  :root {
+    --control-h: 44px;
+  }
 }
 
 /* ---------------------------------------------------------------------------

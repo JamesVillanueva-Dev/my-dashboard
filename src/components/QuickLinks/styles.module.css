@@ -1,5 +1,7 @@
-/* Quick links in the nav bar. The row takes the space left between the clock and
-   the app controls; the + button opens a popover for editing it. */
+/* Quick links in the nav bar. On a wide screen the row takes the space left
+   between the clock and the app controls; below 900px the header gives it a
+   line of its own (see the media query at the foot of this file). Either way the
+   + button at its end opens a popover for editing it. */
 .container {
   display: flex;
   align-items: center;
@@ -33,7 +35,8 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 10px;
+  height: var(--control-h);
+  padding: 0 10px;
   border: 1px solid transparent;
   border-radius: 999px;
   text-decoration: none;
@@ -62,11 +65,26 @@
   flex: none;
 }
 
+/* `composes` only works on a lone class selector, so the shared pill comes in
+   here... */
 .trigger {
   composes: pill from '../../styles/controls.module.css';
+}
+/* ...and the sizing goes on a class-heavy selector, which has to outrank the
+   pill's own touch padding. Square, so the + is exactly as tall as the
+   bookmarks beside it and the pill radius rounds it to a circle. It is the end
+   cap of the links row rather than one of the bar's controls, which is why it
+   stays round while the widget and settings buttons are ovals. */
+.container .trigger {
   display: inline-flex;
   align-items: center;
-  padding: 6px;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  padding: 0;
+  /* The glyph is 1em, and the pill's text size leaves it lost in a round button
+     this size. */
+  font-size: 1.05rem;
 }
 
 .manage > div {
@@ -154,36 +172,37 @@
   color: var(--danger);
 }
 
-/* Labels are the first thing to go when the bar gets tight — the favicons stay
-   recognisable on their own, and the title attribute still names each link. */
+/* ---------- The bar on its own row ----------
+   At this width the header hands the links a full-width row of their own, which
+   is what pays for the labels: nothing else on the line is competing for the
+   space, so every bookmark keeps its name instead of shrinking to a bare
+   favicon. The row then starts at the left edge like the rest of the page, and
+   each bookmark takes the same outline and fill as the controls above it — the
+   strip reads as one set of buttons, all the same height and shape. */
 @media (max-width: 900px) {
-  .container > ul span {
-    display: none;
+  .container {
+    justify-content: flex-start;
+    gap: 8px;
   }
+  .container > ul {
+    flex: 1 1 auto;
+    gap: 8px;
+  }
+  /* `composes` cannot reach a descendant selector, so the chip restates the
+     shared pill's border and fill rather than pulling them in. */
   .container > ul a {
-    padding: 5px 7px;
+    padding-inline: 12px;
+    border-color: var(--card-border);
+    background: var(--card);
   }
 }
 
-@media (max-width: 560px) {
-  /* The row is centred by now, so anchoring the popover to the button's right
-     edge would run it off the left of the screen. Centre it on the button. */
-  .manage > div {
-    right: auto;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-}
-
-/* Touch: the favicons are the whole row on a phone, so they get a tap target
-   around them, and the remove buttons in the popover get one too. The scroll
-   row keeps its momentum and stops the page scrolling with it at either end. */
+/* Touch: the remove buttons in the popover get a tap target of their own — the
+   bookmarks and the + already carry one through --control-h. The scroll row
+   keeps its momentum and stops the page scrolling with it at either end. */
 @media (pointer: coarse) {
   .container > ul {
     overscroll-behavior-x: contain;
-  }
-  .container > ul a {
-    padding: 10px;
   }
   .manage li {
     padding: 8px 6px;

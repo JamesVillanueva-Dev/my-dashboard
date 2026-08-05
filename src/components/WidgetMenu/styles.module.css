@@ -2,11 +2,13 @@
   position: relative;
 }
 
-/* The "Widgets" trigger. */
+/* The "Widgets" trigger, on the bar's shared control height. */
 .button {
   composes: pill from '../../styles/controls.module.css';
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  height: var(--control-h);
   gap: 6px;
   font-size: 0.85rem;
 }
@@ -98,6 +100,15 @@
 @media (max-width: 460px) {
   .button > span {
     display: none;
+  }
+  /* Around a lone glyph the pill would close up into a circle. Hold it open to
+     half again its height so it keeps the oval the labelled state had, and give
+     the glyph the room that width just bought it. The selector carries two
+     classes because it has to outrank the pill's own touch padding. */
+  .container .button {
+    width: calc(var(--control-h) * 1.5);
+    padding: 0;
+    font-size: 1.05rem;
   }
 }
 

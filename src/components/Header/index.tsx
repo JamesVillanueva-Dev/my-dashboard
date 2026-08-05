@@ -13,8 +13,9 @@ interface HeaderProps {
 /**
  * Sticky nav bar across the top of the dashboard: a ticking clock on the left,
  * the quick links in the middle, and the app controls (widget menu, settings,
- * user menu) on the right. The clock re-renders once per second via an
- * interval that is cleared on unmount.
+ * user menu) on the right. Narrow enough and the bar wraps, dropping the quick
+ * links to a full-width row under the clock rather than squeezing them. The
+ * clock re-renders once per second via an interval that is cleared on unmount.
  *
  * The bar spans the full viewport width rather than the dashboard's content
  * column, so it is rendered outside that column by {@link Dashboard}. The

@@ -44,8 +44,9 @@ function favicon(url: string): string {
 
 /**
  * Bookmark shortcuts living in the nav bar, between the clock and the app
- * controls. Each link shows its site favicon and label and opens in a new tab;
- * the list is persisted to localStorage under `quicklinks`.
+ * controls — or, once the bar is too narrow to hold all three, on a row of their
+ * own beneath them. Each link shows its site favicon and label and opens in a
+ * new tab; the list is persisted to localStorage under `quicklinks`.
  *
  * These used to be a dashboard panel. Navigation is not something you scroll to
  * look up, so it belongs in the chrome that is always on screen rather than in

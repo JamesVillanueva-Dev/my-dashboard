@@ -48,6 +48,23 @@
   gap: 12px;
 }
 
+/* ---------- Quick links drop to their own row ---------- */
+/* Past this width the bar cannot hold the clock, the bookmarks and the controls
+   on one line: the links are squeezed until only their favicons fit, which
+   leaves the bar a jumble of loose icons next to full-size buttons. Wrap them
+   onto a full-width row of their own instead, where there is room for each
+   bookmark to keep its label. */
+@media (max-width: 900px) {
+  .container {
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .container > nav {
+    order: 1;
+    flex-basis: 100%;
+  }
+}
+
 @media (max-width: 560px) {
   .container {
     padding-block: 8px;

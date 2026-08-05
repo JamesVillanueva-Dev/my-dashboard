@@ -1,7 +1,22 @@
 /* user-menu
-   `.container` is the root. Clerk renders and styles the avatar button itself,
-   so this only reserves a consistent slot beside the other header controls. */
+   `.container` is the root. Clerk renders the avatar button itself, so this
+   reserves its slot beside the other header controls and sets its size. */
 .container {
+  /* Over the bar's control height rather than level with it: a face reads as
+     itself at a size a glyph does not, and this is the control with the most
+     behind it (account, sign out). */
+  --avatar: calc(var(--control-h) + 4px);
   display: flex;
   align-items: center;
+}
+
+/* Clerk's own class names, hence `:global` — they are the documented handle on
+   its internals (the `userButtonAvatarBox` appearance key), and two classes here
+   outrank the single class Clerk styles them with. Left alone it draws a 28px
+   avatar, noticeably smaller than every button next to it. The trigger is sized
+   too: it is the box the avatar fills, so on its own the avatar cannot grow. */
+.container :global(.cl-userButtonTrigger),
+.container :global(.cl-userButtonAvatarBox) {
+  width: var(--avatar);
+  height: var(--avatar);
 }
