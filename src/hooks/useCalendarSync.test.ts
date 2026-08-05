@@ -285,6 +285,17 @@ describe('useCalendarSync', () => {
       expect(result.current.connected).toBe(false);
       expect(JSON.parse(localStorage.getItem(INTENT)!)).toBe(false);
     });
+
+    it('gives up the earned trust, so a failed reconnect reads as disconnected', async () => {
+      const { result } = setup();
+      await act(async () => result.current.connect());
+      act(() => result.current.disconnect());
+
+      vi.mocked(runSync).mockRejectedValue(new Error('popup closed'));
+      await act(async () => result.current.connect());
+
+      expect(result.current.connected).toBe(false);
+    });
   });
 
   describe('on mount', () => {
@@ -315,6 +326,61 @@ describe('useCalendarSync', () => {
 
       expect(runSync).not.toHaveBeenCalled();
     });
+
+    it('shows as connected while the silent reconnect is still in flight', () => {
+      localStorage.setItem(INTENT, JSON.stringify(true));
+      vi.mocked(runSync).mockReturnValue(deferred<SyncResult>().promise);
+
+      const { result } = setup();
+
+      // Never a Connect button in the gap — that is the whole point.
+      expect(result.current.connected).toBe(true);
+    });
+
+    it('falls back to disconnected when the silent reconnect fails', async () => {
+      localStorage.setItem(INTENT, JSON.stringify(true));
+      vi.mocked(runSync).mockRejectedValue(new Error('popup_failed_to_open'));
+
+      const { result } = setup();
+
+      await waitFor(() => expect(result.current.connected).toBe(false));
+    });
+
+    it('does not blame the user for a reconnect they cannot fix', async () => {
+      localStorage.setItem(INTENT, JSON.stringify(true));
+      vi.mocked(runSync).mockRejectedValue(new Error('popup_failed_to_open'));
+
+      const { result } = setup();
+
+      await waitFor(() => expect(result.current.connected).toBe(false));
+      expect(result.current.error).toBe('');
+    });
+  });
+
+  describe('returning to the tab', () => {
+    it('retries a reconnect that failed earlier', async () => {
+      localStorage.setItem(INTENT, JSON.stringify(true));
+      vi.mocked(runSync).mockRejectedValue(new Error('popup_failed_to_open'));
+      const { result } = setup();
+      await waitFor(() => expect(result.current.connected).toBe(false));
+
+      vi.mocked(runSync).mockResolvedValue(syncResult());
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      await waitFor(() => expect(result.current.connected).toBe(true));
+    });
+
+    it('leaves a user who never connected alone', async () => {
+      setup();
+
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(runSync).not.toHaveBeenCalled();
+    });
   });
 
   describe('while connected', () => {
@@ -329,6 +395,22 @@ describe('useCalendarSync', () => {
       });
 
       expect(runSync).toHaveBeenCalledTimes(1);
+    });
+
+    it('rides out a failed poll rather than dropping a working session', async () => {
+      vi.useFakeTimers();
+      const { result } = setup();
+      await act(async () => result.current.connect());
+
+      vi.mocked(runSync).mockRejectedValue(new Error('rate limited'));
+      await act(async () => {
+        vi.advanceTimersByTime(60_000);
+      });
+
+      // Proven connections stay put, and this one is worth reporting: it is a
+      // real sync failing, not a token we never had.
+      expect(result.current.connected).toBe(true);
+      expect(result.current.error).toBe('rate limited');
     });
 
     it('stops polling once disconnected', async () => {

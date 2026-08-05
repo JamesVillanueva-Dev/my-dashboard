@@ -133,6 +133,13 @@ async function ensureClient(scope: string): Promise<TokenClient> {
  *   open a Google consent popup, so it MUST be triggered by a user gesture
  *   (e.g. a button click). Pass `false` for background refreshes, which reuse
  *   the existing Google session silently and reject if that is not possible.
+ *
+ *   The two map onto GIS `prompt` values that both mean "don't nag": `''` shows
+ *   a screen only when Google actually needs one — consent the first time, then
+ *   nothing on later visits — while `'none'` forbids any UI at all. Notably `''`
+ *   is *not* right for the background path even though it usually stays quiet,
+ *   because the one time it does decide to prompt is a popup with no user
+ *   gesture behind it, which browsers block.
  * @param scope - Which OAuth scope to authorize. Defaults to
  *   {@link CALENDAR_SCOPE}, so existing calendar callers are unchanged.
  * @returns A bearer access token good for that scope's Google API.
@@ -148,7 +155,7 @@ export async function getAccessToken(
   const client = await ensureClient(scope);
   return new Promise<string>((resolve, reject) => {
     state.pending = { resolve, reject };
-    client.requestAccessToken({ prompt: interactive ? 'consent' : '' });
+    client.requestAccessToken({ prompt: interactive ? '' : 'none' });
   });
 }
 

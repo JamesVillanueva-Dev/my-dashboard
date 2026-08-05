@@ -113,22 +113,25 @@ describe('getAccessToken', () => {
     );
   });
 
-  it('asks for consent on an interactive request', async () => {
+  it('lets Google decide whether to prompt on an interactive request', async () => {
     const gis = installGis();
     const { getAccessToken } = await loadWith(CLIENT_ID);
 
     await getAccessToken(true);
 
-    expect(lastPrompt(gis)).toBe('consent');
+    // Not 'consent', which would re-show the consent screen to someone who has
+    // already granted the scope — the reason connecting felt like a fresh
+    // signup every time.
+    expect(lastPrompt(gis)).toBe('');
   });
 
-  it('stays silent on a background refresh, so no popup can appear', async () => {
+  it('forbids any UI on a background refresh, so no popup can appear', async () => {
     const gis = installGis();
     const { getAccessToken } = await loadWith(CLIENT_ID);
 
     await getAccessToken(false);
 
-    expect(lastPrompt(gis)).toBe('');
+    expect(lastPrompt(gis)).toBe('none');
   });
 
   it('rejects when Google returns an error', async () => {
