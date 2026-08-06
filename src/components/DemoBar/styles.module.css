@@ -1,0 +1,100 @@
+/* demo-bar
+   `.container` is the root: a full-bleed strip above the demo dashboard. It uses
+   the accent tint rather than a warning colour — this is information, not a
+   problem the visitor needs to fix. */
+
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+  padding: calc(10px + var(--safe-top)) var(--page-pad) 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, var(--card-border));
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.container p {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  min-width: 0;
+  line-height: 1.45;
+}
+.container p svg {
+  flex: none;
+  color: var(--accent);
+  font-size: 1rem;
+}
+.container strong {
+  font-weight: 650;
+}
+
+.container > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.signIn {
+  padding: 7px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  transition: filter 0.15s;
+}
+.signIn:hover {
+  filter: brightness(1.07);
+}
+
+.exit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+.exit:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.signIn:focus-visible,
+.exit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signIn,
+  .exit {
+    transition: none;
+  }
+}
+
+/* Below this the message and the buttons stop fitting on one line; stacking them
+   left-aligned reads better than letting `space-between` strand the buttons. */
+@media (max-width: 600px) {
+  .container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (pointer: coarse) {
+  .signIn,
+  .exit {
+    min-height: 44px;
+  }
+}

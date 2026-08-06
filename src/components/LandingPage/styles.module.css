@@ -1,0 +1,321 @@
+/* landing-page
+   `.container` is the root: the full page a signed-out visitor lands on. It sets
+   the reading column every section sits in, so no section manages its own width.
+   Everything is drawn from the theme tokens, so it follows all six palettes. */
+
+.container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: calc(40px + var(--safe-top)) var(--page-pad) calc(24px + var(--safe-bottom));
+}
+
+/* Sections are the page's rhythm; spacing lives here rather than on each one. */
+.container > section {
+  margin-top: 84px;
+}
+
+.container h2 {
+  margin: 0 0 12px;
+  font-size: clamp(1.5rem, 3.2vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.container h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.container p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+/* Small caps label above each section heading, tying the page to the dashboard's
+   own section labels ("NEXT UP", "TODAY"). */
+.eyebrow {
+  margin: 0 0 8px !important;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+}
+
+/* ---------- Hero ---------- */
+.hero {
+  text-align: center;
+  padding: 24px 0 8px;
+}
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px !important;
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text) !important;
+}
+.mark > span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.hero h1 {
+  margin: 0 0 16px;
+  font-size: clamp(2.1rem, 6vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+.lede {
+  max-width: 60ch;
+  margin: 0 auto !important;
+  font-size: clamp(1rem, 1.6vw, 1.12rem);
+}
+
+/* ---------- Calls to action ---------- */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 22px;
+  border: 1px solid var(--accent);
+  border-radius: 11px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.98rem;
+  font-weight: 650;
+  transition: filter 0.15s, transform 0.15s;
+}
+.primary:hover {
+  filter: brightness(1.07);
+}
+.primary svg {
+  font-size: 1.05rem;
+}
+
+.secondary {
+  padding: 13px 22px;
+  border: 1px solid var(--card-border);
+  border-radius: 11px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.98rem;
+  font-weight: 600;
+  transition: border-color 0.15s, color 0.15s;
+}
+.secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primary,
+  .secondary {
+    transition: none;
+  }
+}
+
+/* The reassurance under the buttons — deliberately small, since it answers an
+   objection rather than making a claim. */
+.note {
+  max-width: 52ch;
+  margin: 14px auto 0 !important;
+  font-size: 0.83rem;
+}
+
+/* The "you cannot sign up" disclosure. Boxed and left-aligned rather than set as
+   more centred small print, because it has to survive being skimmed: someone who
+   misses it reaches a sign-in form that cannot help them. */
+.notice {
+  display: flex;
+  gap: 10px;
+  max-width: 60ch;
+  margin: 22px auto 0 !important;
+  padding: 14px 16px;
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  background: var(--well);
+  text-align: left;
+  font-size: 0.85rem;
+}
+.notice svg {
+  flex: none;
+  margin-top: 0.15em;
+  color: var(--accent);
+  font-size: 1rem;
+}
+.notice strong {
+  color: var(--text);
+  font-weight: 650;
+}
+
+/* ---------- Lead section and the privacy block ---------- */
+/* Both are prose with a list under them, and both sit in the recessed well the
+   dashboard's own panels use, so the page previews its material. */
+.lead,
+.privacy {
+  padding: 30px 32px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--well);
+  box-shadow: var(--well-shadow);
+}
+
+.beats {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.beats li {
+  position: relative;
+  padding-left: 22px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+/* A small accent tick rather than a bullet glyph, so the marker reads as part of
+   the design and not as a list the browser drew. */
+.beats li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.beats strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---------- Feature grids ---------- */
+.grid {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.grid li {
+  padding: 20px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  background: var(--well);
+  box-shadow: var(--well-shadow);
+}
+
+.grid p {
+  font-size: 0.88rem;
+}
+
+.badge {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 1.1rem;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* ---------- FAQ ---------- */
+.faq {
+  margin: 24px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 22px 32px;
+}
+
+.faq dt {
+  margin-bottom: 6px;
+  font-size: 0.98rem;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.faq dd {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+/* ---------- Closing ---------- */
+.closing {
+  text-align: center;
+  padding: 44px 24px 8px;
+}
+.closing p {
+  max-width: 54ch;
+  margin: 0 auto !important;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 640px) {
+  .container {
+    padding-top: calc(24px + var(--safe-top));
+  }
+  .container > section {
+    margin-top: 60px;
+  }
+  .lead,
+  .privacy {
+    padding: 22px 20px;
+  }
+  /* Full-width buttons stack better than two half-width ones at this size. */
+  .actions {
+    flex-direction: column;
+  }
+  .primary,
+  .secondary {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+/* Touch targets are already well past 44px from the padding above; what a coarse
+   pointer needs here is room between the two stacked buttons. */
+@media (pointer: coarse) {
+  .actions {
+    gap: 14px;
+  }
+}

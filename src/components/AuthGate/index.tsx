@@ -7,6 +7,11 @@ import {
   type SyncUser,
 } from '../../hooks/useProfileSync';
 import { hasClerkKey } from '../../lib/clerkAuth';
+import { useTheme } from '../../hooks/useTheme';
+import { DEMO_SCOPE, clearDemo, seedDemo } from '../../lib/demo';
+import LandingPage from '../LandingPage';
+import DemoBar from '../DemoBar';
+import Icon from '../Icon';
 import styles from './styles.module.css';
 
 /** Props for {@link AuthGate}. */
@@ -73,13 +78,86 @@ function ScopedApp({ children }: AuthGateProps) {
   );
 }
 
+/** What a signed-out visitor is currently looking at. */
+type SignedOutView = 'landing' | 'signin' | 'demo';
+
+/**
+ * The sign-in screen, reached from the landing page.
+ *
+ * Its own component so it can call {@link useTheme} — a signed-out visitor has
+ * no dashboard mounted to apply their palette, and this view can be the first
+ * thing rendered if someone returns straight to it.
+ *
+ * @param props.onBack - Returns to the landing page.
+ */
+function SignInScreen({ onBack }: { onBack: () => void }) {
+  useTheme();
+
+  return (
+    <div className={styles.container}>
+      <button className={styles.back} onClick={onBack}>
+        <Icon name="chevronLeft" />
+        Back
+      </button>
+      <h1>Welcome back</h1>
+      <p>
+        Sign in to load your widgets, notes, and reminders. This is a personal project —
+        only accounts added by hand can get in, so an outside account will be turned away.
+      </p>
+      <SignIn routing="virtual" />
+    </div>
+  );
+}
+
+/**
+ * Everything a signed-out visitor can see: the landing page, the sign-in form,
+ * or the demo.
+ *
+ * The demo is the real {@link children} — the same `Dashboard` a signed-in user
+ * gets — mounted under {@link DEMO_SCOPE}. That scope is what keeps it honest in
+ * both directions: the sample data cannot reach a real account, and a visitor
+ * who signs in afterwards does not inherit a dashboard full of someone else's
+ * pretend tasks. `adoptLegacyKeys` skips it for the same reason it skips every
+ * other already-scoped key.
+ *
+ * @param props - See {@link AuthGateProps}.
+ */
+function SignedOutApp({ children }: AuthGateProps) {
+  const [view, setView] = useState<SignedOutView>('landing');
+
+  const openDemo = () => {
+    seedDemo();
+    setView('demo');
+  };
+
+  const exitDemo = () => {
+    clearDemo();
+    setView('landing');
+  };
+
+  if (view === 'demo') {
+    return (
+      <>
+        <DemoBar onExit={exitDemo} onSignIn={() => setView('signin')} />
+        <StorageScopeProvider value={DEMO_SCOPE}>{children}</StorageScopeProvider>
+      </>
+    );
+  }
+
+  if (view === 'signin') return <SignInScreen onBack={() => setView('landing')} />;
+
+  return <LandingPage onTryDemo={openDemo} onSignIn={() => setView('signin')} />;
+}
+
 /**
  * Decides whether the dashboard sits behind a Clerk sign-in.
  *
  * Authentication is opt-in (ADR 0003): with no `VITE_CLERK_PUBLISHABLE_KEY` this
  * renders `children` unchanged, keeping the zero-setup, unscoped behaviour the
- * app has always had. With a key set, the dashboard requires a signed-in user and
- * that user's data is stored under their own namespace.
+ * app has always had — there is no signed-out state, so no landing page either.
+ * With a key set, a visitor gets the landing page, can try a demo, and the
+ * dashboard proper requires a signed-in user whose data is stored under their
+ * own namespace.
  *
  * @param props - See {@link AuthGateProps}.
  */
@@ -89,11 +167,7 @@ export default function AuthGate({ children }: AuthGateProps) {
   return (
     <>
       <SignedOut>
-        <div className={styles.container}>
-          <h1>Dashboard</h1>
-          <p>Sign in to load your widgets, notes, and reminders.</p>
-          <SignIn routing="virtual" />
-        </div>
+        <SignedOutApp>{children}</SignedOutApp>
       </SignedOut>
       <SignedIn>
         <ScopedApp>{children}</ScopedApp>

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import AuthGate from './index';
 
@@ -54,14 +55,86 @@ describe('AuthGate', () => {
     expect(localStorage.getItem('notes.text')).toBe(JSON.stringify(''));
   });
 
-  it('shows the sign-in form instead of the app when signed out', () => {
+  it('lands a signed-out visitor on the landing page, not on a login form', () => {
     render(
       <AuthGate>
         <Child />
       </AuthGate>,
     );
-    expect(screen.getByText('Clerk sign-in form')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/your whole day/i);
+    // Neither the app nor a form is asked for before anything is explained.
     expect(screen.queryByRole('button', { name: /notes:/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Clerk sign-in form')).not.toBeInTheDocument();
+  });
+
+  it('reaches the sign-in form from the landing page, and back again', async () => {
+    const user = userEvent.setup();
+    render(
+      <AuthGate>
+        <Child />
+      </AuthGate>,
+    );
+
+    await user.click(screen.getAllByRole('button', { name: 'Sign in' })[0]);
+    expect(screen.getByText('Clerk sign-in form')).toBeInTheDocument();
+    // Repeated here because someone can land straight on this view.
+    expect(screen.getByText(/only accounts added by hand/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /back/i }));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/your whole day/i);
+  });
+
+  it('opens the real dashboard in the demo, under its own storage scope', async () => {
+    const user = userEvent.setup();
+    render(
+      <AuthGate>
+        <Child />
+      </AuthGate>,
+    );
+
+    await user.click(screen.getAllByRole('button', { name: /try the live demo/i })[0]);
+
+    // The same child the signed-in path renders — not a mock-up of it — and it
+    // is reading the seeded sample data.
+    expect(screen.getByRole('button', { name: /notes: Ideas for the offsite/ })).toBeInTheDocument();
+    expect(localStorage.getItem('demo:notes.text')).toContain('offsite');
+    // Nothing landed in the unscoped namespace a real account would adopt.
+    expect(localStorage.getItem('notes.text')).toBeNull();
+  });
+
+  it('discards the demo on the way out', async () => {
+    const user = userEvent.setup();
+    render(
+      <AuthGate>
+        <Child />
+      </AuthGate>,
+    );
+
+    await user.click(screen.getAllByRole('button', { name: /try the live demo/i })[0]);
+    expect(localStorage.getItem('demo:layout')).not.toBeNull();
+
+    await user.click(screen.getByRole('button', { name: /exit demo/i }));
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/your whole day/i);
+    expect(Object.keys(localStorage).some((k) => k.startsWith('demo:'))).toBe(false);
+  });
+
+  it('never carries the demo into an account that signs in afterwards', () => {
+    // `adoptLegacyKeys` migrates unscoped keys on first sign-in. Demo keys carry
+    // a scope already, so a visitor who tries the demo and then signs in must
+    // not inherit a dashboard full of sample tasks.
+    localStorage.setItem('demo:notes.text', JSON.stringify('sample data'));
+    state.signedIn = true;
+
+    render(
+      <AuthGate>
+        <Child />
+      </AuthGate>,
+    );
+
+    expect(screen.getByRole('button', { name: 'notes: empty' })).toBeInTheDocument();
+    expect(localStorage.getItem('user_a:notes.text')).toBe(JSON.stringify(''));
+    expect(localStorage.getItem('demo:notes.text')).toBe(JSON.stringify('sample data'));
   });
 
   it('renders the app once signed in', () => {

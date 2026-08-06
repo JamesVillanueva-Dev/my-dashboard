@@ -3,6 +3,7 @@
    visitors. Clerk renders its own themed card below the heading, so this only
    handles centring and the copy above it. */
 .container {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -24,4 +25,43 @@
   margin: 0 0 16px;
   color: var(--text-muted);
   font-size: 0.9rem;
+}
+
+/* Sign-in is reached from the landing page, so it needs a way back that is not
+   the browser's button — this view is a state change, not a navigation. */
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  padding: 8px 12px 8px 8px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  transition: color 0.15s;
+}
+.back:hover {
+  color: var(--accent);
+}
+.back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The heading and copy are centred in the page; the back button is not, so it is
+   pulled out of that flow and pinned to the top-left of the reading area. */
+@media (min-width: 561px) {
+  .back {
+    position: absolute;
+    top: calc(20px + var(--safe-top));
+    left: var(--page-pad);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .back {
+    transition: none;
+  }
 }
