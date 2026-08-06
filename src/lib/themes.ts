@@ -26,7 +26,8 @@ export type ThemeId =
   | 'forest'
   | 'ocean'
   | 'rose'
-  | 'solarized';
+  | 'solarized'
+  | 'lavender';
 
 /**
  * What the user picked. `'system'` defers to the OS `prefers-color-scheme`
@@ -53,6 +54,7 @@ export const THEMES: readonly Theme[] = [
   { id: 'light', label: 'White & blue', mode: 'light', bg: '#f5f7fb', accent: '#2f6bff' },
   { id: 'rose', label: 'Rose', mode: 'light', bg: '#fdf6f7', accent: '#d6336c' },
   { id: 'solarized', label: 'Solarized', mode: 'light', bg: '#fdf6e3', accent: '#268bd2' },
+  { id: 'lavender', label: 'Lavender', mode: 'light', bg: '#f7f5fc', accent: '#7c5cff' },
   { id: 'dark', label: 'Black & yellow', mode: 'dark', bg: '#0c0c0d', accent: '#ffd21e' },
   { id: 'midnight', label: 'Purple & blue', mode: 'dark', bg: '#0d0b16', accent: '#8b7cff' },
   { id: 'forest', label: 'Forest', mode: 'dark', bg: '#0a1310', accent: '#4ade80' },

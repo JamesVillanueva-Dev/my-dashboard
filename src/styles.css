@@ -181,6 +181,26 @@
   color-scheme: light;
 }
 
+/* Soft violet, light. */
+:root[data-theme='lavender'] {
+  --bg: #f7f5fc;
+  --bg-grad-1: #ece3fb;
+  --bg-grad-2: #fbf9ff;
+  --card: #ffffff;
+  --card-border: #e4daf5;
+  --text: #2b2340;
+  --text-muted: #6e6485;
+  --accent: #7c5cff;
+  --accent-soft: #ece4ff;
+  --accent-text: #ffffff;
+  --danger: #d6336c;
+  --shadow: 0 1px 2px rgba(50, 20, 90, 0.05), 0 8px 24px rgba(50, 20, 90, 0.08);
+  --well: #ece3f7;
+  --well-shadow: inset 0 1px 2px rgba(50, 20, 90, 0.09),
+    inset 0 0 0 1px rgba(50, 20, 90, 0.045), 0 1px 0 rgba(255, 255, 255, 0.75);
+  color-scheme: light;
+}
+
 /* Layout tokens for the dashboard's content column. These are not theme
    dependent, so they live outside the palette blocks above. The nav bar is
    full-bleed but uses both to line its contents up with the grid below it. */
