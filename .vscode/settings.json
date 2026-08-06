@@ -1,0 +1,6 @@
+{
+  // `composes` is a CSS Modules directive, not a real CSS property, so the
+  // built-in CSS language service reports it as unknown. See CLAUDE.md
+  // ("Sharing styles") and src/styles/controls.module.css.
+  "css.lint.unknownProperties": "ignore"
+}
