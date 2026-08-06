@@ -12,6 +12,8 @@ import link from './icons/link.svg?raw';
 import music from './icons/music.svg?raw';
 import mail from './icons/mail.svg?raw';
 import video from './icons/video.svg?raw';
+/** Stacked lines with a play triangle: a queue of videos, i.e. a playlist. */
+import list from './icons/list.svg?raw';
 
 /* ---------- Weather conditions (WMO codes) ---------- */
 import sun from './icons/sun.svg?raw';
@@ -80,6 +82,7 @@ const FILES = {
   music,
   mail,
   video,
+  list,
   sun,
   cloudSun,
   cloud,

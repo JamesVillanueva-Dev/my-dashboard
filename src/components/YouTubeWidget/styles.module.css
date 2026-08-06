@@ -41,8 +41,24 @@
   align-items: center;
 }
 
+/* A playlist tab carries the queue glyph, so what a source *is* reads off the
+   row of tabs rather than only once it starts playing. */
 .tab {
   composes: pill from '../../styles/controls.module.css';
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tab svg {
+  flex: none;
+}
+/* A playlist that took its name from YouTube can be a sentence long; keep it to
+   something a tab row can hold, with the full name in the tooltip. */
+.tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 18ch;
 }
 .tab.isActive {
   border-color: var(--accent);
@@ -80,6 +96,117 @@
   height: 100%;
 }
 
+/* ---------- Playlist queue ----------
+   A strip of thumbnails under the player: what is in the list, where playback
+   has got to, and a way to jump. Only rendered for a playlist, which is what
+   makes it the panel's way of saying one is playing — no label needed. */
+.queue {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--well);
+  box-shadow: var(--well-shadow);
+}
+
+/* Now playing: glyph, title, and the position in the list, pushed to the end. */
+.queue > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text-muted);
+}
+.queue strong {
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queue > div > span {
+  margin-left: auto;
+  flex: none;
+  font-size: 0.76rem;
+  /* Digits of equal width, so the count doesn't jitter as the track changes. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* The strip itself. Scrolls sideways rather than wrapping: one line of
+   thumbnails costs the panel a fixed 54px however long the playlist is. */
+.queue ol {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+  /* Keeps a snapped thumbnail clear of the padding rather than flush to it. */
+  scroll-padding-inline: 2px;
+  overscroll-behavior-x: contain;
+}
+.queue li {
+  flex: none;
+  scroll-snap-align: center;
+}
+
+.queue ol button {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  overflow: hidden;
+  cursor: pointer;
+  /* Everything that isn't playing sits back a little, so the current thumbnail
+     is legible at a glance from across a desk. */
+  opacity: 0.6;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.queue ol button:hover,
+.queue ol button:focus-visible {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+.queue img {
+  display: block;
+  width: 96px;
+  height: 54px;
+  object-fit: cover;
+  background: var(--card-border);
+}
+
+/* Track number, over the bottom-left corner of its thumbnail. */
+.queue ol button > span {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Playing now: full strength, ringed, and its number in the accent. */
+.queue ol button.isActive {
+  opacity: 1;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.queue ol button.isActive > span {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
 /* Shown when every source has been removed. */
 .empty {
   composes: empty from '../../styles/controls.module.css';
@@ -88,6 +215,18 @@
 .hint {
   composes: muted small from '../../styles/controls.module.css';
   margin: 10px 0 0;
+}
+
+/* The lift on hover is decoration; the ring and the opacity already say which
+   thumbnail is playing. */
+@media (prefers-reduced-motion: reduce) {
+  .queue ol button {
+    transition: none;
+  }
+  .queue ol button:hover,
+  .queue ol button:focus-visible {
+    transform: none;
+  }
 }
 
 @media (pointer: coarse) {
@@ -99,4 +238,6 @@
   .del {
     padding: 8px 6px;
   }
+  /* The thumbnails clear the 44px touch minimum on both sides at their normal
+     size, so the strip needs nothing here beyond the scrolling it already does. */
 }

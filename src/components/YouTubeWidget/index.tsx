@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Widget from '../Widget';
 import Icon from '../Icon';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
+import { useYouTubePlaylist } from '../../hooks/useYouTubePlaylist';
+import { playlistTitle, thumbnailUrl } from '../../lib/youtube';
 import styles from './styles.module.css';
 
 /** A saved YouTube source that can be loaded into the player. */
@@ -34,6 +36,12 @@ const LIST_ID = /^(?:PL|OL|UU|FL|RD)[\w-]*$/;
 
 /** The private playlists above, matched so they can be reported rather than ignored. */
 const PRIVATE_LIST = /^(?:WL$|LL)/;
+
+/**
+ * `RD…` lists are the mixes YouTube generates around a video rather than
+ * playlists somebody made, so they have no name of their own to look up.
+ */
+const MIX_ID = /^RD/;
 
 /** Hosts whose links this widget knows how to turn into an embed. */
 const HOSTS = /^(?:www\.|m\.|music\.)?(?:youtube\.com|youtube-nocookie\.com|youtu\.be)$/i;
@@ -153,12 +161,29 @@ function namesPrivateList(raw: string): boolean {
  */
 function embedUrl(src: Source): string {
   const params = new URLSearchParams({ rel: '0' });
-  if (src.listId) params.set('list', src.listId);
+  if (src.listId) {
+    params.set('list', src.listId);
+    // Opts the embed into the IFrame API, which is the only way the page can ask
+    // it what is in the queue (ADR 0012). `origin` is the security half of that
+    // handshake: the player will only answer this page. Set for playlists alone,
+    // since a single video has no queue to read.
+    params.set('enablejsapi', '1');
+    params.set('origin', window.location.origin);
+  }
   return `https://www.youtube-nocookie.com/embed/${src.videoId ?? VIDEOSERIES}?${params}`;
 }
 
-/** Label used when the user doesn't name a source themselves. */
-const defaultLabel = (parsed: Parsed): string => (parsed.videoId ? 'Video' : 'Playlist');
+/**
+ * Label used when the user doesn't name a source themselves.
+ *
+ * A playlist is named "Playlist" only until {@link playlistTitle} comes back with
+ * what YouTube calls it. Mixes never get that far — they are generated per
+ * viewer and have no title to fetch — so they say what they are instead.
+ */
+const defaultLabel = (parsed: Parsed): string => {
+  if (!parsed.listId) return 'Video';
+  return MIX_ID.test(parsed.listId) ? 'Mix' : 'Playlist';
+};
 
 /**
  * Music panel backed by YouTube. Users save sources — a video, a playlist, a
@@ -171,6 +196,10 @@ const defaultLabel = (parsed: Parsed): string => (parsed.videoId ? 'Video' : 'Pl
  * the Spotify embed (ADR 0006), YouTube's player chrome carries its own volume
  * and transport controls, so there is nothing here for the panel to rebuild and
  * no second, opt-in playback mode to reason about.
+ *
+ * A playlist source draws one thing the embed does not: its queue, as a strip of
+ * thumbnails under the player marking where in the list playback is, and jumping
+ * to any of them on click (ADR 0012).
  */
 export default function YouTubeWidget() {
   const [stored, setSources] = useLocalStorage<Source[]>('youtube.sources', DEFAULTS);
@@ -179,9 +208,36 @@ export default function YouTubeWidget() {
   const [label, setLabel] = useState('');
   const [link, setLink] = useState('');
   const [error, setError] = useState('');
+  // The live embed element, held in state rather than a ref so that swapping
+  // sources re-runs the hook below against the new frame.
+  const [frame, setFrame] = useState<HTMLIFrameElement | null>(null);
 
   const sources = repairSources(stored);
   const current = sources.find((s) => s.id === currentId) ?? sources[0];
+
+  const queue = useYouTubePlaylist(current?.listId ? frame : null);
+  const strip = useRef<HTMLOListElement>(null);
+
+  // Follow playback along the strip, so the thumbnail that is playing is on
+  // screen when a track ends and the next one starts.
+  //
+  // Scrolls the strip itself rather than calling `scrollIntoView` on the
+  // thumbnail: that walks every scrollable ancestor, so an unattended playlist
+  // would haul the whole dashboard back to this panel each time a track changed.
+  useEffect(() => {
+    const list = strip.current;
+    const active = list?.children[queue.index] as HTMLElement | undefined;
+    if (!list || !active) return;
+    // Both offsets are measured from the same ancestor — the strip establishes no
+    // positioning of its own — so the difference is the item's place within it.
+    const left = active.offsetLeft - list.offsetLeft - (list.clientWidth - active.clientWidth) / 2;
+    list.scrollTo?.({
+      left,
+      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
+    });
+  }, [queue.index]);
 
   // Write the repair back, so a dashboard carrying the retired default is healed
   // once rather than re-patched on every load. `repairSources` is identity when
@@ -200,13 +256,24 @@ export default function YouTubeWidget() {
       );
       return;
     }
+    const named = label.trim();
     const next: Source = {
       id: `${Date.now()}`,
-      label: label.trim() || defaultLabel(parsed),
+      label: named || defaultLabel(parsed),
       ...parsed,
     };
     setSources([...sources, next]);
     setCurrentId(next.id);
+    // Ask YouTube what the playlist is called, and adopt the answer as the tab's
+    // name. Fire-and-forget: the source is already saved and playing under its
+    // generic label, and this only ever improves on it.
+    if (!named && parsed.listId && !MIX_ID.test(parsed.listId)) {
+      playlistTitle(parsed.listId).then((title) => {
+        if (title) {
+          setSources((prev) => prev.map((s) => (s.id === next.id ? { ...s, label: title } : s)));
+        }
+      });
+    }
     setLabel('');
     setLink('');
     setError('');
@@ -268,7 +335,8 @@ export default function YouTubeWidget() {
                 onClick={() => setCurrentId(s.id)}
                 title={`Play ${s.label}`}
               >
-                {s.label}
+                {s.listId && <Icon name="list" />}
+                <span>{s.label}</span>
               </button>
               <button
                 className={styles.del}
@@ -292,12 +360,46 @@ export default function YouTubeWidget() {
         <div className={styles.frame}>
           <iframe
             key={current.id}
+            ref={setFrame}
             title={`YouTube – ${current.label}`}
             src={embedUrl(current)}
             loading="lazy"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
           />
+        </div>
+      )}
+
+      {/* Only once the player has answered with a real queue; a playlist of one,
+          or an embed the API never reached, has nothing to show. */}
+      {queue.items.length > 1 && (
+        <div className={styles.queue}>
+          <div>
+            <Icon name="list" />
+            {queue.title && <strong>{queue.title}</strong>}
+            {/* The player reports no position while it is between items or
+                playing an ad, which is a moment to drop the "4 /", not the length. */}
+            <span>
+              {queue.index >= 0 && `${queue.index + 1} / `}
+              {queue.items.length}
+            </span>
+          </div>
+          <ol ref={strip} aria-label={`${current?.label} queue`}>
+            {queue.items.map((videoId, i) => (
+              <li key={`${videoId}-${i}`}>
+                <button
+                  className={i === queue.index ? styles.isActive : undefined}
+                  onClick={() => queue.playAt(i)}
+                  title={`Play track ${i + 1}`}
+                  aria-label={`Play track ${i + 1}`}
+                  aria-current={i === queue.index || undefined}
+                >
+                  <img src={thumbnailUrl(videoId)} alt="" loading="lazy" width="96" height="54" />
+                  <span>{i + 1}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
         </div>
       )}
 
