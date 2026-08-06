@@ -60,7 +60,12 @@ export default function TodayPanel({ showFocus = true }: TodayPanelProps) {
     >
       <div className={styles.lead}>
         <div className={styles.next}>
-          <h2 id="today-heading">Next up</h2>
+          {/* Kept in the DOM but not on screen: it names the section for
+              `aria-labelledby` and keeps the "Today" heading below it from
+              skipping a level. The headline underneath says what it is. */}
+          <h2 id="today-heading" className={styles.srOnly}>
+            Next up
+          </h2>
           {next ? (
             <>
               <p className={styles.title}>{next.title}</p>
@@ -70,12 +75,22 @@ export default function TodayPanel({ showFocus = true }: TodayPanelProps) {
                 <span>{timeLabel(next)}</span>
               </p>
             </>
-          ) : (
+          ) : upcoming.configured && !upcoming.connected ? (
+            // The prompt *is* the control: with nothing scheduled there is
+            // nothing else on this row to click, so the sentence carries the
+            // action rather than sitting above a separate button.
             <p className={styles.title}>
-              {upcoming.configured && !upcoming.connected
-                ? 'Connect your calendar to see what’s coming.'
-                : 'Nothing scheduled.'}
+              <button
+                className={styles.connect}
+                onClick={upcoming.connect}
+                disabled={upcoming.loading}
+              >
+                Connect your calendar
+              </button>{' '}
+              to see what’s coming.
             </p>
+          ) : (
+            <p className={styles.title}>Nothing scheduled.</p>
           )}
           <StatStrip counts={counts} />
         </div>

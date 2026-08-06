@@ -23,18 +23,32 @@
   grid-template-columns: 1fr;
 }
 
-.next h2 {
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  color: var(--text-muted);
+/* The blocks of this column — headline, its time line, the stat strip — are
+   spaced by one gap rather than by each element's own margins, so a state that
+   drops one of them (no next item, no counts to report) still spaces correctly. */
+.next {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+/* Present for the accessible name and the heading outline; never seen. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* The headline commitment. */
 .title {
-  margin: 6px 0 0;
+  margin: 0;
   font-size: clamp(1.3rem, 2.2vw, 1.8rem);
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -45,9 +59,43 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 4px 0 14px;
+  /* Belongs to the headline above it, so it is pulled back out of the column's
+     even spacing to sit against it. */
+  margin: -10px 0 0;
   font-size: 0.9rem;
   color: var(--text-muted);
+}
+
+/* The inline call to action inside the headline, matching the editable name in
+   the greeting: accent-coloured, dashed underline. Unlike that one the underline
+   is drawn at rest rather than on hover — with nothing scheduled this is the only
+   thing on the row to press, and it should not have to be found first. */
+.connect {
+  padding: 0;
+  border: none;
+  border-bottom: 2px dashed var(--accent);
+  background: none;
+  font: inherit;
+  color: var(--accent);
+  transition: border-bottom-color 0.15s, color 0.15s;
+}
+.connect:hover:not(:disabled) {
+  border-bottom-style: solid;
+}
+.connect:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.connect:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connect {
+    transition: none;
+  }
 }
 /* The relative part ("in 40m") is the bit you actually read. */
 .when span:first-child {

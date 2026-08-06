@@ -13,9 +13,11 @@ const counts = (over: Partial<AgendaCounts> = {}): AgendaCounts => ({
 });
 
 describe('StatStrip', () => {
-  it('shows an all-clear line when every figure is zero', () => {
-    render(<StatStrip counts={counts()} />);
-    expect(screen.getByText('Nothing left today.')).toBeInTheDocument();
+  it('renders nothing when every figure is zero', () => {
+    // The Today zone says the day is empty twice already, in the headline and
+    // in the timeline's empty state; a third line between them was repetition.
+    const { container } = render(<StatStrip counts={counts()} />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('omits zero-valued figures rather than printing "0"', () => {

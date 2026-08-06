@@ -25,7 +25,9 @@ interface Stat {
  *
  * Zero-valued stats are dropped rather than rendered as "0", so the strip stays a
  * list of things needing attention instead of a wall of noughts. When every
- * figure is zero it collapses to a single all-clear line.
+ * figure is zero it renders nothing at all: the Today zone already says the day
+ * is empty, in the headline and again in the timeline's empty state, and a third
+ * "Nothing left today." between them was just repetition.
  *
  * @param props - See {@link StatStripProps}.
  */
@@ -45,9 +47,7 @@ export default function StatStrip({ counts }: StatStripProps) {
     { key: 'undated', label: 'undated', value: counts.undated },
   ].filter((stat) => stat.value > 0);
 
-  if (stats.length === 0) {
-    return <p className={styles.clear}>Nothing left today.</p>;
-  }
+  if (stats.length === 0) return null;
 
   return (
     <ul className={styles.container}>

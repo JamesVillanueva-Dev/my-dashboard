@@ -6,6 +6,21 @@ import styles from './styles.module.css';
 import { DashboardDataProvider } from '../../hooks/DashboardDataProvider';
 import type { Reminder } from '../../lib/gcalSync';
 
+// Google is unconfigured by default, which is what every test below except the
+// connect one wants — it is the state a fresh dashboard is in.
+const { google } = vi.hoisted(() => ({
+  google: { configured: false, fetchUpcoming: vi.fn() },
+}));
+
+vi.mock('../../lib/googleAuth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/googleAuth')>()),
+  hasGoogleClientId: () => google.configured,
+}));
+vi.mock('../../lib/gcalEvents', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/gcalEvents')>()),
+  fetchUpcoming: (...args: unknown[]) => google.fetchUpcoming(...args),
+}));
+
 /** Renders the panel with the shared data provider it depends on. */
 function renderPanel(props: { showFocus?: boolean } = {}) {
   return render(
@@ -48,6 +63,8 @@ describe('TodayPanel', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date(2026, 0, 15, 12, 0, 0));
     window.localStorage.clear();
+    google.configured = false;
+    google.fetchUpcoming.mockReset().mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -59,7 +76,43 @@ describe('TodayPanel', () => {
     const { container } = renderPanel();
     expect(headline(container)).toBe('Nothing scheduled.');
     expect(screen.getByText(/Nothing on today/)).toBeInTheDocument();
-    expect(screen.getByText('Nothing left today.')).toBeInTheDocument();
+    // The stat strip stays away entirely rather than adding a third way of
+    // saying the same thing.
+    expect(screen.queryByText('Nothing left today.')).not.toBeInTheDocument();
+  });
+
+  it('names the zone for assistive tech without printing a label above it', () => {
+    seedTasks([]);
+    renderPanel();
+
+    // "Next up" survives as the section's accessible name and as the heading
+    // the "Today" sub-heading hangs off — it just is not drawn.
+    const heading = screen.getByRole('heading', { name: 'Next up', level: 2 });
+    expect(heading).toHaveClass(styles.srOnly);
+    expect(screen.getByRole('region', { name: 'Next up' })).toBeInTheDocument();
+  });
+
+  it('offers connecting the calendar as a button inside the headline', async () => {
+    google.configured = true;
+    seedTasks([]);
+    const user = userEvent.setup();
+    const { container } = renderPanel();
+
+    const connect = screen.getByRole('button', { name: 'Connect your calendar' });
+    // The control is the sentence, not a button sitting under one.
+    expect(connect.closest(`.${styles.title}`)).not.toBeNull();
+    expect(headline(container)).toBe('Connect your calendar to see what’s coming.');
+
+    await user.click(connect);
+    // Interactive, so Google is allowed to show its consent popup.
+    expect(google.fetchUpcoming).toHaveBeenCalledWith(true, expect.any(Number));
+  });
+
+  it('offers no connect button when there is no Google client id to connect with', () => {
+    seedTasks([]);
+    const { container } = renderPanel();
+    expect(screen.queryByRole('button', { name: /connect your calendar/i })).not.toBeInTheDocument();
+    expect(headline(container)).toBe('Nothing scheduled.');
   });
 
   it('surfaces the soonest unfinished task as next up', () => {

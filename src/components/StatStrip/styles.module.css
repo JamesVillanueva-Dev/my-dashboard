@@ -27,8 +27,3 @@
 .isUrgent strong {
   color: var(--danger);
 }
-
-.clear {
-  composes: muted small from '../../styles/controls.module.css';
-  margin: 0;
-}
