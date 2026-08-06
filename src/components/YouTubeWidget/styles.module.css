@@ -212,11 +212,6 @@
   composes: empty from '../../styles/controls.module.css';
 }
 
-.hint {
-  composes: muted small from '../../styles/controls.module.css';
-  margin: 10px 0 0;
-}
-
 /* The lift on hover is decoration; the ring and the opacity already say which
    thumbnail is playing. */
 @media (prefers-reduced-motion: reduce) {
