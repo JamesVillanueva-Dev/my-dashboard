@@ -402,8 +402,6 @@ export default function YouTubeWidget() {
           </ol>
         </div>
       )}
-
-      <p className={styles.hint}>Volume and playback controls live inside the player.</p>
     </Widget>
   );
 }
