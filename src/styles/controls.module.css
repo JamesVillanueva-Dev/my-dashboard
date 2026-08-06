@@ -74,6 +74,42 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Loading placeholder.
+
+   One grey block, pulsing. It carries no size of its own — the widget that
+   composes it says how tall and how wide, so a set of them can be arranged into
+   the shape of the answer that is coming:
+
+     .bar { composes: skeleton from '../../styles/controls.module.css'; }
+
+   Placeholders rather than a "Loading…" line because the panel then keeps its
+   height across the swap: the content lands where the blocks were instead of
+   shoving the rest of the dashboard down. Wrap a set in one element with
+   `role="status"` and an `aria-label` so it announces once, and leave the blocks
+   themselves out of the accessibility tree — they say nothing.
+   --------------------------------------------------------------------------- */
+.skeleton {
+  display: block;
+  background: var(--card-border);
+  border-radius: 6px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* A pulse is decoration; the placeholder still reads as "not here yet" without
+   it, and for anyone who asked motion to stop, that is the whole message. */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Touch sizing.
 
    A finger has no cursor to aim with, so every control it can reach grows to a

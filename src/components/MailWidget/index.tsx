@@ -137,10 +137,10 @@ export default function MailWidget() {
         <div className={styles.skeleton} role="status" aria-label="Reading your inbox">
           {[0, 1, 2].map((row) => (
             <div key={row}>
-              <span />
+              <span className={styles.bar} />
               <div>
-                <span />
-                <span />
+                <span className={styles.bar} />
+                <span className={styles.bar} />
               </div>
             </div>
           ))}
@@ -224,11 +224,6 @@ export default function MailWidget() {
       }
     >
       {body()}
-      {connected && (
-        <p className={styles.hint}>
-          Scored in this browser from headers and Gmail’s preview. Hover a pick for why.
-        </p>
-      )}
     </Widget>
   );
 }

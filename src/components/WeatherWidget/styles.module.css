@@ -47,6 +47,74 @@
   composes: link from '../../styles/controls.module.css';
 }
 
+/* ---------- Loading ----------
+   The three bands the panel is made of — conditions, readings, forecast — at
+   the sizes and spacings they will have once the fetch lands. */
+.bar {
+  composes: skeleton from '../../styles/controls.module.css';
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Conditions: the condition glyph, with temperature and label beside it. */
+.skeleton > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.skeleton > div:first-child > span {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+}
+.skeleton > div:first-child > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.skeleton > div:first-child span:first-child {
+  height: 26px;
+  width: 46%;
+}
+.skeleton > div:first-child span:last-child {
+  height: 10px;
+  width: 32%;
+  animation-delay: 0.15s;
+}
+
+/* Readings: four chips on one wrapping row, matching `.meta`. */
+.skeleton > div:nth-child(2) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 14px 0;
+}
+.skeleton > div:nth-child(2) span {
+  height: 10px;
+  width: 62px;
+}
+.skeleton > div:nth-child(2) span:nth-child(even) {
+  width: 78px;
+  animation-delay: 0.15s;
+}
+
+/* Forecast: one bar per day, under the same rule `.forecast` sits below. */
+.skeleton > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding-top: 14px;
+  border-top: 1px solid var(--card-border);
+}
+.skeleton > div:last-child span {
+  height: 11px;
+}
+
 /* ---------- Current conditions ---------- */
 .now {
   display: grid;

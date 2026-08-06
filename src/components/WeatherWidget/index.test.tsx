@@ -67,9 +67,9 @@ describe('WeatherWidget', () => {
     unmount();
     render(<WeatherWidget />);
 
-    // No "Loading weather…" flash: the forecast is there on the first render.
+    // No placeholder flash: the forecast is there on the first render.
     expect(screen.getByText('72°F')).toBeInTheDocument();
-    expect(screen.queryByText(/Loading weather/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: /loading weather/i })).not.toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 

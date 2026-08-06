@@ -203,7 +203,11 @@
 }
 
 /* ---------- Loading ----------
-   Three placeholder rows in the shape of the answer. */
+   Three placeholder rows in the shape of the answer: avatar, sender, subject. */
+.bar {
+  composes: skeleton from '../../styles/controls.module.css';
+}
+
 .skeleton {
   display: flex;
   flex-direction: column;
@@ -224,13 +228,6 @@
   gap: 7px;
 }
 
-.skeleton span {
-  display: block;
-  background: var(--card-border);
-  border-radius: 6px;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
 .skeleton > div > span {
   width: 34px;
   height: 34px;
@@ -245,28 +242,6 @@
   width: 78%;
   height: 11px;
   animation-delay: 0.15s;
-}
-
-@keyframes pulse {
-  50% {
-    opacity: 0.4;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .skeleton span {
-    animation: none;
-  }
-}
-
-/* ---------- Footer note ---------- */
-.hint {
-  composes: muted small from '../../styles/controls.module.css';
-  margin: 12px 0 0;
-  padding-top: 10px;
-  border-top: 1px solid var(--card-border);
-  font-size: 0.72rem;
-  line-height: 1.4;
 }
 
 /* Touch: the rows are the panel, so they get a thumb-sized band. There is no

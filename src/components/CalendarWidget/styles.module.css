@@ -41,6 +41,48 @@
   margin: 0;
 }
 
+/* ---------- Loading ----------
+   The agenda's own shape: a day heading with its events under it, on the same
+   spacing `.agenda` uses below, so nothing shifts when the events arrive. */
+.bar {
+  composes: skeleton from '../../styles/controls.module.css';
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* The day heading. */
+.skeleton > div > span {
+  width: 68px;
+  height: 8px;
+  margin-bottom: 10px;
+}
+
+/* One event: the time column, then the title filling the rest. */
+.skeleton > div > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 4px;
+}
+.skeleton > div > div span:first-child {
+  flex: 0 0 auto;
+  width: 62px;
+  height: 10px;
+}
+.skeleton > div > div span:last-child {
+  flex: 1;
+  height: 11px;
+  animation-delay: 0.15s;
+}
+/* Titles are not all the same length, and a column of equal bars says they are. */
+.skeleton > div > div:last-child span:last-child {
+  max-width: 62%;
+}
+
 /* ---------- Agenda ---------- */
 .agenda {
   display: flex;

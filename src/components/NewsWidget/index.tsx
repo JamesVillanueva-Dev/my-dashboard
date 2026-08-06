@@ -236,7 +236,16 @@ export default function NewsWidget() {
               </button>
             ))}
           </div>
-          {status === 'loading' && <p>Loading headlines…</p>}
+          {status === 'loading' && (
+            <div className={styles.skeleton} role="status" aria-label="Loading headlines">
+              {[0, 1, 2, 3, 4].map((row) => (
+                <div key={row}>
+                  <span className={styles.bar} />
+                  <span className={styles.bar} />
+                </div>
+              ))}
+            </div>
+          )}
           {status === 'error' && (
             <p>
               Couldn't load this feed.{' '}

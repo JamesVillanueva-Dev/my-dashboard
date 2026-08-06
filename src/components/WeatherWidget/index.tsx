@@ -237,7 +237,30 @@ export default function WeatherWidget() {
       {searching && <p>Searching…</p>}
       {geoError && <p>Couldn't get your location.</p>}
 
-      {status === 'loading' && <p>Loading weather…</p>}
+      {status === 'loading' && (
+        <div className={styles.skeleton} role="status" aria-label="Loading weather">
+          {/* Current conditions: icon, temperature, label. */}
+          <div>
+            <span className={styles.bar} />
+            <div>
+              <span className={styles.bar} />
+              <span className={styles.bar} />
+            </div>
+          </div>
+          {/* The four readings under it. */}
+          <div>
+            {[0, 1, 2, 3].map((chip) => (
+              <span key={chip} className={styles.bar} />
+            ))}
+          </div>
+          {/* One line per forecast day. */}
+          <div>
+            {[0, 1, 2, 3].map((day) => (
+              <span key={day} className={styles.bar} />
+            ))}
+          </div>
+        </div>
+      )}
       {status === 'error' && (
         <p>
           Couldn't load weather.{' '}

@@ -65,9 +65,9 @@ describe('NewsWidget', () => {
     unmount();
     render(<NewsWidget />);
 
-    // Present on the very first render — no "Loading headlines…" in between.
+    // Present on the very first render — no loading placeholders in between.
     expect(screen.getByRole('link', { name: 'Headline One' })).toBeInTheDocument();
-    expect(screen.queryByText(/Loading headlines/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: /loading headlines/i })).not.toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 

@@ -192,15 +192,6 @@ describe('MailWidget — ranked mail', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
-  it('discloses that scoring happens here, and how to see why', async () => {
-    connected();
-    render(<MailWidget />);
-
-    await screen.findByText('Subject a');
-    expect(screen.getByText(/scored in this browser/i)).toBeInTheDocument();
-    expect(screen.getByText(/hover a pick for why/i)).toBeInTheDocument();
-  });
-
   it('offers a refresh that costs nothing to take', async () => {
     connected();
     const user = userEvent.setup();

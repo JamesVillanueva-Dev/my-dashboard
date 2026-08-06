@@ -96,9 +96,25 @@ export default function CalendarWidget() {
           Connect your Google account to see what’s coming up over the next {WINDOW_DAYS} days.
         </p>
       ) : days.length === 0 ? (
-        <p className={styles.empty}>
-          {cal.loading ? 'Loading…' : `Nothing scheduled in the next ${WINDOW_DAYS} days.`}
-        </p>
+        cal.loading ? (
+          // Two days' worth of placeholder rows: a day heading and the events
+          // under it, so the agenda arrives in the space it already occupied.
+          <div className={styles.skeleton} role="status" aria-label="Loading your calendar">
+            {[0, 1].map((day) => (
+              <div key={day}>
+                <span className={styles.bar} />
+                {[0, 1].map((event) => (
+                  <div key={event}>
+                    <span className={styles.bar} />
+                    <span className={styles.bar} />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.empty}>Nothing scheduled in the next {WINDOW_DAYS} days.</p>
+        )
       ) : (
         <div className={styles.agenda}>
           {days.map((day) => (

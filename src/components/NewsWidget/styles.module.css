@@ -129,6 +129,44 @@
   composes: link from '../../styles/controls.module.css';
 }
 
+/* ---------- Loading ----------
+   Placeholder headlines, laid out on the same rhythm as `.list` below — same
+   padding, same hairline — so the real ones land exactly where these sat. */
+.bar {
+  composes: skeleton from '../../styles/controls.module.css';
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--card-border);
+}
+.skeleton > div:last-child {
+  border-bottom: none;
+}
+
+/* Headline, then its timestamp. The widths alternate rather than repeating:
+   five identical bars read as a table, which a list of headlines is not. */
+.skeleton span:first-child {
+  height: 11px;
+  width: 92%;
+}
+.skeleton > div:nth-child(even) span:first-child {
+  width: 74%;
+}
+.skeleton span:last-child {
+  height: 8px;
+  width: 26%;
+  animation-delay: 0.15s;
+}
+
 /* ---------- Headlines ---------- */
 .list {
   list-style: none;
