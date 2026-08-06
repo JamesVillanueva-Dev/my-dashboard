@@ -1,0 +1,56 @@
+version: 2
+
+updates:
+  # Application dependencies.
+  #
+  # Grouped rather than one PR per package: a bare `npm ci` project with ~30
+  # devDependencies produces a steady drip of individual bumps, and the review
+  # cost of ten separate PRs is what makes people stop reading them. Minor and
+  # patch updates travel together in a single PR per group; majors still come
+  # through on their own, because those are the ones worth reading.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # React and its type definitions move in lockstep — splitting them across
+      # PRs produces a state where neither one type-checks on its own.
+      react:
+        patterns:
+          - react
+          - react-dom
+          - '@types/react'
+          - '@types/react-dom'
+        update-types:
+          - minor
+          - patch
+      # Everything used to build and test, none of which ships to the browser.
+      dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      # Runtime dependencies that aren't React (currently just Clerk).
+      production:
+        dependency-type: production
+        exclude-patterns:
+          - react
+          - react-dom
+        update-types:
+          - minor
+          - patch
+
+  # The actions pinned in `deploy.yml`. These go stale quietly — a deprecated
+  # action keeps working until the day GitHub retires the runner image.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns:
+          - '*'
