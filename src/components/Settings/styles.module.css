@@ -59,6 +59,14 @@
   border-top: 1px solid var(--card-border);
 }
 
+/* A heading part-way down opens a new section ("Background"), so it takes the
+   divider its own list would have taken had the heading not broken them up. */
+.container > div > ul + p {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--card-border);
+}
+
 .container label {
   display: flex;
   align-items: center;

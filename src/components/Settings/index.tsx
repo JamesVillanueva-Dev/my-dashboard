@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Icon from '../Icon';
+import { useAura } from '../../hooks/useAura';
 import { useDismiss } from '../../hooks/useDismiss';
 import { useTheme } from '../../hooks/useTheme';
 import { THEMES, themeById } from '../../lib/themes';
@@ -33,9 +34,13 @@ function Swatch({ theme }: { theme: Theme }) {
  * The themes are a single radio group whose value is the stored *preference*,
  * so "Follow system" is one of the options rather than a separate switch — it
  * is a peer choice, not a modifier on top of a chosen palette.
+ *
+ * Below them sits the background section, which is only rendered on a device
+ * with a pointer to follow — see {@link useAura}.
  */
 export default function Settings() {
   const { preference, setPreference, system } = useTheme();
+  const aura = useAura();
   const [open, setOpen] = useState(false);
   const ref = useDismiss<HTMLDivElement>(open, () => setOpen(false));
 
@@ -88,6 +93,24 @@ export default function Settings() {
               </label>
             </li>
           </ul>
+          {aura.supported && (
+            <>
+              <p id="background-heading">Background</p>
+              <ul aria-labelledby="background-heading">
+                <li>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={aura.enabled}
+                      onChange={(e) => aura.setEnabled(e.target.checked)}
+                    />
+                    <Icon name="sun" />
+                    Aura follows the cursor
+                  </label>
+                </li>
+              </ul>
+            </>
+          )}
         </div>
       )}
     </div>

@@ -268,7 +268,16 @@ body,
 body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   color: var(--text);
-  background: radial-gradient(1200px 600px at 80% -10%, var(--bg-grad-1), transparent),
+  /* Two soft auras over the flat background. The accent one is steerable: with
+     the cursor setting on, `useAura` writes --aura-x/--aura-y and it re-centres
+     on the pointer. Unset — the setting off, or no mouse to follow — the
+     fallbacks hold it in the top-right corner it has always sat in. The second
+     stays anchored either way, so the page keeps a fixed point of reference. */
+  background: radial-gradient(
+      1200px 600px at var(--aura-x, 80%) var(--aura-y, -10%),
+      var(--bg-grad-1),
+      transparent
+    ),
     radial-gradient(900px 500px at 0% 0%, var(--bg-grad-2), transparent), var(--bg);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
@@ -276,6 +285,14 @@ body {
      silently breaks every size relationship the layout is built on. */
   text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
+}
+
+/* While the aura is following the cursor, its layer is measured against the
+   viewport rather than the document — otherwise scrolling would slide it out
+   from under a pointer that never moved. Only the steerable layer is pinned;
+   the anchored one still scrolls with the page. */
+:root[data-aura='pointer'] body {
+  background-attachment: fixed, scroll;
 }
 
 button {
