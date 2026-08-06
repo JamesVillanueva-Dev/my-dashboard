@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Settings from './index';
 import { THEMES } from '../../lib/themes';
@@ -11,6 +11,31 @@ async function openMenu() {
   await user.click(screen.getByRole('button', { name: /settings/i }));
   return user;
 }
+
+/** The global stub from `src/test/setup.ts`, which reports no mouse. */
+const realMatchMedia = window.matchMedia;
+
+/**
+ * Reports a device with a mouse, so the background section is offered. The
+ * default stub answers `false` to everything, which is a touch device.
+ */
+function stubMouse() {
+  window.matchMedia = ((query: string) => ({
+    matches: query.includes('pointer: fine'),
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as unknown as typeof window.matchMedia;
+}
+
+afterEach(() => {
+  window.matchMedia = realMatchMedia;
+  document.documentElement.removeAttribute('data-aura');
+});
 
 describe('Settings', () => {
   it('follows the system scheme until the user picks a palette', () => {
@@ -96,5 +121,64 @@ describe('Settings', () => {
     const user = await openMenu();
     await user.click(document.body);
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  describe('the cursor aura', () => {
+    it('is not offered on a device with no pointer to follow', async () => {
+      await openMenu();
+
+      expect(screen.queryByRole('checkbox', { name: /aura/i })).not.toBeInTheDocument();
+      expect(screen.queryByText('Background')).not.toBeInTheDocument();
+    });
+
+    it('is offered, and off, on a device with a mouse', async () => {
+      stubMouse();
+
+      await openMenu();
+
+      expect(screen.getByRole('checkbox', { name: /aura follows the cursor/i })).not.toBeChecked();
+    });
+
+    it('starts following when switched on, and persists the choice', async () => {
+      stubMouse();
+      const user = await openMenu();
+
+      await user.click(screen.getByRole('checkbox', { name: /aura/i }));
+
+      expect(screen.getByRole('checkbox', { name: /aura/i })).toBeChecked();
+      expect(document.documentElement).toHaveAttribute('data-aura', 'pointer');
+      expect(localStorage.getItem('aura.follow')).toBe(JSON.stringify(true));
+    });
+
+    it('gives the corner position back when switched off', async () => {
+      stubMouse();
+      localStorage.setItem('aura.follow', JSON.stringify(true));
+      const user = await openMenu();
+
+      await user.click(screen.getByRole('checkbox', { name: /aura/i }));
+
+      await waitFor(() => expect(document.documentElement).not.toHaveAttribute('data-aura'));
+      expect(localStorage.getItem('aura.follow')).toBe(JSON.stringify(false));
+    });
+
+    it('restores a choice stored by a previous visit', async () => {
+      stubMouse();
+      localStorage.setItem('aura.follow', JSON.stringify(true));
+
+      await openMenu();
+
+      expect(screen.getByRole('checkbox', { name: /aura/i })).toBeChecked();
+      expect(document.documentElement).toHaveAttribute('data-aura', 'pointer');
+    });
+
+    it('leaves the palette picker alone', async () => {
+      stubMouse();
+      const user = await openMenu();
+
+      await user.click(screen.getByRole('checkbox', { name: /aura/i }));
+
+      expect(screen.getAllByRole('radio')).toHaveLength(THEMES.length + 1);
+      expect(screen.getByRole('radio', { name: /follow system/i })).toBeChecked();
+    });
   });
 });
