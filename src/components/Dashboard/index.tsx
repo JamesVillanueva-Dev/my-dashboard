@@ -1,6 +1,7 @@
 import {
   useState,
   useRef,
+  useMemo,
   useCallback,
   useLayoutEffect,
   type PointerEvent as ReactPointerEvent,
@@ -16,6 +17,7 @@ import Footer from '../Footer';
 import WidgetMenu from '../WidgetMenu';
 import { DashboardDataProvider } from '../../hooks/DashboardDataProvider';
 import { useSyncStatus } from '../../hooks/useProfileSync';
+import { stepDrag, type DragTarget, type PanelRect } from '../../lib/dragOrder';
 import {
   DEFAULT_LAYOUT,
   MAX_COLS,
@@ -45,6 +47,23 @@ const HEIGHT_STEP = 24;
  */
 const PIN_THRESHOLD = 5;
 
+/**
+ * How far the pointer must travel before a grab becomes a drag, in px.
+ *
+ * Without it, a plain click on the grip lifts the card — scaling and rotating it
+ * for the length of the click, which reads as a glitch rather than as a gesture.
+ */
+const DRAG_THRESHOLD = 4;
+
+/**
+ * How long a finger must rest on the grip before it starts a drag, in ms.
+ *
+ * A mouse press is unambiguous, so it lifts immediately; a touch is not — the
+ * same contact begins a scroll, a tap, or a drag. Waiting a moment is how the
+ * gesture is told apart, and it is the convention every touch reorder UI uses.
+ */
+const TOUCH_HOLD_MS = 180;
+
 /** Reads the grid's live track size and gap, falling back to the constants above. */
 function gridMetrics(grid: HTMLElement | null) {
   const style = grid ? getComputedStyle(grid) : null;
@@ -57,6 +76,41 @@ function gridMetrics(grid: HTMLElement | null) {
     colWidth: Number.parseFloat(tracks[0] ?? '') || 0,
     /** Columns the grid currently has; 0 when it cannot be measured. */
     columns: tracks.length,
+  };
+}
+
+/**
+ * The translation an element's transform is currently applying.
+ *
+ * Needed because `getBoundingClientRect()` **includes** transforms — including
+ * the ones a running Web Animation is driving. Subtracting this is the only way
+ * to ask where the *layout* has put an element while it is still gliding, and
+ * getting that wrong is what made the old FLIP compound its error across
+ * reorders.
+ */
+function translation(el: HTMLElement): { x: number; y: number } {
+  if (typeof DOMMatrixReadOnly !== 'function') return { x: 0, y: 0 };
+  const value = getComputedStyle(el).transform;
+  if (!value || value === 'none') return { x: 0, y: 0 };
+  try {
+    const matrix = new DOMMatrixReadOnly(value);
+    return { x: matrix.m41, y: matrix.m42 };
+  } catch {
+    // Unparseable transform (jsdom returns odd values); treat it as none.
+    return { x: 0, y: 0 };
+  }
+}
+
+/** Where the grid has put a panel, with any animation transform taken back off. */
+function layoutRect(el: HTMLElement, id: string): PanelRect {
+  const rect = el.getBoundingClientRect();
+  const offset = translation(el);
+  return {
+    id,
+    x: rect.left - offset.x,
+    y: rect.top - offset.y,
+    width: rect.width,
+    height: rect.height,
   };
 }
 
@@ -89,6 +143,37 @@ function applySpan(item: HTMLElement) {
   item.style.gridRowEnd = `span ${span}`;
 }
 
+/** Everything one in-flight pointer drag needs to remember. */
+interface DragSession {
+  /** The panel being dragged. */
+  id: string;
+  /** Pointer offset inside the card at the moment it was grabbed. */
+  grabX: number;
+  grabY: number;
+  /** Where the pointer went down, for the movement threshold. */
+  startX: number;
+  startY: number;
+  /** Latest pointer position, so the card can be re-placed after a reorder. */
+  x: number;
+  y: number;
+  /** Which pointer this is, for releasing capture on the way out. */
+  pointerId: number;
+  /** The grip that captured the pointer; listeners live on it. */
+  node: HTMLElement;
+  /**
+   * `false` until the gesture has earned the lift — past {@link DRAG_THRESHOLD}
+   * for a mouse, or past {@link TOUCH_HOLD_MS} for a finger. Nothing moves and
+   * nothing is styled until this turns true.
+   */
+  active: boolean;
+  /** What the reorder model last settled on. See `lib/dragOrder.ts`. */
+  target: DragTarget | null;
+  /** Pending hold timer for a touch drag, if any. */
+  hold: number | null;
+  /** Pending rAF for the move handler, if any. */
+  frame: number | null;
+}
+
 /**
  * Root of the dashboard. Owns the persisted layout — the ordered list of enabled
  * widget ids — and renders a responsive masonry grid from it.
@@ -96,6 +181,10 @@ function applySpan(item: HTMLElement) {
  * Reordering is a custom pointer-based drag: grabbing a card's handle lifts the
  * card and makes it follow the cursor (or finger), the other cards glide out of
  * the way via a FLIP animation, and the card eases into its new slot on release.
+ * Where it lands is decided by `lib/dragOrder.ts` rather than by hit-testing the
+ * point under the cursor — most of this grid is empty space, so that question
+ * has no useful answer most of the time.
+ *
  * Resizing is a second drag, from each card's bottom-right corner, setting width
  * and height at once. Widgets can also be removed via the × on each card, and
  * re-added or reset from the widget menu. The user's name is persisted so the
@@ -120,8 +209,11 @@ export default function Dashboard() {
    */
   const [columns, setColumns] = useState(MAX_COLS);
 
-  // Guard against ids from an older saved layout that no longer exist.
-  const enabled = layout.filter((id) => widgetById(id));
+  // Guard against ids from an older saved layout that no longer exist. Memoised
+  // so the effects below key off an actual change rather than off a new array
+  // every render — the FLIP effect used to re-measure on every render because
+  // this was a fresh `filter` each time.
+  const enabled = useMemo(() => layout.filter((id) => widgetById(id)), [layout]);
 
   /** A widget's current size: the user's choice if they made one, else the default. */
   const sizeOf = useCallback(
@@ -141,20 +233,39 @@ export default function Dashboard() {
 
   const gridRef = useRef<HTMLElement | null>(null);
   const itemRefs = useRef<Map<string, HTMLElement>>(new Map());
-  const prevRects = useRef<Map<string, DOMRect>>(new Map());
-  const dragState = useRef<{ id: string; grabX: number; grabY: number } | null>(null);
-  const lastPointer = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  /** Layout positions from the last measure, keyed by id. Drives FLIP and the drag. */
+  const layoutRects = useRef<Map<string, PanelRect>>(new Map());
+  const dragState = useRef<DragSession | null>(null);
+  /**
+   * The live saved order, for the drag's frame callback to read without
+   * re-binding its listeners. Deliberately the *full* layout rather than
+   * `enabled`: reordering through the filtered list would quietly drop ids from
+   * a saved layout whose widget no longer exists.
+   */
+  const layoutRef = useRef(layout);
+  // Synced in an effect rather than during render: refs are not render state,
+  // and the drag only reads this from a rAF callback, which runs later anyway.
+  useLayoutEffect(() => {
+    layoutRef.current = layout;
+  });
+
+  /** Re-reads every panel's layout box. Cheap enough per reorder, not per frame. */
+  const measureLayout = () => {
+    layoutRects.current = new Map();
+    itemRefs.current.forEach((el, id) => layoutRects.current.set(id, layoutRect(el, id)));
+  };
 
   /** Position the lifted card so the cursor stays at the point where it was grabbed. */
   const positionDragged = (x: number, y: number) => {
     const st = dragState.current;
     const el = st && itemRefs.current.get(st.id);
-    if (!st || !el) return;
-    el.style.transform = '';
-    const r = el.getBoundingClientRect();
-    const tx = x - st.grabX - r.left;
-    const ty = y - st.grabY - r.top;
-    el.style.transform = `translate(${tx}px, ${ty}px) scale(1.03) rotate(1.4deg)`;
+    if (!st || !el || !st.active) return;
+    // Against the cached layout box, so the pointer path neither writes nor
+    // reads geometry — the old version cleared the transform and re-measured on
+    // every single move, forcing a synchronous reflow each time.
+    const box = layoutRects.current.get(st.id);
+    if (!box) return;
+    el.style.transform = `translate(${x - st.grabX - box.x}px, ${y - st.grabY - box.y}px) scale(1.03) rotate(1.4deg)`;
   };
 
   // Track how many columns the grid actually has, so a resize drag can never
@@ -192,6 +303,10 @@ export default function Dashboard() {
     // Content changes height on its own — news loads, a form opens, a list grows.
     if (typeof ResizeObserver !== 'function') return;
     const observer = new ResizeObserver((entries) => {
+      // Not while a drag is in flight: re-spanning moves panels out from under
+      // the cursor with no animation, which reads as the layout glitching on its
+      // own. Whatever grew will be re-spanned when the drag ends.
+      if (dragState.current?.active) return;
       for (const entry of entries) {
         const item = (entry.target as HTMLElement).parentElement;
         if (item) applySpan(item);
@@ -203,34 +318,67 @@ export default function Dashboard() {
     return () => observer.disconnect();
   }, [enabled, sizeOf, columns]);
 
-  // FLIP: after a reorder re-renders, glide each card from its old box to its new
-  // one. The card being dragged is excluded (it follows the pointer instead).
+  // FLIP: after a reorder re-renders, glide each card from where it *looked* to
+  // where it now belongs.
+  //
+  // "Where it looked" matters. A card interrupted mid-glide is still carrying a
+  // partial transform, so the delta has to be measured against its current
+  // visual position, not against the layout position it was heading for.
+  // Cancelling and restarting from a stale delta — what this used to do — makes
+  // the card teleport on every reorder.
   useLayoutEffect(() => {
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const draggingId = dragState.current?.id;
-    const nextRects = new Map<string, DOMRect>();
+    const draggingId = dragState.current?.active ? dragState.current.id : undefined;
+    const previous = layoutRects.current;
+    const nextRects = new Map<string, PanelRect>();
 
     itemRefs.current.forEach((el, id) => {
-      if (id === draggingId) return;
-      const next = el.getBoundingClientRect();
-      nextRects.set(id, next);
-      const prev = prevRects.current.get(id);
-      if (!prev || reduceMotion || typeof el.animate !== 'function') return;
-      const dx = prev.left - next.left;
-      const dy = prev.top - next.top;
-      if (dx || dy) {
-        el.getAnimations().forEach((a) => a.cancel());
-        el.animate(
-          [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
-          { duration: 240, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
-        );
+      if (id === draggingId) {
+        // The lifted card carries our own scale/rotate, which would corrupt a
+        // measurement. Take it off, measure, put it back — once per reorder,
+        // not once per pointer event.
+        const held = el.style.transform;
+        el.style.transform = '';
+        nextRects.set(id, layoutRect(el, id));
+        el.style.transform = held;
+        return;
       }
+
+      // Read the in-flight offset *before* cancelling anything, then derive the
+      // layout box from it.
+      const offset = translation(el);
+      const rect = el.getBoundingClientRect();
+      const next: PanelRect = {
+        id,
+        x: rect.left - offset.x,
+        y: rect.top - offset.y,
+        width: rect.width,
+        height: rect.height,
+      };
+      nextRects.set(id, next);
+
+      const prev = previous.get(id);
+      if (!prev || reduceMotion || typeof el.animate !== 'function') return;
+
+      // Composite FLIP: (where it was) - (where it will be) + (how far it has
+      // already travelled). With no animation running `offset` is zero and this
+      // is the ordinary FLIP delta.
+      const dx = prev.x - next.x + offset.x;
+      const dy = prev.y - next.y + offset.y;
+      if (!dx && !dy) return;
+
+      el.getAnimations().forEach((a) => a.cancel());
+      el.animate(
+        [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+        { duration: 240, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+      );
     });
 
-    prevRects.current = nextRects;
+    layoutRects.current = nextRects;
     // Keep the lifted card glued to the pointer after siblings shift.
-    if (draggingId) positionDragged(lastPointer.current.x, lastPointer.current.y);
-  }, [enabled]);
+    const st = dragState.current;
+    if (st?.active) positionDragged(st.x, st.y);
+  }, [enabled, sizes, columns]);
 
   const toggle = (id: string) =>
     setLayout((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -324,15 +472,19 @@ export default function Dashboard() {
       applySpan(item);
     };
 
-    const onUp = () => {
+    const finish = () => {
       window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
       setResizeId(null);
       commitSize(id, size);
     };
 
     window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointerup', finish);
+    // Without this a cancelled gesture (a system swipe, a lost pointer) leaves
+    // the panel mid-resize and the listeners attached forever.
+    window.addEventListener('pointercancel', finish);
   };
 
   /** Arrow keys resize: left/right by a column, up/down by {@link HEIGHT_STEP}px. */
@@ -366,66 +518,133 @@ export default function Dashboard() {
   /** Unpin a panel's height, letting it grow with its content again. */
   const fitHeight = (id: string) => commitSize(id, { ...sizeOf(id), height: null });
 
-  /**
-   * Move `sourceId` before/after the widget the pointer is currently over.
-   *
-   * Which side counts as "after" depends on how the two panels sit. When the
-   * pointer is inside the target's vertical band they are side by side, so the
-   * horizontal midpoint decides; otherwise the panels are stacked and the
-   * vertical midpoint does. A grid puts panels beside each other, which the
-   * original vertical-only test could not express.
-   */
-  const reorderAround = (
-    sourceId: string,
-    overEl: HTMLElement,
-    pointerX: number,
-    pointerY: number,
-  ) => {
-    const overId = overEl.dataset.id;
-    if (!overId || overId === sourceId) return;
-    const rect = overEl.getBoundingClientRect();
-    const sideBySide = pointerY >= rect.top && pointerY <= rect.bottom;
-    const after = sideBySide
-      ? pointerX > rect.left + rect.width / 2
-      : pointerY > rect.top + rect.height / 2;
-    setLayout((prev) => {
-      const next = prev.filter((x) => x !== sourceId);
-      let at = next.indexOf(overId);
-      if (at < 0) return prev;
-      if (after) at += 1;
-      next.splice(at, 0, sourceId);
-      if (next.length === prev.length && next.every((v, i) => v === prev[i])) return prev;
-      return next;
-    });
+  /** Turns the pending grab into a real drag: lifts the card and takes a baseline. */
+  const beginDrag = () => {
+    const st = dragState.current;
+    if (!st || st.active) return;
+    st.active = true;
+    st.hold = null;
+    measureLayout();
+    setDragId(st.id);
+    positionDragged(st.x, st.y);
   };
 
-  /** Start a pointer-based drag from a widget's grip. */
+  /**
+   * Start a pointer-based drag from a widget's grip.
+   *
+   * The pointer is captured by the grip, so the gesture survives the pointer
+   * leaving the card, crossing another element, or running off the window.
+   */
   const onGrab = (e: ReactPointerEvent, id: string) => {
     const el = itemRefs.current.get(id);
-    if (!el || e.button !== 0) return;
-    const r = el.getBoundingClientRect();
-    dragState.current = { id, grabX: e.clientX - r.left, grabY: e.clientY - r.top };
-    lastPointer.current = { x: e.clientX, y: e.clientY };
-    el.style.pointerEvents = 'none';
-    setDragId(id);
-    positionDragged(e.clientX, e.clientY);
+    const node = e.currentTarget as HTMLElement;
+    if (!el || e.button !== 0 || dragState.current) return;
 
-    const onMove = (ev: PointerEvent) => {
-      lastPointer.current = { x: ev.clientX, y: ev.clientY };
-      positionDragged(ev.clientX, ev.clientY);
-      const under = document.elementFromPoint(ev.clientX, ev.clientY);
-      const item = under?.closest<HTMLElement>(`.${styles.item}`);
-      if (item) reorderAround(id, item, ev.clientX, ev.clientY);
+    const box = layoutRect(el, id);
+    const session: DragSession = {
+      id,
+      grabX: e.clientX - box.x,
+      grabY: e.clientY - box.y,
+      startX: e.clientX,
+      startY: e.clientY,
+      x: e.clientX,
+      y: e.clientY,
+      pointerId: e.pointerId,
+      node,
+      active: false,
+      target: null,
+      hold: null,
+      frame: null,
+    };
+    dragState.current = session;
+
+    try {
+      // Capture keeps the gesture attached to this grip when the pointer leaves
+      // the card or runs off the window, and is what makes a touch drag hold on
+      // to its finger. Note the listeners below are on `window`, not on the
+      // grip: capture retargets events but they still bubble, and binding to the
+      // grip alone loses the drag the moment a re-render disturbs that element.
+      node.setPointerCapture(e.pointerId);
+    } catch {
+      // Capture is unavailable (jsdom, or a pointer that has already gone).
+      // The window listeners below still work; only the guarantee is lost.
+    }
+
+    // A finger has to commit before it gets a drag, or every attempt to scroll
+    // the page from a grip becomes a reorder. A mouse press is unambiguous.
+    if (e.pointerType === 'touch') {
+      session.hold = window.setTimeout(beginDrag, TOUCH_HOLD_MS);
+    }
+
+    /** Reads the latest pointer position once per frame, not once per event. */
+    const step = () => {
+      const st = dragState.current;
+      if (!st) return;
+      st.frame = null;
+      if (!st.active) return;
+
+      positionDragged(st.x, st.y);
+
+      const order = layoutRef.current;
+      const result = stepDrag({
+        rects: [...layoutRects.current.values()],
+        x: st.x,
+        y: st.y,
+        draggedId: st.id,
+        order,
+        target: st.target,
+      });
+      st.target = result.target;
+      // Reference equality means nothing moved — skip the render entirely.
+      if (result.order !== order) setLayout(result.order);
     };
 
-    const onUp = () => {
+    const onMove = (ev: PointerEvent) => {
+      const st = dragState.current;
+      if (!st || ev.pointerId !== st.pointerId) return;
+      st.x = ev.clientX;
+      st.y = ev.clientY;
+
+      if (!st.active) {
+        const travelled = Math.hypot(ev.clientX - st.startX, ev.clientY - st.startY);
+        if (travelled < DRAG_THRESHOLD) return;
+        // A finger that moves before the hold elapses is scrolling, not
+        // dragging: drop the gesture rather than stealing it.
+        if (ev.pointerType === 'touch' && st.hold !== null) {
+          clearTimeout(st.hold);
+          finish();
+          return;
+        }
+        beginDrag();
+      }
+
+      if (st.frame === null) st.frame = requestAnimationFrame(step);
+    };
+
+    /**
+     * The single exit. `pointerup` and `pointercancel` both land here, because
+     * having two teardown paths is exactly how a cancelled drag used to leave a
+     * panel stuck mid-air with its listeners still attached.
+     */
+    const finish = () => {
+      const st = dragState.current;
       window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      const dropped = itemRefs.current.get(id);
-      if (dropped) {
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+      if (!st) return;
+
+      if (st.hold !== null) clearTimeout(st.hold);
+      if (st.frame !== null) cancelAnimationFrame(st.frame);
+      try {
+        node.releasePointerCapture(st.pointerId);
+      } catch {
+        // Already released, or never captured.
+      }
+
+      const dropped = itemRefs.current.get(st.id);
+      if (st.active && dropped) {
         const first = dropped.getBoundingClientRect();
         dropped.style.transform = '';
-        dropped.style.pointerEvents = '';
         const last = dropped.getBoundingClientRect();
         const dx = first.left - last.left;
         const dy = first.top - last.top;
@@ -439,13 +658,17 @@ export default function Dashboard() {
             { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
           );
         }
+      } else if (dropped) {
+        dropped.style.transform = '';
       }
+
       dragState.current = null;
       setDragId(null);
     };
 
     window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
     e.preventDefault();
   };
 

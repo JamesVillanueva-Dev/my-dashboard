@@ -55,6 +55,57 @@ describe('Dashboard', () => {
     expect(grips).toHaveLength(DEFAULT_LAYOUT.length);
   });
 
+  /** The grid item wrapping a grip — the element a drag transforms. */
+  const itemOf = (grip: HTMLElement) => grip.closest<HTMLElement>('[data-id]')!;
+
+  /**
+   * A pointer event jsdom can actually construct — it implements no
+   * `PointerEvent`, so this is a `MouseEvent` wearing the two fields the drag
+   * reads off it.
+   */
+  function pointerEvent(type: string, init: MouseEventInit & { pointerId?: number } = {}) {
+    const event = new MouseEvent(type, { bubbles: true, ...init });
+    Object.assign(event, { pointerId: init.pointerId ?? 1, pointerType: 'mouse' });
+    return event;
+  }
+
+  /** Presses the pointer on `grip` and moves it `dx` px, as a mouse would. */
+  function grab(grip: HTMLElement, dx = 0) {
+    grip.dispatchEvent(pointerEvent('pointerdown', { button: 0, clientX: 0, clientY: 0 }));
+    if (dx) window.dispatchEvent(pointerEvent('pointermove', { clientX: dx, clientY: 0 }));
+  }
+
+  it('does not lift a panel until the pointer has actually travelled', () => {
+    render(<Dashboard />);
+    const grip = screen.getAllByRole('button', { name: /^reorder /i })[0];
+    const item = itemOf(grip);
+
+    // A plain click, and a twitch smaller than the threshold.
+    grab(grip, 2);
+
+    expect(item.style.transform).toBe('');
+    window.dispatchEvent(pointerEvent('pointerup'));
+  });
+
+  it('leaves nothing stuck when a drag is cancelled mid-gesture', () => {
+    // A system gesture or a lost pointer fires `pointercancel` instead of
+    // `pointerup`. With only one exit path, that used to strand the panel
+    // mid-air with its listeners still attached.
+    render(<Dashboard />);
+    const grip = screen.getAllByRole('button', { name: /^reorder /i })[0];
+    const item = itemOf(grip);
+
+    grab(grip, 40);
+    window.dispatchEvent(pointerEvent('pointercancel'));
+
+    expect(item.style.transform).toBe('');
+    expect(item.style.pointerEvents).toBe('');
+
+    // And the gesture is genuinely over: further movement does nothing.
+    window.dispatchEvent(pointerEvent('pointermove', { clientX: 300, clientY: 0 }));
+    expect(item.style.transform).toBe('');
+  });
+
   it('reorders a widget with the arrow keys and announces the move', async () => {
     const user = userEvent.setup();
     render(<Dashboard />);

@@ -127,14 +127,27 @@
   outline-offset: 2px;
   border-radius: 4px;
 }
-/* Dashboard sets pointer-events:none on the lifted card, so :hover drops out
-   mid-drag — keep the grip lit until the drop. */
+/* The grip keeps the pointer captured for the whole drag, so :hover is not what
+   is keeping it lit once the card leaves the cursor — this is. */
 .container.isDragging .grip {
   opacity: 1;
   color: var(--accent);
 }
 .grip:active {
   cursor: grabbing;
+}
+
+/* A finger cannot hover, so the reveal-on-hover treatment leaves the grip
+   invisible — and the panel unreorderable — on a touch device. Show it, and give
+   it the 44px target `controls.module.css` argues for. */
+@media (pointer: coarse) {
+  .grip {
+    opacity: 0.6;
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    margin: -10px 0 -10px -10px;
+  }
 }
 
 /* ---------- Remove button ----------

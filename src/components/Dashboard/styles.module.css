@@ -55,15 +55,18 @@
 .item {
   min-width: 0;
   grid-column: span var(--cols, 1);
-  will-change: transform;
 }
 .item > * {
   height: var(--h, auto);
 }
+/* `will-change` only while it is actually moving. Left on every panel it gives a
+   dozen cards a permanent compositing layer, which costs memory the whole time
+   and buys nothing until a drag starts. */
 .item.isDragging {
   z-index: 100;
   position: relative;
   cursor: grabbing;
+  will-change: transform;
 }
 
 /* ---------- Empty state ---------- */
