@@ -34,52 +34,251 @@
   composes: empty from '../../styles/controls.module.css';
 }
 
-/* ---------- The picks ---------- */
-/* Numbered because the order *is* the ranking — it carries meaning here, unlike
-   the other list panels. */
+/* ---------- The picks ----------
+   One row per message, laid out the way a mail client lays one out: avatar,
+   then sender and age on a line, then the subject, then the preview. Reading
+   an inbox is a habit, so the panel borrows the shape that habit expects
+   rather than inventing a list of its own.
+
+   Still an <ol>: the order *is* the ranking. The numerals are gone because the
+   avatar column says more in the same space, and the order remains visible in
+   the one way that matters — top to bottom. */
 .list {
-  list-style: decimal;
+  list-style: none;
   margin: 0;
-  padding-left: 1.4em;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 2px;
 }
 
-.list li::marker {
-  color: var(--text-muted);
-  font-size: 0.8rem;
+.list li {
+  display: flex;
+  gap: 11px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  /* Transparent at rest so the hover state changes colour, not layout. */
+  border: 1px solid transparent;
+  /* Anchors the row-wide hit area `.subject::after` paints. */
+  position: relative;
+  transition: background 0.15s, border-color 0.15s;
 }
 
-.list a {
+/* Hovering lifts one row to the raised surface, the same --card/--well pairing
+   the dashboard uses everywhere else to say "this one". */
+.list li:hover {
+  background: var(--card);
+  border-color: var(--card-border);
+}
+
+/* The text column beside the avatar. `min-width: 0` is what lets the lines
+   below actually truncate instead of stretching the row. */
+.list li > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Sender on the left, age pinned right — baseline-aligned so the two sizes sit
+   on one line rather than near it. */
+.list header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.list header span {
+  font-size: 0.78rem;
   font-weight: 600;
-  font-size: 0.95rem;
-  line-height: 1.3;
-  display: block;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Sender. */
-.meta {
-  composes: muted small from '../../styles/controls.module.css';
-  margin: 2px 0 0;
+.list time {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-/* The one-line justification — the reason this panel exists at all, so it takes
-   the accent rather than the muted treatment the sender line uses. */
-.reason {
-  margin: 4px 0 0;
-  font-size: 0.82rem;
-  line-height: 1.4;
+/* ---------- Avatar ----------
+   A sender's initial, which is enough to tell three rows apart at a glance.
+   Outlined for mail already read, filled for unread — so "new" is carried by
+   the one element that has room to carry it. */
+.avatar {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 650;
+  line-height: 1;
+  user-select: none;
+}
+
+.isUnread .avatar {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* ---------- Subject ----------
+   The line you read, so it takes the body colour and no underline; two lines
+   at most, because a third pushes the preview out of the panel. */
+.subject {
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 550;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.isUnread .subject {
+  font-weight: 680;
+}
+
+/* The whole row opens the message — the link stretches over it, so there is no
+   thin line of text to aim at. It stays an <a> around the subject alone, so its
+   accessible name is the subject and the sender line is not read into it. */
+.subject::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.list li:hover .subject {
   color: var(--accent);
 }
 
+/* Keyboard focus has to ring the row the click covers, not the text. */
+.subject:focus-visible {
+  outline: none;
+}
+.subject:focus-visible::after {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+/* Gmail's own preview, one line of it. Quietest thing in the row: it is there
+   to disambiguate two similar subjects, not to be read. */
+.list li p {
+  margin: 1px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The one-line justification — the reason this panel exists at all, so it takes
+   the accent. A chip rather than a sentence: it repeats across rows, and three
+   identical accent-coloured sentences shout in a way three small chips do not. */
+.list li p.reason {
+  align-self: flex-start;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 550;
+}
+
+/* ---------- Loading ----------
+   Three placeholder rows in the shape of the answer. */
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.skeleton > div {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 10px;
+}
+
+.skeleton > div > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.skeleton span {
+  display: block;
+  background: var(--card-border);
+  border-radius: 6px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton > div > span {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+.skeleton > div > div span:first-child {
+  width: 35%;
+  height: 8px;
+}
+.skeleton > div > div span:last-child {
+  width: 78%;
+  height: 11px;
+  animation-delay: 0.15s;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton span {
+    animation: none;
+  }
+}
+
+/* ---------- Footer note ---------- */
 .hint {
   composes: muted small from '../../styles/controls.module.css';
   margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--card-border);
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
+/* Touch: the rows are the panel, so they get a thumb-sized band. There is no
+   hover to reveal the raised surface either, so the separation has to be
+   drawn — hairlines between rows, none after the last. */
 @media (pointer: coarse) {
-  .list {
-    gap: 18px;
+  .list li {
+    padding: 12px 10px;
+    border-radius: 0;
+    border-bottom-color: var(--card-border);
+  }
+  .list li:last-child {
+    border-bottom-color: transparent;
   }
 }

@@ -23,6 +23,25 @@ const TTL_MS = 5 * 60 * 1000;
 const gmailUrl = (id: string) => `https://mail.google.com/mail/u/0/#inbox/${id}`;
 
 /**
+ * Age of a message, at the width a mail row can spare: `now`, `12m`, `3h`, `2d`.
+ *
+ * Nothing longer is needed — candidates are capped at a week old (`gmail.ts`) —
+ * and nothing longer would fit beside the sender without pushing on it.
+ */
+function timeAgo(at: number): string {
+  const minutes = Math.max(0, Math.floor((Date.now() - at) / 60_000));
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours}h` : `${Math.floor(hours / 24)}d`;
+}
+
+/** First letter of the sender, for the avatar disc. `?` when nothing parses. */
+function initial(sender: string): string {
+  return sender.match(/[a-z0-9]/i)?.[0].toUpperCase() ?? '?';
+}
+
+/**
  * The full arithmetic behind one pick, for the `title` tooltip.
  *
  * This is the advantage a local heuristic has over asking a model: when the
@@ -111,7 +130,23 @@ export default function MailWidget() {
       );
     }
 
-    if (ranking.status === 'loading') return <p className={styles.empty}>Reading your inbox…</p>;
+    if (ranking.status === 'loading') {
+      // Placeholder rows rather than a line of text: they occupy the shape the
+      // answer will take, so the panel does not jump when it arrives.
+      return (
+        <div className={styles.skeleton} role="status" aria-label="Reading your inbox">
+          {[0, 1, 2].map((row) => (
+            <div key={row}>
+              <span />
+              <div>
+                <span />
+                <span />
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
 
     if (ranking.status === 'error') {
       return (
@@ -131,15 +166,41 @@ export default function MailWidget() {
 
     return (
       <ol className={styles.list}>
-        {picks.map((pick) => (
-          <li key={pick.message.id} title={breakdown(pick)}>
-            <a href={gmailUrl(pick.message.id)} target="_blank" rel="noreferrer">
-              {pick.message.subject || '(no subject)'}
-            </a>
-            <p className={styles.meta}>{senderName(pick.message.from)}</p>
-            <p className={styles.reason}>{pick.reason}</p>
-          </li>
-        ))}
+        {picks.map((pick) => {
+          const { message } = pick;
+          const sender = senderName(message.from);
+          return (
+            <li
+              key={message.id}
+              className={message.unread ? styles.isUnread : undefined}
+              title={breakdown(pick)}
+            >
+              <span className={styles.avatar} aria-hidden="true">
+                {initial(sender)}
+              </span>
+              <div>
+                <header>
+                  <span>{sender}</span>
+                  <time dateTime={new Date(message.receivedAt).toISOString()}>
+                    {timeAgo(message.receivedAt)}
+                  </time>
+                </header>
+                {/* The link covers the whole row (see `.subject::after`), but its
+                    accessible name stays the subject alone. */}
+                <a
+                  className={styles.subject}
+                  href={gmailUrl(message.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {message.subject || '(no subject)'}
+                </a>
+                {message.snippet && <p>{message.snippet}</p>}
+                <p className={styles.reason}>{pick.reason}</p>
+              </div>
+            </li>
+          );
+        })}
       </ol>
     );
   };
