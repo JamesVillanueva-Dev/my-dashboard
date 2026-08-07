@@ -29,6 +29,38 @@ interface Player {
   getVideoData(): VideoData | undefined;
   /** Jumps to a position in the playlist and plays it. */
   playVideoAt(index: number): void;
+  /** Seconds elapsed in the current item. */
+  getCurrentTime(): number;
+  /** {@link PLAYING} while playing; other codes are paused, buffering, ended. */
+  getPlayerState(): number;
+  /** Jumps within the current item. */
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
+  /** Starts, or resumes, playback. */
+  playVideo(): void;
+}
+
+/** `YT.PlayerState.PLAYING`. The only state this hook needs to tell apart. */
+const PLAYING = 1;
+
+/**
+ * How often the player's position is read, in ms.
+ *
+ * This is the resolution a resumed track lands at, and it costs almost nothing:
+ * `getCurrentTime` answers from a value the player already pushes to this window
+ * as it plays, so a sample is a property read rather than a round trip.
+ */
+const SAMPLE_MS = 500;
+
+/** Where playback had got to, carried across a reload of the embed. */
+interface Resume {
+  /** The item that was playing — what identifies it in the reloaded playlist. */
+  videoId: string;
+  /** Its position in the playlist, or `-1` for a standalone video. */
+  index: number;
+  /** Seconds elapsed in it. */
+  seconds: number;
+  /** Whether it was playing, as opposed to paused, when the embed went away. */
+  playing: boolean;
 }
 
 /** Every player event this hook listens for carries the player that raised it. */
@@ -93,7 +125,8 @@ type Queue = Pick<Playlist, 'items' | 'index' | 'title'>;
 const EMPTY: Queue = { items: [], index: -1, title: null };
 
 /**
- * Reads the playlist out of a YouTube embed and lets the page jump around it.
+ * Reads the playlist out of a YouTube embed and lets the page jump around it,
+ * and puts playback back where it was when the embed is rebuilt.
  *
  * The embed plays a playlist perfectly well on its own; what it does not do is
  * *say* that it is one. Its chrome shows a video, then another video, with the
@@ -101,13 +134,23 @@ const EMPTY: Queue = { items: [], index: -1, title: null };
  * panel draws that queue itself: which videos are in the list, which one is
  * playing, and a way to pick another.
  *
- * Deliberately read-only over playback — no volume, no play/pause, no skip. Those
- * are already drawn inside the player, and ADR 0007 turned down rebuilding them;
- * the queue is the part that has nowhere else to appear (ADR 0012).
+ * The second job comes from the panel's full-screen view. Moving an `<iframe>`
+ * to another parent destroys its browsing context — that is the HTML spec, not
+ * something React can route around — so opening or closing that view hands the
+ * widget a *new* embed, back at the first track from zero. This hook samples the
+ * position while a player is attached and, because it outlives any one embed,
+ * restores it on the next: same track, same offset, still playing. What the user
+ * sees is a video that jumps size, not one that starts over.
+ *
+ * Deliberately read-only over playback otherwise — no volume, no play/pause, no
+ * skip. Those are already drawn inside the player, and ADR 0007 turned down
+ * rebuilding them; the queue is the part that has nowhere else to appear
+ * (ADR 0012), and a resume is the panel repairing its own damage rather than a
+ * transport control.
  *
  * Entirely best-effort. If the API script is blocked or slow, every field stays
- * empty and the caller simply renders no queue — the embed underneath is
- * untouched and still plays.
+ * empty, nothing is restored, and the caller simply renders no queue — the embed
+ * underneath is untouched and still plays.
  *
  * @param frame - The embed to read, or `null` to attach to nothing. Must have
  *   been rendered with `enablejsapi=1`, or the player will never answer.
@@ -122,6 +165,9 @@ export function useYouTubePlaylist(frame: HTMLIFrameElement | null): Playlist {
     frame,
   });
   const playerRef = useRef<Player | null>(null);
+  // Outlives every embed this hook is pointed at, which is the whole point: the
+  // player that recorded the position is gone by the time one restores it.
+  const resumeRef = useRef<Resume | null>(null);
 
   if (state.frame !== frame) setState({ ...EMPTY, frame });
 
@@ -130,8 +176,20 @@ export function useYouTubePlaylist(frame: HTMLIFrameElement | null): Playlist {
     if (!frame) return;
 
     let attached = true;
+    /** Set when a resume is waiting on the player to reach the saved track. */
+    let seekTo: Resume | null = null;
+
     const read = ({ target }: PlayerEvent) => {
       if (!attached) return;
+      const videoId = target.getVideoData()?.video_id;
+      // `playVideoAt` below only gets playback to the right track; the offset
+      // has to wait until that track is the one loaded, or the seek would land
+      // in whichever video the player was still showing.
+      if (seekTo && videoId === seekTo.videoId) {
+        target.seekTo(seekTo.seconds, true);
+        if (seekTo.playing) target.playVideo();
+        seekTo = null;
+      }
       setState({
         frame,
         items: target.getPlaylist() ?? [],
@@ -140,6 +198,44 @@ export function useYouTubePlaylist(frame: HTMLIFrameElement | null): Playlist {
       });
     };
 
+    /** Records where playback is, for whichever embed comes next. */
+    const sample = () => {
+      const player = playerRef.current;
+      const videoId = player?.getVideoData()?.video_id;
+      if (!player || !videoId) return;
+      resumeRef.current = {
+        videoId,
+        index: player.getPlaylistIndex(),
+        seconds: player.getCurrentTime(),
+        playing: player.getPlayerState() === PLAYING,
+      };
+    };
+
+    /**
+     * Puts a freshly loaded embed back where the last one left off.
+     *
+     * A resume is spent whether or not it is used: it describes one particular
+     * embed going away, and the next one either inherits it or has no business
+     * with it at all. Switching source is that second case — the saved track is
+     * not in the playlist that just loaded, so nothing is restored.
+     */
+    const restore = ({ target }: PlayerEvent) => {
+      const saved = resumeRef.current;
+      resumeRef.current = null;
+      if (!saved) return;
+      const here = target.getVideoData()?.video_id;
+      if (saved.videoId !== here && !(target.getPlaylist() ?? []).includes(saved.videoId)) return;
+      if (saved.videoId === here) {
+        target.seekTo(saved.seconds, true);
+        if (saved.playing) target.playVideo();
+      } else {
+        target.playVideoAt(saved.index);
+        seekTo = saved;
+      }
+    };
+
+    let timer: ReturnType<typeof setInterval> | undefined;
+
     loadApi()
       .then((YT) => {
         if (!attached) return;
@@ -147,7 +243,17 @@ export function useYouTubePlaylist(frame: HTMLIFrameElement | null): Playlist {
         // — which is what moves the highlight as one video ends and the next
         // starts, without this hook polling for it.
         playerRef.current = new YT.Player(frame, {
-          events: { onReady: read, onStateChange: read },
+          events: {
+            onReady: (event) => {
+              restore(event);
+              read(event);
+              // Only once there is a player to ask, and only after the restore
+              // above has had the saved position — a sample from a player still
+              // sitting at zero would overwrite the very thing being restored.
+              timer = setInterval(sample, SAMPLE_MS);
+            },
+            onStateChange: read,
+          },
         });
       })
       // No API, no queue. The embed itself is unaffected, so there is nothing
@@ -157,6 +263,7 @@ export function useYouTubePlaylist(frame: HTMLIFrameElement | null): Playlist {
     return () => {
       attached = false;
       playerRef.current = null;
+      clearInterval(timer);
       // Deliberately no `player.destroy()`: it removes the iframe from the DOM,
       // and that element belongs to React. Dropping the reference is enough —
       // the player has no timers of its own, and it goes quiet the moment React

@@ -150,6 +150,9 @@ export default function NewsWidget() {
     <Widget
       title="News"
       className={styles.container}
+      // Eight headlines and a row of source tabs, in a card that fits about
+      // four of them — this is the panel with the most to gain from the room.
+      expandable
       action={
         <>
           <button

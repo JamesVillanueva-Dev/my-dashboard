@@ -209,6 +209,9 @@ export default function MailWidget() {
     <Widget
       title="Mail"
       className={styles.container}
+      // Each pick carries a subject, a preview, and the reason it was picked.
+      // Those three lines are what get truncated first at card width.
+      expandable
       action={
         connected && (
           <button

@@ -160,16 +160,17 @@ function namesPrivateList(raw: string): boolean {
  * dashboard that otherwise keeps everything in this browser (ADR 0001).
  */
 function embedUrl(src: Source): string {
+  // Opts the embed into the IFrame API, which is the only way the page can ask
+  // it what is in the queue (ADR 0012) — and, since the panel gained a
+  // full-screen view, the only way to hand playback back to the embed that
+  // replaces this one. That second reason applies to a standalone video as much
+  // as to a playlist, which is why this is no longer set for playlists alone.
+  // `origin` is the security half of the handshake: the player will only answer
+  // this page.
   const params = new URLSearchParams({ rel: '0' });
-  if (src.listId) {
-    params.set('list', src.listId);
-    // Opts the embed into the IFrame API, which is the only way the page can ask
-    // it what is in the queue (ADR 0012). `origin` is the security half of that
-    // handshake: the player will only answer this page. Set for playlists alone,
-    // since a single video has no queue to read.
-    params.set('enablejsapi', '1');
-    params.set('origin', window.location.origin);
-  }
+  if (src.listId) params.set('list', src.listId);
+  params.set('enablejsapi', '1');
+  params.set('origin', window.location.origin);
   return `https://www.youtube-nocookie.com/embed/${src.videoId ?? VIDEOSERIES}?${params}`;
 }
 
@@ -215,7 +216,10 @@ export default function YouTubeWidget() {
   const sources = repairSources(stored);
   const current = sources.find((s) => s.id === currentId) ?? sources[0];
 
-  const queue = useYouTubePlaylist(current?.listId ? frame : null);
+  // Attached to every source, not just playlists: a standalone video has no
+  // queue to draw, but it still has a position to keep across the full-screen
+  // view. `items` stays empty for one, so the strip below is unaffected.
+  const queue = useYouTubePlaylist(frame);
   const strip = useRef<HTMLOListElement>(null);
 
   // Follow playback along the strip, so the thumbnail that is playing is on
@@ -290,6 +294,11 @@ export default function YouTubeWidget() {
     <Widget
       title="YouTube"
       className={styles.container}
+      // A video is the one thing here that is *only* better bigger. The embed
+      // reloads on the way in and out — moving an iframe in the DOM discards its
+      // browsing context, and no amount of React avoids that — so the widget
+      // hands the player back its place with `resumeAt` below.
+      expandable
       action={
         <button
           className={styles.toggle}

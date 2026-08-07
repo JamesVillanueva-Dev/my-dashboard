@@ -5,6 +5,17 @@
   line-height: 1.5;
 }
 
+/* Full screen, the point is the writing space — a card-sized box floating in a
+   full-screen dialog would be the joke version of this feature. The dialog body
+   is a flex column, so the textarea takes everything the note about local
+   storage leaves behind, and the drag-to-resize grip goes away with nowhere
+   left to drag to. */
+.container[data-expanded] textarea {
+  flex: 1;
+  min-height: 0;
+  resize: none;
+}
+
 /* The "saved" flash in the widget header. */
 .status {
   composes: muted small from '../../styles/controls.module.css';
