@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Icon from '../Icon';
 import { useAura } from '../../hooks/useAura';
+import { useDashboardData } from '../../hooks/useDashboardData';
 import { useDismiss } from '../../hooks/useDismiss';
 import { useTheme } from '../../hooks/useTheme';
 import { THEMES, themeById } from '../../lib/themes';
@@ -35,12 +36,14 @@ function Swatch({ theme }: { theme: Theme }) {
  * so "Follow system" is one of the options rather than a separate switch — it
  * is a peer choice, not a modifier on top of a chosen palette.
  *
- * Below them sits the background section, which is only rendered on a device
- * with a pointer to follow — see {@link useAura}.
+ * Below them sit two sections that each render only where they can do anything:
+ * the background effect needs a pointer to follow (see {@link useAura}), and due
+ * notices need a browser that has the Notification API at all.
  */
 export default function Settings() {
   const { preference, setPreference, system } = useTheme();
   const aura = useAura();
+  const { notify } = useDashboardData();
   const [open, setOpen] = useState(false);
   const ref = useDismiss<HTMLDivElement>(open, () => setOpen(false));
 
@@ -106,6 +109,29 @@ export default function Settings() {
                     />
                     <Icon name="sun" />
                     Aura follows the cursor
+                  </label>
+                </li>
+              </ul>
+            </>
+          )}
+          {notify.supported && (
+            <>
+              <p id="notifications-heading">Notifications</p>
+              <ul aria-labelledby="notifications-heading">
+                <li>
+                  {/* Disabled rather than hidden once refused: the row is where
+                      someone comes looking for this, so it has to explain why
+                      it will not switch on instead of vanishing. */}
+                  <label className={notify.blocked ? styles.isBlocked : undefined}>
+                    <input
+                      type="checkbox"
+                      checked={notify.active}
+                      disabled={notify.blocked}
+                      onChange={(e) => notify.setEnabled(e.target.checked)}
+                    />
+                    <Icon name="alarm" />
+                    Remind me when a task is due
+                    {notify.blocked && <small>Blocked</small>}
                   </label>
                 </li>
               </ul>

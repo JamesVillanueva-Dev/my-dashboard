@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { CalendarSync } from './useCalendarSync';
+import type { TaskNotifications } from './useTaskNotifications';
 import type { UpcomingEvents } from './useUpcomingEvents';
 import type { AgendaCounts, AgendaItem } from '../lib/agenda';
 import type { Reminder } from '../lib/gcalSync';
@@ -31,6 +32,12 @@ export interface DashboardData {
   agenda: AgendaItem[];
   /** Aggregate figures for the Today zone's stat strip. */
   counts: AgendaCounts;
+  /**
+   * Browser notifications when a task comes due. Lives here rather than in the
+   * settings menu that switches it on, so it keeps running while that menu is
+   * closed — and so there is only ever one copy of the choice.
+   */
+  notify: TaskNotifications;
   /** Current time, advancing once a minute. Render from this, not `Date.now()`. */
   now: number;
 }
