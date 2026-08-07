@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import Icon, { type IconName } from '../Icon';
+import { WidgetExpandedProvider } from './expanded';
 import styles from './styles.module.css';
 
 /** Props for {@link WidgetModal}. */
@@ -121,7 +122,9 @@ export default function WidgetModal({
             </button>
           </div>
         </header>
-        <div className={styles.body}>{children}</div>
+        <div className={styles.body}>
+          <WidgetExpandedProvider value={true}>{children}</WidgetExpandedProvider>
+        </div>
       </div>
     </div>,
     document.body,
