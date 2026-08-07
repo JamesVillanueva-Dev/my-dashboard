@@ -155,6 +155,96 @@
   font-size: 0.76rem;
 }
 
+/* ---------- Recently dismissed ----------
+   Full screen only (see `useWidgetExpanded`). Deliberately quieter than the
+   picks above it: this is a drawer you open when you want something back, not a
+   second inbox competing with the first. */
+.recent {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border);
+}
+
+.recent > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.recent h3 {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.recent ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Sender, then subject taking the slack, then the way back. */
+.recent li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  font-size: 0.82rem;
+}
+.recent li:hover {
+  background: var(--bg);
+}
+
+.recent li span:first-child {
+  flex: 0 0 auto;
+  max-width: 30%;
+  font-weight: 600;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The subject. Dimmed, because it is no longer something you are being asked
+   to read — it is a label on a thing you can take back. */
+.recent li span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent li button {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+}
+
+/* The standing reassurance that nothing was destroyed. */
+.recent > p {
+  margin: 10px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+@media (pointer: coarse) {
+  .recent li {
+    padding: 10px;
+  }
+}
+
 /* ---------- Avatar ----------
    A sender's initial, which is enough to tell three rows apart at a glance.
    Outlined for mail already read, filled for unread — so "new" is carried by

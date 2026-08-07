@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Widget from '../Widget';
 import Icon from '../Icon';
+import { useWidgetExpanded } from '../WidgetModal/expanded';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useCachedResource } from '../../hooks/useCachedResource';
 import { hasGoogleClientId } from '../../lib/googleAuth';
@@ -52,6 +53,89 @@ function breakdown({ score, signals }: RankedMail): string {
     s.factor === 1 ? `${s.key} ${s.points >= 0 ? '+' : ''}${s.points}` : `${s.key} ×${s.factor.toFixed(2)}`,
   );
   return `score ${score} — ${parts.join(', ')}`;
+}
+
+/** Props for {@link Dismissed}. */
+interface DismissedProps {
+  /** The dismissed messages still in the ranking, newest dismissal first. */
+  picks: RankedMail[];
+  /** Brings one message back. */
+  onRestore: (id: string) => void;
+  /** Brings all of them back. */
+  onRestoreAll: () => void;
+}
+
+/**
+ * What has been dismissed, and how to take it back.
+ *
+ * Two forms of the same thing, because the panel has two sizes. The card gets a
+ * single line and a way to undo the lot: it has room for three messages, and
+ * spending one of those rows on mail you already waved away would defeat the
+ * dismissing. Full screen gets the messages themselves, each with its own
+ * Restore — which is where you would go looking, having dismissed one and
+ * changed your mind.
+ *
+ * A component rather than something {@link MailWidget} decides inline, because
+ * only a component *inside* the widget body can read {@link useWidgetExpanded}.
+ * `MailWidget` builds that body, so it sits above the provider the dialog wraps
+ * it in and would read `false` even at full screen.
+ *
+ * Says "dismissed" throughout, never "deleted": the messages are untouched in
+ * Gmail, and a panel wired to someone's real inbox has no business implying
+ * otherwise.
+ *
+ * @param props - See {@link DismissedProps}.
+ */
+function Dismissed({ picks, onRestore, onRestoreAll }: DismissedProps) {
+  const expanded = useWidgetExpanded();
+  if (picks.length === 0) return null;
+
+  if (!expanded) {
+    return (
+      <p className={styles.hiddenNote}>
+        {picks.length} dismissed{' '}
+        <button className={styles.link} onClick={onRestoreAll}>
+          Restore
+        </button>
+      </p>
+    );
+  }
+
+  return (
+    <section className={styles.recent}>
+      <header>
+        <h3>Recently dismissed</h3>
+        {/* Restoring six one at a time is a chore nobody should have to do. */}
+        {picks.length > 1 && (
+          <button className={styles.link} onClick={onRestoreAll}>
+            Restore all
+          </button>
+        )}
+      </header>
+      <ul>
+        {picks.map(({ message }) => {
+          const subject = message.subject || '(no subject)';
+          return (
+            <li key={message.id}>
+              <span>{senderName(message.from)}</span>
+              <span>{subject}</span>
+              <button
+                className={styles.link}
+                onClick={() => onRestore(message.id)}
+                aria-label={`Restore ${subject}`}
+              >
+                Restore
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <p>
+        Dismissing only hides a message here — nothing was removed from Gmail. These drop off
+        the list as they age out of the last seven days.
+      </p>
+    </section>
+  );
 }
 
 /**
@@ -110,8 +194,19 @@ export default function MailWidget() {
   const kept = ranked.filter((pick) => !hidden.has(pick.message.id));
   /** The window onto the ranking: the best few that are still wanted. */
   const picks = kept.slice(0, TOP_N);
-  /** How many of the messages currently worth showing have been waved away. */
-  const hiddenCount = ranked.length - kept.length;
+
+  /**
+   * What has been dismissed, newest dismissal first.
+   *
+   * Derived from the ranking rather than stored: the messages are still in it —
+   * being hidden is what `dismissed` does — so there is nothing to keep in
+   * storage beyond the ids already there. It expires correctly for free, too. A
+   * message that ages out of the ranking leaves this list on the same pass that
+   * prunes its id, so "recently" stays true without a clock to enforce it.
+   */
+  const dismissedPicks = ranked
+    .filter((pick) => hidden.has(pick.message.id))
+    .sort((a, b) => dismissed.indexOf(b.message.id) - dismissed.indexOf(a.message.id));
 
   /**
    * Forgets dismissals for mail that has left the ranking.
@@ -142,12 +237,6 @@ export default function MailWidget() {
     }
   };
 
-  /** Brings every dismissed message back. One element, used by both states. */
-  const restoreButton = (
-    <button className={styles.link} onClick={() => setDismissed([])}>
-      Restore
-    </button>
-  );
 
   const body = () => {
     if (!configured) {
@@ -203,20 +292,17 @@ export default function MailWidget() {
       );
     }
 
-    if (picks.length === 0) {
-      // Two different nothings: an inbox with nothing in it worth your time, and
-      // one you have already cleared by hand. The second comes with its way back.
-      return hiddenCount > 0 ? (
-        <p className={styles.empty}>
-          That’s everything — you’ve dismissed the rest. {restoreButton}
-        </p>
-      ) : (
-        <p className={styles.empty}>Nothing in the last week needs you. Enjoy it.</p>
-      );
+    if (picks.length === 0 && dismissedPicks.length === 0) {
+      return <p className={styles.empty}>Nothing in the last week needs you. Enjoy it.</p>;
     }
 
     return (
       <>
+        {/* Distinct from an inbox that never had anything: this one you emptied
+            by hand, and the way back is directly below. */}
+        {picks.length === 0 ? (
+          <p className={styles.empty}>That’s everything — you’ve dismissed the rest.</p>
+        ) : (
         <ol className={styles.list}>
           {picks.map((pick) => {
             const { message } = pick;
@@ -262,14 +348,15 @@ export default function MailWidget() {
             );
           })}
         </ol>
+        )}
 
         {/* Says what is being kept from you, and undoes it. Without this a
             dismissal is a one-way door with no sign on it. */}
-        {hiddenCount > 0 && (
-          <p className={styles.hiddenNote}>
-            {hiddenCount} dismissed {restoreButton}
-          </p>
-        )}
+        <Dismissed
+          picks={dismissedPicks}
+          onRestore={(id) => setDismissed(dismissed.filter((kept) => kept !== id))}
+          onRestoreAll={() => setDismissed([])}
+        />
       </>
     );
   };

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MailWidget from './index';
 import type { MailSummary } from '../../lib/gmail';
@@ -316,6 +316,84 @@ describe('MailWidget — dismissing a pick', () => {
       expect(window.localStorage.getItem('mail.dismissed')).toBe(JSON.stringify(['a'])),
     );
     expect(screen.queryByText('Subject a')).not.toBeInTheDocument();
+  });
+
+  it('keeps the recently-dismissed list out of the card, which has no room for it', async () => {
+    connected();
+    const user = userEvent.setup();
+    render(<MailWidget />);
+
+    await screen.findByText('Subject a');
+    await dismiss(user, 'Subject a');
+
+    // The card gets the one-line count; spending one of three rows on mail you
+    // already waved away would defeat the dismissing.
+    expect(await screen.findByText(/1 dismissed/)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Recently dismissed' })).not.toBeInTheDocument();
+  });
+
+  it('lists what was dismissed, newest first, once opened full screen', async () => {
+    connected();
+    const user = userEvent.setup();
+    render(<MailWidget />);
+
+    await screen.findByText('Subject a');
+    await dismiss(user, 'Subject a');
+    await dismiss(user, 'Subject b');
+    await user.click(screen.getByRole('button', { name: 'Show Mail full screen' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      within(dialog).getByRole('heading', { name: 'Recently dismissed' }),
+    ).toBeInTheDocument();
+    // Most recently dismissed leads — `b` went second, so it comes first.
+    const restores = within(dialog).getAllByRole('button', { name: /^Restore Subject/ });
+    expect(restores.map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Restore Subject b',
+      'Restore Subject a',
+    ]);
+  });
+
+  it('takes one message back without disturbing the others', async () => {
+    connected();
+    state.rankMail.mockReturnValue(ranked(['a', 'b', 'c', 'd', 'e']));
+    const user = userEvent.setup();
+    render(<MailWidget />);
+
+    await screen.findByText('Subject a');
+    await dismiss(user, 'Subject a');
+    await dismiss(user, 'Subject b');
+    await user.click(screen.getByRole('button', { name: 'Show Mail full screen' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Restore Subject a' }));
+
+    // `a` outranks everything, so it returns to the top of the picks.
+    await waitFor(() =>
+      expect(within(screen.getByRole('dialog')).getAllByRole('link')[0]).toHaveAccessibleName(
+        'Subject a',
+      ),
+    );
+    // `b` was not touched, so it stays on the list.
+    expect(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Restore Subject b' }),
+    ).toBeInTheDocument();
+  });
+
+  it('says plainly that nothing was removed from Gmail', async () => {
+    connected();
+    const user = userEvent.setup();
+    render(<MailWidget />);
+
+    await screen.findByText('Subject a');
+    await dismiss(user, 'Subject a');
+    await user.click(screen.getByRole('button', { name: 'Show Mail full screen' }));
+
+    // The panel reads someone's real inbox; a list of set-aside mail must not
+    // leave them wondering whether it was deleted.
+    expect(
+      await within(await screen.findByRole('dialog')).findByText(/nothing was removed from Gmail/i),
+    ).toBeInTheDocument();
   });
 
   it('does not forget dismissals while the ranking is still loading', async () => {
