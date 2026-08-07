@@ -96,6 +96,17 @@
   height: 100%;
 }
 
+/* Full screen the constraint flips: height is what's scarce, not width. The
+   player takes whatever the tabs and the queue strip leave, and `align-self`
+   lets 16:9 decide the width from it — so the video grows to fill the dialog
+   without ever pushing the queue off the bottom of it. */
+.container[data-expanded] .frame {
+  flex: 1;
+  min-height: 0;
+  align-self: center;
+  max-width: 100%;
+}
+
 /* ---------- Playlist queue ----------
    A strip of thumbnails under the player: what is in the list, where playback
    has got to, and a way to jump. Only rendered for a playlist, which is what

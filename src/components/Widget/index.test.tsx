@@ -22,11 +22,11 @@ function chrome(over: Partial<WidgetChrome> = {}): WidgetChrome {
 }
 
 /** Renders a widget inside the grid, as the dashboard does. */
-function renderInGrid(over: Partial<WidgetChrome> = {}) {
+function renderInGrid(over: Partial<WidgetChrome> = {}, props: { expandable?: boolean } = {}) {
   const value = chrome(over);
   const utils = render(
     <WidgetChromeProvider value={value}>
-      <Widget title="Weather" icon="cloudSun">
+      <Widget title="Weather" icon="cloudSun" {...props}>
         <p>18°C</p>
       </Widget>
     </WidgetChromeProvider>,
@@ -74,6 +74,54 @@ describe('Widget', () => {
     const card = container.querySelector('section')!;
     expect(card).toHaveClass(styles.container);
     expect(card).toHaveClass('weather-root');
+  });
+
+  describe('full screen', () => {
+    it('offers no expand button unless the widget asks for one', () => {
+      render(<Widget title="Weather">18°C</Widget>);
+
+      expect(screen.queryByRole('button', { name: /full screen/ })).not.toBeInTheDocument();
+    });
+
+    it('reopens the body in a dialog, and hands it back on close', () => {
+      render(
+        <Widget title="Notes" expandable>
+          <p>my note</p>
+        </Widget>,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Show Notes full screen' }));
+
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).getByText('my note')).toBeInTheDocument();
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Close Notes' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByText('my note')).toBeInTheDocument();
+    });
+
+    it('draws the body in one place at a time, so nothing is mounted twice', () => {
+      render(
+        <Widget title="Notes" expandable>
+          <p>my note</p>
+        </Widget>,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Show Notes full screen' }));
+
+      // Would throw on a second copy behind the dialog.
+      expect(screen.getByText('my note')).toBeInTheDocument();
+    });
+
+    it('leaves the card its slot in the grid, with a way back', () => {
+      const { container } = renderInGrid({}, { expandable: true });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Show Weather full screen' }));
+      expect(container.querySelector('section')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Bring it back' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
   });
 
   describe('outside the dashboard grid', () => {

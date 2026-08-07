@@ -5,8 +5,10 @@ import YouTubeWidget from './index';
 import styles from './styles.module.css';
 
 /**
- * The tail every playlist embed carries: the IFrame API opt-in that lets the
- * queue below the player read the list, locked to this page's origin.
+ * The tail every embed carries: the IFrame API opt-in that lets the queue below
+ * the player read the list — and lets playback be handed to the embed that
+ * replaces this one when the panel opens full screen — locked to this page's
+ * origin.
  */
 const JSAPI = `enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`;
 
@@ -23,12 +25,16 @@ async function addSource(user: ReturnType<typeof userEvent.setup>, link: string,
  * to a cross-origin frame — neither of which exists in jsdom. Reports `items` as
  * the loaded playlist and answers `onReady` a tick later, as the real API does.
  */
-function stubPlayerApi(items: string[], index = 0) {
+function stubPlayerApi(items: string[] | null, index = 0) {
   const player = {
     getPlaylist: () => items,
-    getPlaylistIndex: () => index,
-    getVideoData: () => ({ video_id: items[index], title: `Track ${index + 1}` }),
+    getPlaylistIndex: () => (items ? index : -1),
+    getVideoData: () => ({ video_id: items?.[index] ?? 'dQw4w9WgXcQ', title: `Track ${index + 1}` }),
     playVideoAt: vi.fn(),
+    getCurrentTime: () => 0,
+    getPlayerState: () => 1,
+    seekTo: vi.fn(),
+    playVideo: vi.fn(),
   };
   vi.stubGlobal(
     'YT',
@@ -121,7 +127,7 @@ describe('YouTubeWidget', () => {
 
     expect(screen.getByTitle('YouTube – My Song')).toHaveAttribute(
       'src',
-      'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0',
+      `https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0&${JSAPI}`,
     );
     expect(localStorage.getItem('youtube.sources')).toContain('dQw4w9WgXcQ');
   });
@@ -176,7 +182,7 @@ describe('YouTubeWidget', () => {
     // list=WL would render "This video is unavailable"; the video alone plays.
     expect(screen.getByTitle('YouTube – Video')).toHaveAttribute(
       'src',
-      'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0',
+      `https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0&${JSAPI}`,
     );
   });
 
@@ -319,7 +325,10 @@ describe('YouTubeWidget', () => {
   });
 
   it('leaves a single video without a queue', async () => {
-    stubPlayerApi(['aaaaaaaaaaa', 'bbbbbbbbbbb']);
+    // What the real player answers for a lone video: it is attached, and asked,
+    // and says there is no playlist. The embed opts into the API either way now,
+    // so this is what keeps the strip off — not the absence of a player.
+    stubPlayerApi(null);
     window.localStorage.setItem(
       'youtube.sources',
       JSON.stringify([{ id: '9', label: 'My Song', videoId: 'dQw4w9WgXcQ', listId: null }]),
@@ -328,11 +337,9 @@ describe('YouTubeWidget', () => {
 
     render(<YouTubeWidget />);
 
-    // The embed never opts into the API for a lone video, so nothing can report
-    // a queue for it however loudly the player is stubbed.
     expect(screen.getByTitle('YouTube – My Song')).toHaveAttribute(
       'src',
-      'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0',
+      `https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0&${JSAPI}`,
     );
     await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
     expect(screen.queryByRole('button', { name: TRACKS })).not.toBeInTheDocument();

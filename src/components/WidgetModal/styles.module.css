@@ -1,0 +1,161 @@
+/* widget-modal
+   `.container` is the backdrop and the root; its only child is the dialog.
+   Deliberately the same treatment as the calendar's month dialog — a panel
+   opening full screen should not look like a different kind of surface. */
+.container {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 60;
+  animation: fade 0.15s ease;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The dialog itself. The widget's own root class rides alongside this one, so
+   its descendant rules keep styling the body they already style in the card. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 1080px;
+  /* A set height rather than one that hugs the content: a panel asked to go full
+     screen should arrive at full screen, not as a popup the size of the four
+     items it happens to be holding. The body scrolls inside it either way.
+     dvh, not vh: on a phone `vh` measures the viewport as if the address bar
+     were hidden, so a `vh`-sized dialog starts taller than the screen. */
+  height: min(90dvh, 760px);
+  overflow: hidden;
+}
+.panel:focus {
+  outline: none;
+}
+
+/* ---------- Header ---------- */
+.panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 650;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The icon is the only element inside the heading, accent-coloured as it is on
+   the card so the dialog reads as the same panel. */
+.panel h2 svg {
+  flex: 0 0 auto;
+  font-size: 1.2rem;
+  color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.close {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  font-size: 1.2rem;
+  line-height: 0;
+  color: var(--text-muted);
+}
+.close:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* ---------- Body ----------
+   The room the whole exercise is for. It takes the leftover height and scrolls,
+   so a long list is read here rather than in a card-sized window onto it. */
+.body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  padding: 18px;
+  /* A column, so a widget with one thing worth stretching — an editor, a canvas —
+     can claim the leftover height with `flex: 1` rather than guessing at a
+     viewport fraction. Everything else stacks exactly as it does in the card. */
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Phones: the dialog docks to the bottom ----------
+   Same reasoning as the calendar and legal dialogs — a phone has no room for a
+   margin on four sides, and a sheet reaching the bottom edge puts the content
+   under the thumb rather than at the top of the screen. */
+@media (max-width: 560px) {
+  .container {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .panel {
+    height: 94dvh;
+    border-width: 1px 0 0;
+    border-radius: var(--radius) var(--radius) 0 0;
+    animation: rise 0.24s cubic-bezier(0.2, 0, 0, 1);
+  }
+  .panel > header {
+    padding: 12px 14px;
+  }
+  .panel h2 {
+    font-size: 1.05rem;
+  }
+  /* The last row would otherwise sit under the home indicator. */
+  .body {
+    padding: 14px 14px calc(14px + var(--safe-bottom));
+  }
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(16px);
+  }
+}
+
+/* Touch: the close button is the smallest thing in the dialog and the one most
+   often aimed at. */
+@media (pointer: coarse) {
+  .close {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .container,
+  .panel {
+    animation: none;
+  }
+}

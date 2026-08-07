@@ -29,6 +29,8 @@ export default function NotesWidget() {
     <Widget
       title="Notes"
       className={styles.container}
+      // Writing more than a line or two in a card-sized textarea is miserable.
+      expandable
       action={
         <span className={styles.status}>
           {saved && notes ? (

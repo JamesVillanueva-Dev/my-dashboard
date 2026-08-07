@@ -86,6 +86,8 @@ export default function RemindersWidget() {
       title="Tasks"
       icon="checkSquare"
       className={styles.container}
+      // A task list only grows, and the card shows the top of it.
+      expandable
       action={
         /* Only two things live here — a count and, at most, one icon button.
            The old header also carried a "Synced" label and a "Disconnect" link,

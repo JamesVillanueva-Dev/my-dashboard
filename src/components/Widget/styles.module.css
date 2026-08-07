@@ -174,6 +174,42 @@
   opacity: 1;
 }
 
+/* ---------- Expand button ----------
+   Quiet until the panel is hovered, like the grip and the remove button: it
+   belongs to the shell, not to the widget's own header controls, and a panel at
+   rest should show only its content. */
+.expand {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 0;
+  padding: 2px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.container:hover .expand {
+  opacity: 0.6;
+}
+.expand:hover {
+  opacity: 1;
+  color: var(--accent);
+}
+/* Keyboard users need to see this even without hover. */
+.expand:focus-visible {
+  opacity: 1;
+}
+
+/* ---------- Body while the dialog has it ---------- */
+.away {
+  composes: muted small from '../../styles/controls.module.css';
+  margin: 0;
+}
+
+.back {
+  composes: link small from '../../styles/controls.module.css';
+}
+
 /* ---------- Resize handle ----------
    Sits in the corner both axes meet at, because one drag sets width and height
    together. Quiet until hover, like the other controls. */
@@ -235,13 +271,15 @@
 @media (hover: none) {
   .grip,
   .remove,
+  .expand,
   .handle {
     opacity: 0.55;
   }
 }
 @media (pointer: coarse) {
   .grip,
-  .remove {
+  .remove,
+  .expand {
     padding: 8px;
   }
   /* The handle is absolutely positioned, so it grows rather than pads. */
