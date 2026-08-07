@@ -1,5 +1,9 @@
 # Brief: make widget dragging stop feeling glitchy
 
+**Status: shipped.** This brief drove the work now described in
+[ADR 0011](adr/0011-drag-reorder-model.md) and `src/lib/dragOrder.ts`. Kept
+here as a historical record of the brief, not as an outstanding task.
+
 Paste everything below the line into a fresh Claude Code session in this repo.
 
 ---

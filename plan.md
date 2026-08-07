@@ -12,10 +12,15 @@ Google Calendar sync for Reminders is **already written** and unit-tested, per
 | Sync driver | [src/hooks/useCalendarSync.ts](src/hooks/useCalendarSync.ts) | Done — connect, 60s poll, debounced push |
 | Widget UI | [src/components/RemindersWidget/index.tsx](src/components/RemindersWidget/index.tsx) | Done — Connect/Disconnect/status |
 
-What is **not** done: `VITE_GOOGLE_CLIENT_ID` is absent from `.env.local`, so none
-of the above has ever run against real Google servers. Everything below assumes
-Phase 0 happens first — there is no point building a second integration on an
-auth layer that has not been proven once.
+**Update:** Phase 1's core (per-scope token cache, `getAccessToken(interactive,
+scope)`, `clearAccessToken(scope?)`) has since shipped in
+[src/lib/googleAuth.ts](src/lib/googleAuth.ts), and the Mail panel (Phase 4,
+below) now runs on it. What's still open from Phase 1 is the shared
+`googleApi.ts` fetch wrapper and `grantedScopes()`/incremental auth — see the
+Phase 1 section for the current split. What is **not** done from Phase 0:
+whether `VITE_GOOGLE_CLIENT_ID` is set locally is out of this repo's hands, so
+none of the above is guaranteed to have run against real Google servers on any
+given machine.
 
 Guardrails that stay true for every phase: no backend (ADR 0001), no client
 secret, tokens in memory only, every integration invisible until its env var is
@@ -56,55 +61,39 @@ Goal: a real "📅 Synced" badge in the Reminders widget.
    screen on every interactive connect (should only be needed for the first
    grant), and a token that expires mid-session should renew silently rather
    than surfacing an error in the widget.
-5. Add a `.env.example` listing both `VITE_GOOGLE_CLIENT_ID` and
-   `VITE_CLERK_PUBLISHABLE_KEY` with placeholder values, so setup is discoverable.
+5. ~~Add a `.env.example` listing both `VITE_GOOGLE_CLIENT_ID` and
+   `VITE_CLERK_PUBLISHABLE_KEY` with placeholder values, so setup is
+   discoverable.~~ **Done** — see `.env.example` at the repo root (it also
+   lists `VITE_SPOTIFY_CLIENT_ID`, added after this plan was written).
 
 **Done when:** the six manual checks above pass and `npm run lint`, `npx tsc -b`,
 `npm run test:run` are green.
 
 ---
 
-## Phase 1 — Generalise the auth layer (the enabling refactor)
+## Phase 1 — Generalise the auth layer (the enabling refactor) — partially done
 
-`googleAuth.ts` today caches exactly one token and hard-codes `CALENDAR_SCOPE`
-into `initTokenClient`, ignoring what callers ask for. Every integration after
-this one needs a different scope, so this must be reshaped before Phase 2+.
-Do it as its own change, with Calendar still the only consumer, so a regression
-here is unambiguous.
+Steps 1 and 4 below have shipped: `src/lib/googleAuth.ts` now keys a
+`Map<string, ScopeState>` per scope, and `getAccessToken(interactive, scope)` /
+`clearAccessToken(scope?)` replace the old single-token singleton (note the
+shipped parameter order is `(interactive, scope)`, not `(scope, interactive)`
+as originally sketched below). `src/lib/googleAuth.test.ts` covers cached
+reuse, per-scope isolation, expiry refresh, and the unconfigured case — step 5.
+Both `gcalEvents.ts` and `gcalWrite.ts` call the scoped `getAccessToken`
+already, and the Mail panel (Phase 4) is a second real consumer.
 
-Target shape for `src/lib/googleAuth.ts`:
+Still open — steps 2 and 3:
 
-```ts
-export const SCOPES = {
-  calendar: 'https://www.googleapis.com/auth/calendar',
-  tasks:    'https://www.googleapis.com/auth/tasks',
-  gmail:    'https://www.googleapis.com/auth/gmail.readonly',
-  drive:    'https://www.googleapis.com/auth/drive.metadata.readonly',
-} as const;
-
-/** Resolves a token for one scope, reusing a cached one when still valid. */
-export function getAccessToken(scope: string, interactive: boolean): Promise<string>;
-/** Which scopes the user has granted this session (drives per-widget UI). */
-export function grantedScopes(): string[];
-export function clearAccessToken(scope?: string): void; // omit scope = clear all
-```
-
-Steps:
-
-1. Replace the module-level `accessToken`/`tokenExpiry`/`tokenClient` singletons
-   with a `Map<scope, { token, expiry, client }>`; keep the one-in-flight-request
-   guard per scope.
-2. Pass `include_granted_scopes: true` so a second consent adds to the first
+~~2. Pass `include_granted_scopes: true` so a second consent adds to the first
    grant instead of replacing it, and use `google.accounts.oauth2.hasGrantedAllScopes`
-   to decide whether a request can be silent.
+   to decide whether a request can be silent.~~ Not done — each widget still
+   requests its own scope independently; no `grantedScopes()` exists.
 3. Extract the shared `fetch` wrapper (auth header, JSON, status→`ApiError`)
    out of `gcalSync.ts` into `src/lib/googleApi.ts` — Tasks/Gmail/Drive all need
    the identical wrapper, plus one shared place to handle `401` (token expired →
-   retry once) and `403 rateLimitExceeded` (back off).
-4. Update `gcalSync.ts` to call `getAccessToken(SCOPES.calendar, …)` and the
-   shared wrapper. No behaviour change.
-5. Add `src/lib/googleAuth.test.ts` covering: cached token reuse, per-scope
-   isolation, expiry-minus-60s refresh, and rejection when unconfigured.
+   retry once) and `403 rateLimitExceeded` (back off). `gcalEvents.ts` and
+   `gcalWrite.ts` both currently duplicate their own copy of this wrapper
+   rather than share one, and say so in their file-header comments.
 
 **Done when:** Phase 0's manual checks still pass unchanged, plus green checks.
 
@@ -205,7 +194,16 @@ so this closes a real gap rather than duplicating Calendar.
 
 ---
 
-## Phase 4 — Gmail unread widget (read-only, optional)
+## Phase 4 — Gmail unread widget (read-only, optional) — superseded
+
+Shipped as something better than what's sketched below: the **Mail** panel
+(`src/components/MailWidget/`, `src/lib/importantMail.ts`) doesn't show a raw
+unread count — it heuristically ranks and surfaces the 3 messages most worth
+answering, with the reasoning shown on hover. See
+[ADR 0010](docs/adr/0010-heuristic-mail-ranking.md) (and ADR 0009 for the
+superseded first attempt) and the README's "Optional: the Mail panel" section.
+The steps below are kept for the original unread-count idea, in case that's
+ever wanted alongside the ranked view rather than instead of it.
 
 1. Enable **Gmail API**; scope `gmail.readonly`.
    ⚠️ This is a **restricted** scope: fine while the OAuth app is in Testing with
