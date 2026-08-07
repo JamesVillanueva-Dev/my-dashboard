@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Widget from '../Widget';
 import Icon from '../Icon';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
@@ -66,9 +66,20 @@ function breakdown({ score, signals }: RankedMail): string {
  * Ranking is cached mostly to spare the Gmail API, not because it is expensive:
  * every pick carries the signals that produced it, so a wrong answer can be
  * hovered rather than guessed at.
+ *
+ * A pick can be dismissed, which promotes the next one off the ranking — the
+ * panel holds a window onto the full ordering rather than a fixed three. A
+ * dismissal is a local act only: it hides a message here and never touches the
+ * mail itself, which stays exactly as unread in Gmail as it was.
  */
 export default function MailWidget() {
   const [connected, setConnected] = useLocalStorage<boolean>('mail.connected', false);
+  /**
+   * Ids of messages the user has waved away, kept so they stay gone across a
+   * refresh and a reload — a dismissal that lasted only until the next poll
+   * would be a worse answer than no dismissal at all.
+   */
+  const [dismissed, setDismissed] = useLocalStorage<string[]>('mail.dismissed', []);
   const [connectError, setConnectError] = useState('');
 
   const configured = hasGoogleClientId();
@@ -94,6 +105,32 @@ export default function MailWidget() {
     load,
   );
 
+  const ranked = ranking.data ?? [];
+  const hidden = new Set(dismissed);
+  const kept = ranked.filter((pick) => !hidden.has(pick.message.id));
+  /** The window onto the ranking: the best few that are still wanted. */
+  const picks = kept.slice(0, TOP_N);
+  /** How many of the messages currently worth showing have been waved away. */
+  const hiddenCount = ranked.length - kept.length;
+
+  /**
+   * Forgets dismissals for mail that has left the ranking.
+   *
+   * Without this the list only grows: every message ever dismissed would be
+   * remembered forever, long after it aged out of the seven-day window the panel
+   * even looks at. Pruning against what is currently ranked keeps the stored
+   * list to the handful of ids that can still do anything.
+   *
+   * Deliberately skipped unless a ranking is actually in hand — pruning against
+   * an empty `loading` state would forget every dismissal on each reload.
+   */
+  useEffect(() => {
+    if (ranking.status !== 'ready' || !ranking.data) return;
+    const live = new Set(ranking.data.map((pick) => pick.message.id));
+    if (dismissed.every((id) => live.has(id))) return;
+    setDismissed(dismissed.filter((id) => live.has(id)));
+  }, [ranking.status, ranking.data, dismissed, setDismissed]);
+
   const connect = async () => {
     setConnectError('');
     try {
@@ -104,6 +141,13 @@ export default function MailWidget() {
       setConnectError(e instanceof Error ? e.message : 'Could not connect to Gmail.');
     }
   };
+
+  /** Brings every dismissed message back. One element, used by both states. */
+  const restoreButton = (
+    <button className={styles.link} onClick={() => setDismissed([])}>
+      Restore
+    </button>
+  );
 
   const body = () => {
     if (!configured) {
@@ -159,49 +203,74 @@ export default function MailWidget() {
       );
     }
 
-    const picks = ranking.data ?? [];
     if (picks.length === 0) {
-      return <p className={styles.empty}>Nothing in the last week needs you. Enjoy it.</p>;
+      // Two different nothings: an inbox with nothing in it worth your time, and
+      // one you have already cleared by hand. The second comes with its way back.
+      return hiddenCount > 0 ? (
+        <p className={styles.empty}>
+          That’s everything — you’ve dismissed the rest. {restoreButton}
+        </p>
+      ) : (
+        <p className={styles.empty}>Nothing in the last week needs you. Enjoy it.</p>
+      );
     }
 
     return (
-      <ol className={styles.list}>
-        {picks.map((pick) => {
-          const { message } = pick;
-          const sender = senderName(message.from);
-          return (
-            <li
-              key={message.id}
-              className={message.unread ? styles.isUnread : undefined}
-              title={breakdown(pick)}
-            >
-              <span className={styles.avatar} aria-hidden="true">
-                {initial(sender)}
-              </span>
-              <div>
-                <header>
-                  <span>{sender}</span>
-                  <time dateTime={new Date(message.receivedAt).toISOString()}>
-                    {timeAgo(message.receivedAt)}
-                  </time>
-                </header>
-                {/* The link covers the whole row (see `.subject::after`), but its
-                    accessible name stays the subject alone. */}
-                <a
-                  className={styles.subject}
-                  href={gmailUrl(message.id)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {message.subject || '(no subject)'}
-                </a>
-                {message.snippet && <p>{message.snippet}</p>}
-                <p className={styles.reason}>{pick.reason}</p>
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+      <>
+        <ol className={styles.list}>
+          {picks.map((pick) => {
+            const { message } = pick;
+            const sender = senderName(message.from);
+            return (
+              <li
+                key={message.id}
+                className={message.unread ? styles.isUnread : undefined}
+                title={breakdown(pick)}
+              >
+                <span className={styles.avatar} aria-hidden="true">
+                  {initial(sender)}
+                </span>
+                <div>
+                  <header>
+                    <span>{sender}</span>
+                    <time dateTime={new Date(message.receivedAt).toISOString()}>
+                      {timeAgo(message.receivedAt)}
+                    </time>
+                    <button
+                      className={styles.dismiss}
+                      onClick={() => setDismissed([...dismissed, message.id])}
+                      title="Dismiss — shows the next most important message"
+                      aria-label={`Dismiss ${message.subject || '(no subject)'}`}
+                    >
+                      <Icon name="close" />
+                    </button>
+                  </header>
+                  {/* The link covers the whole row (see `.subject::after`), but its
+                      accessible name stays the subject alone. */}
+                  <a
+                    className={styles.subject}
+                    href={gmailUrl(message.id)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {message.subject || '(no subject)'}
+                  </a>
+                  {message.snippet && <p>{message.snippet}</p>}
+                  <p className={styles.reason}>{pick.reason}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+
+        {/* Says what is being kept from you, and undoes it. Without this a
+            dismissal is a one-way door with no sign on it. */}
+        {hiddenCount > 0 && (
+          <p className={styles.hiddenNote}>
+            {hiddenCount} dismissed {restoreButton}
+          </p>
+        )}
+      </>
     );
   };
 

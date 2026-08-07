@@ -304,11 +304,15 @@ describe('rankMail', () => {
     expect(picks[0].message.id).toBe('good');
   });
 
-  it('caps at the number the panel shows', () => {
+  it('ranks past what the panel shows, so a dismissal has something to promote', () => {
     const strong = [...'abcde'].map((id) =>
       mail(id, { to: [SELF], unread: true, subject: 'can you review this?' }),
     );
-    expect(rankMail(strong, { self: SELF }, NOW)).toHaveLength(TOP_N);
+    // Every one of them clears the floor, and every one is returned. Cutting to
+    // three here would leave the panel nothing to reach for when a pick is
+    // waved away — the window belongs to the caller.
+    expect(rankMail(strong, { self: SELF }, NOW)).toHaveLength(strong.length);
+    expect(strong.length).toBeGreaterThan(TOP_N);
   });
 
   it('breaks a tie on recency, then on id — never on Gmail’s order', () => {
@@ -486,13 +490,15 @@ describe('rankMail — a realistic inbox', () => {
 
   const context = { self: SELF, knownSenders: new Set(['priya@work.com']) };
   const picks = rankMail(inbox, context, NOW);
+  /** What the panel actually shows: the top of the ranking it windows. */
+  const shown = picks.slice(0, TOP_N);
 
   it('picks the colleague’s question, the failed payment, and the lease', () => {
-    expect(picks.map((p) => p.message.id)).toEqual(['priya', 'stripe', 'lease']);
+    expect(shown.map((p) => p.message.id)).toEqual(['priya', 'stripe', 'lease']);
   });
 
   it('explains each pick in the panel’s words', () => {
-    expect(picks.map((p) => p.reason)).toEqual([
+    expect(shown.map((p) => p.reason)).toEqual([
       'Makes a direct request, asks a direct question',
       'Flags action required, addressed to you alone',
       // The star is what lifted the lease into the list, but "please review and

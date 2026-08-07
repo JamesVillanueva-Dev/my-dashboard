@@ -104,6 +104,55 @@
   color: var(--text-muted);
   white-space: nowrap;
   flex-shrink: 0;
+  /* Takes the free space itself, so the age and the dismiss button sit together
+     at the right edge. Left to `space-between`, three children would spread and
+     strand the age in the middle of the row. */
+  margin-left: auto;
+}
+
+/* ---------- Dismiss ----------
+   Sits in the sender line beside the age, where there is already space to the
+   right and nothing to push out of the way. Quiet until the row is hovered,
+   like every other piece of chrome on this dashboard — the panel is three lines
+   of mail at rest, not three lines of mail and three buttons. */
+.dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  line-height: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  opacity: 0;
+  /* Above the row-wide hit area `.subject::after` paints, which would otherwise
+     take this click and open Gmail instead of dismissing. */
+  position: relative;
+  z-index: 1;
+  transition: opacity 0.15s, color 0.15s;
+}
+.list li:hover .dismiss {
+  opacity: 0.55;
+}
+.dismiss:hover {
+  opacity: 1;
+  color: var(--danger);
+}
+/* Keyboard users never trigger the hover that reveals it. */
+.dismiss:focus-visible {
+  opacity: 1;
+}
+
+/* ---------- Dismissed footer ----------
+   What is being held back, and the way to undo it. */
+.hiddenNote {
+  composes: muted from '../../styles/controls.module.css';
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--card-border);
+  font-size: 0.76rem;
 }
 
 /* ---------- Avatar ----------
@@ -255,5 +304,19 @@
   }
   .list li:last-child {
     border-bottom-color: transparent;
+  }
+  /* Negative margins so the bigger target grows into the row's own padding
+     rather than pushing the sender line taller. */
+  .dismiss {
+    padding: 10px;
+    margin: -10px -8px -10px 0;
+  }
+}
+
+/* A finger cannot hover, so the reveal-on-hover treatment would leave the
+   dismiss button invisible — and the feature unreachable — on a touch device. */
+@media (hover: none) {
+  .dismiss {
+    opacity: 0.5;
   }
 }
