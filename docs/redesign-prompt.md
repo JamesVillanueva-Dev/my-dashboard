@@ -1,5 +1,11 @@
 # Redesign brief: from widget board to life dashboard
 
+**Status: shipped.** This brief drove the work now described in
+[ADR 0005](adr/0005-today-zone-and-panel-tiers.md) (the Today zone, panel
+tiers, and unified agenda) and the `TodayPanel`/`AgendaList`/`StatStrip`
+components it introduced. Kept here as a historical record of the brief, not
+as an outstanding task.
+
 Paste everything below the line into a fresh Claude Code session in this repo.
 
 ---

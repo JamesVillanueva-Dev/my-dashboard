@@ -1,5 +1,9 @@
 # Brief: replace Claude-ranked mail with a heuristic scorer
 
+**Status: shipped.** This brief drove the work now described in
+[ADR 0010](adr/0010-heuristic-mail-ranking.md) and `src/lib/importantMail.ts`.
+Kept here as a historical record of the brief, not as an outstanding task.
+
 Paste everything below the line into a fresh Claude Code session in this repo.
 
 ---

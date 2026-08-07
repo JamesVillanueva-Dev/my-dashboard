@@ -168,28 +168,50 @@ src/
 ├── styles/
 │   └── controls.module.css   shared control primitives, pulled in via `composes`
 ├── hooks/
-│   ├── useLocalStorage.ts    persistence + per-user key namespacing
-│   ├── useCachedResource.ts  cached, refreshable network reads
-│   ├── useCalendarSync.ts    drives the optional Google Calendar sync
-│   ├── useTheme.ts           colour-scheme preference + data-theme/favicon
-│   ├── useDismiss.ts         outside-click / Escape dismissal for popovers
-│   ├── useSpotifyPlayer.ts   optional Web Playback SDK device + volume
-│   └── useProfileSync.ts     pulls/pushes the dashboard to the Clerk account
+│   ├── useLocalStorage.ts       persistence + per-user key namespacing
+│   ├── useCachedResource.ts     cached, refreshable network reads
+│   ├── useCalendarSync.ts       drives the optional Google Calendar sync
+│   ├── useUpcomingEvents.ts     read-only agenda across every Google calendar
+│   ├── useMonthEvents.ts        per-month event cache for the calendar modal
+│   ├── useEventEditor.ts        new/edit/delete state for the event form
+│   ├── useTaskNotifications.ts  browser notifications when a task comes due
+│   ├── useWidgetLayout.ts       drag-to-reorder + resize, desktop/mobile split
+│   ├── useYouTubePlaylist.ts    IFrame Player API wrapper for the music panel
+│   ├── DashboardDataProvider.tsx combines sync, notifications & agenda into one context
+│   ├── useDashboardData.ts      the context + hook the widgets above consume
+│   ├── useTheme.ts              colour-scheme preference + data-theme/favicon
+│   ├── useDismiss.ts            outside-click / Escape dismissal for popovers
+│   ├── useSpotifyPlayer.ts      optional Web Playback SDK device + volume
+│   └── useProfileSync.ts        pulls/pushes the dashboard to the Clerk account
 ├── lib/
 │   ├── registry.tsx          catalogue of available widgets
 │   ├── profileSync.ts        shared vs per-device keys, and conflict rules
-│   ├── gmail.ts              read-only inbox metadata (never message bodies)
-│   ├── importantMail.ts      scores which three messages matter, and why
-│   ├── themes.ts             the colour schemes offered in settings
-│   ├── spotifyAuth.ts        Spotify OAuth (PKCE), opt-in
-│   ├── cache.ts              stale-while-revalidate store behind the hook above
-│   ├── gcalSync.ts           Google Calendar reconciliation
-│   ├── googleAuth.ts         in-memory OAuth token handling
-│   └── clerkAuth.ts          Clerk key + "is auth enabled?" check
+│   ├── agenda.ts              merges Calendar events + local tasks for the Today zone
+│   ├── calendarGrid.ts        pure date arithmetic for the month view
+│   ├── gcalEvents.ts          read-only view across the user's real calendars
+│   ├── gcalWrite.ts           create/edit/delete on the user's real calendars
+│   ├── dragOrder.ts           pure drop-target maths for panel drag-reorder
+│   ├── gridGeometry.ts        reads/writes the masonry grid's sizing custom properties
+│   ├── notifications.ts       decides which due tasks raise a browser notification
+│   ├── tasks.ts                one-time merge of the old To-do widget into Reminders
+│   ├── demo.ts                 seeds/clears the sample dashboard shown before sign-in
+│   ├── feeds.ts                the news panel's built-in + user-added RSS sources
+│   ├── youtube.ts              oEmbed metadata lookups for the music panel
+│   ├── gmail.ts               read-only inbox metadata (never message bodies)
+│   ├── importantMail.ts       scores which three messages matter, and why
+│   ├── themes.ts              the colour schemes offered in settings
+│   ├── spotifyAuth.ts         Spotify OAuth (PKCE), opt-in
+│   ├── cache.ts               stale-while-revalidate store behind the hook above
+│   ├── gcalSync.ts            Google Calendar reconciliation
+│   ├── googleAuth.ts          in-memory OAuth token handling, per scope
+│   └── clerkAuth.ts           Clerk key + "is auth enabled?" check
 └── components/
     ├── Dashboard/            the grid: layout, drag-to-reorder
     ├── AuthGate/             optional Clerk sign-in gate + storage scope
+    ├── LandingPage/          signed-out landing view (shown when auth is on)
+    ├── DemoBar/              banner shown while browsing the sample dashboard
     ├── Header/               clock, quick links, settings
+    ├── Greeting/             time-of-day greeting, editable name, live clock
     ├── QuickLinks/           bookmark shortcuts in the nav bar
     ├── Footer/               identity, source credits, legal links
     ├── UserMenu/             Clerk avatar menu (hidden when auth is off)
@@ -197,10 +219,15 @@ src/
     ├── Widget/               card shell every widget renders into (+ chrome.ts)
     ├── Settings/             colour-scheme picker
     ├── LegalModal/
-    ├── FocusWidget/
+    ├── Icon/                 the shared inline SVG icon set
+    ├── TodayPanel/           the Today zone: focus field + AgendaList + StatStrip
+    ├── AgendaList/           the merged calendar+task timeline inside TodayPanel
+    ├── StatStrip/            at-a-glance counts row (overdue, today, upcoming)
+    ├── CalendarWidget/       read-only agenda panel across the user's calendars
+    ├── CalendarModal/        month view: grid, day detail, opens EventForm
+    ├── EventForm/            create/edit form used by CalendarModal
     ├── WeatherWidget/
     ├── RemindersWidget/
-    ├── TodoWidget/
     ├── NewsWidget/
     ├── NotesWidget/
     ├── MailWidget/
@@ -224,9 +251,13 @@ npm run create:component -- EventsCard --no-test
 - [ADR 0001 — Client-only dashboard architecture](docs/adr/0001-client-only-dashboard-architecture.md)
 - [ADR 0002 — Google Calendar integration](docs/adr/0002-google-calendar-integration.md)
 - [ADR 0003 — Clerk authentication and per-user local data](docs/adr/0003-clerk-authentication.md)
+- [ADR 0004 — Calendar writes to the user's own calendars](docs/adr/0004-calendar-writes-to-user-calendars.md)
+- [ADR 0005 — Today zone and panel tiers](docs/adr/0005-today-zone-and-panel-tiers.md)
 - [ADR 0006 — Opt-in Spotify in-page player](docs/adr/0006-spotify-in-page-player.md)
 - [ADR 0007 — YouTube as the default music panel](docs/adr/0007-youtube-as-the-default-music-panel.md)
 - [ADR 0008 — Account-synced dashboard state](docs/adr/0008-account-synced-dashboard-state.md)
 - [ADR 0009 — Claude-ranked mail](docs/adr/0009-claude-ranked-mail.md) *(superseded)*
 - [ADR 0010 — Heuristic mail ranking](docs/adr/0010-heuristic-mail-ranking.md)
+- [ADR 0011 — Drag reorder model](docs/adr/0011-drag-reorder-model.md)
+- [ADR 0012 — YouTube playlist queue](docs/adr/0012-youtube-playlist-queue.md)
 - [User stories](docs/user-stories.md) · [Wireframes](docs/wireframes.md)

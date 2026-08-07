@@ -64,24 +64,19 @@ As a user, I want reminders with optional due times, so that I don't forget thin
   stays quietly overdue in the stat strip instead of greeting me with a backlog.
 - Calendar events are deliberately left out; Google already alerts on those.
 
-### US-5 — To-do (done)
-As a user, I want a simple checklist separate from timed reminders, so that I can
-track tasks.
+### US-5 — To-do — merged into US-4
+The separate To-do checklist described here originally was folded into
+Reminders: a `Task` is just a `Reminder` without a due date, so the dashboard
+now offers one task list instead of two (see `src/lib/tasks.ts` and
+`registry.tsx`'s note on the retired `todo` widget id). What this story asked
+for is covered by US-4's acceptance criteria above.
 
-**Acceptance criteria**
-- Add tasks; newest appears on top.
-- Check off tasks; completed ones move to the bottom.
-- See a count of remaining tasks.
-- Delete a task.
-
-### US-6 — Focus of the day (done)
-As a user, I want to set one daily intention and see a motivating quote, so that
-I stay focused.
-
-**Acceptance criteria**
-- A single focus field that resets each calendar day.
-- A "quote of the day" that is the same for everyone on a given date.
-- The focus text persists during the day.
+### US-6 — Focus of the day — moved into the Today zone
+No longer a separate widget. The one-intention field now lives in
+`TodayPanel`, alongside the merged agenda (calendar events + tasks) and the
+stat strip — see [ADR 0005](adr/0005-today-zone-and-panel-tiers.md). The
+quote-of-the-day behaviour described here was dropped along the way; today
+it's just the intention field.
 
 ### US-7 — Quick links (done)
 As a user, I want one-click shortcuts to my sites, so that I can navigate fast.
@@ -168,6 +163,12 @@ doesn't break the page.
 
 ## Planned (future phases)
 
-- **US-13 — Google Docs & Calendar** (OAuth + backend): real notes and events.
-- **US-14 — Cross-device sync** of settings and personal data.
+- **US-13 — Google Docs sync** for Notes: real Docs content, not just
+  `localStorage`. (Calendar shipped, client-only, no backend — see US-4's
+  Google Calendar sync, the Calendar widget, and ADR 0002/0004. This story
+  used to bundle Calendar in too; it's kept narrowed to Docs.)
+- **US-14 — Cross-device sync** of settings and personal data. Partially
+  shipped for signed-in accounts via Clerk (see the README's "Signing in also
+  restores your dashboard" section and ADR 0008) — what remains is sync
+  without an account.
 - **US-15 — More widgets**: stocks/crypto, Pomodoro timer, habit tracker.
