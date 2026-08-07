@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import AgendaList from '../AgendaList';
 import StatStrip from '../StatStrip';
 import Icon from '../Icon';
@@ -49,15 +50,28 @@ export default function TodayPanel({ showFocus = true }: TodayPanelProps) {
   const key = todayKey(now);
   // The stored focus expires with the day it was written for.
   const focusText = focus.date === key ? focus.text : '';
+  const [editing, setEditing] = useState(false);
+
+  /**
+   * Nothing set, and nobody typing — so the field asks for nothing.
+   *
+   * This is the state the zone is in most of the time, and it used to be an
+   * empty text box sitting in the best space on the page, waiting. Every other
+   * element here earns its place by showing you something; this one only ever
+   * demanded something, and it emptied itself again every morning. Collapsed to
+   * an offer, it costs nothing on the days you ignore it.
+   */
+  const idle = !editing && !focusText;
 
   const today = todayItems(agenda, now);
   const next = nextUp(agenda, now);
 
+  const classes = [styles.container, !showFocus && styles.isFocusOff, idle && styles.isFocusIdle]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <section
-      className={`${styles.container}${showFocus ? '' : ` ${styles.isFocusOff}`}`}
-      aria-labelledby="today-heading"
-    >
+    <section className={classes} aria-labelledby="today-heading">
       <div className={styles.lead}>
         <div className={styles.next}>
           {/* Kept in the DOM but not on screen: it names the section for
@@ -97,15 +111,47 @@ export default function TodayPanel({ showFocus = true }: TodayPanelProps) {
 
         {showFocus && (
           <div className={styles.focus}>
-            <label htmlFor="today-focus">
-              <Icon name="target" /> Today, my one focus is…
-            </label>
-            <input
-              id="today-focus"
-              value={focusText}
-              onChange={(e) => setFocus({ date: key, text: e.target.value })}
-              placeholder="Set your intention"
-            />
+            {idle ? (
+              <button className={styles.prompt} onClick={() => setEditing(true)}>
+                <Icon name="target" /> Set a focus
+              </button>
+            ) : editing ? (
+              <>
+                <label className={styles.legend} htmlFor="today-focus">
+                  <Icon name="target" /> Today, my one focus is…
+                </label>
+                <input
+                  id="today-focus"
+                  // Mounted by the click that asked for it, so taking focus is
+                  // finishing that gesture rather than stealing the caret.
+                  autoFocus
+                  value={focusText}
+                  // Still written through on every keystroke, as before: closing
+                  // the tab mid-sentence should not lose the sentence.
+                  onChange={(e) => setFocus({ date: key, text: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === 'Escape') setEditing(false);
+                  }}
+                  onBlur={() => setEditing(false)}
+                  placeholder="Set your intention"
+                />
+              </>
+            ) : (
+              <>
+                <span className={styles.legend}>
+                  <Icon name="target" /> Today, my one focus is…
+                </span>
+                {/* Reads as the statement it is; only admits to being a control
+                    on hover. */}
+                <button
+                  className={styles.set}
+                  onClick={() => setEditing(true)}
+                  aria-label={`Edit today’s focus: ${focusText}`}
+                >
+                  {focusText}
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
