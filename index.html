@@ -3,6 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
+    <!-- iOS ignores the SVG favicon for "Add to Home Screen" and, finding no
+         apple-touch-icon, falls back to a generated letter tile. This is what
+         that icon actually looks like on a home screen. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0c0c0d" />
     <!-- viewport-fit=cover lets the page use the full display on notched phones.
          It is only safe because the layout pays the safe-area insets back with
          env() padding — see --page-pad and the nav bar in src/styles.css. -->
