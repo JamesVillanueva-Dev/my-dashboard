@@ -150,11 +150,35 @@ describe('TodayPanel', () => {
     expect(screen.getByText(/Nothing on today/)).toBeInTheDocument();
   });
 
+  it('asks for nothing until asked — no empty field sitting in the lead row', () => {
+    seedTasks([]);
+    renderPanel();
+
+    // The old shape was a text box that was blank almost every time you looked
+    // at it. What's here now is an offer, not a demand.
+    expect(screen.queryByRole('textbox', { name: /one focus is/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Set a focus' })).toBeInTheDocument();
+  });
+
+  it('opens the field on the prompt, with the caret already in it', async () => {
+    seedTasks([]);
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(screen.getByRole('button', { name: 'Set a focus' }));
+
+    const input = screen.getByLabelText(/one focus is/i);
+    expect(input).toBeInTheDocument();
+    // The click asked for the field, so it should not also have to be clicked.
+    expect(input).toHaveFocus();
+  });
+
   it('persists the daily focus', async () => {
     seedTasks([]);
     const user = userEvent.setup();
     renderPanel();
 
+    await user.click(screen.getByRole('button', { name: 'Set a focus' }));
     const input = screen.getByLabelText(/one focus is/i);
     await user.type(input, 'Ship it');
     expect(input).toHaveValue('Ship it');
@@ -163,10 +187,42 @@ describe('TodayPanel', () => {
     expect(stored.text).toBe('Ship it');
   });
 
+  it('reads as a statement once set, and reopens for editing on a click', async () => {
+    seedTasks([]);
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(screen.getByRole('button', { name: 'Set a focus' }));
+    await user.type(screen.getByLabelText(/one focus is/i), 'Ship it{Enter}');
+
+    // Committed: the input is gone and the focus reads as plain text.
+    expect(screen.queryByRole('textbox', { name: /one focus is/i })).not.toBeInTheDocument();
+    const set = screen.getByRole('button', { name: 'Edit today’s focus: Ship it' });
+    expect(set).toHaveTextContent('Ship it');
+
+    await user.click(set);
+    expect(screen.getByLabelText(/one focus is/i)).toHaveValue('Ship it');
+  });
+
+  it('goes back to offering when the focus is cleared', async () => {
+    seedTasks([]);
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(screen.getByRole('button', { name: 'Set a focus' }));
+    const input = screen.getByLabelText(/one focus is/i);
+    await user.type(input, 'Ship it');
+    await user.clear(input);
+    await user.tab();
+
+    expect(screen.getByRole('button', { name: 'Set a focus' })).toBeInTheDocument();
+  });
+
   it('hides the focus field when it is switched off, keeping the rest of the zone', () => {
     seedTasks([{ id: '1', text: 'Email Dana', due: dueIn(3_600_000), done: false }]);
     const { container } = renderPanel({ showFocus: false });
 
+    expect(screen.queryByRole('button', { name: 'Set a focus' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/one focus is/i)).not.toBeInTheDocument();
     // Everything else still works.
     expect(headline(container)).toBe('Email Dana');

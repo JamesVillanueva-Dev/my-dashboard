@@ -26,7 +26,7 @@ describe('Dashboard', () => {
   it('leads with the Today zone, above the widget grid', () => {
     render(<Dashboard />);
     expect(screen.getByRole('heading', { level: 2, name: 'Next up' })).toBeInTheDocument();
-    expect(screen.getByLabelText(/one focus is/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Set a focus' })).toBeInTheDocument();
   });
 
   it('drops retired widget ids from a saved layout instead of crashing', () => {
@@ -218,16 +218,16 @@ describe('Dashboard', () => {
     const user = userEvent.setup();
     render(<Dashboard />);
 
-    expect(screen.getByLabelText(/one focus is/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Set a focus' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /manage widgets/i }));
     await user.click(within(screen.getByRole('menu')).getByLabelText(/daily focus/i));
 
-    expect(screen.queryByLabelText(/one focus is/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set a focus' })).not.toBeInTheDocument();
     expect(localStorage.getItem('today.showFocus')).toBe('false');
 
     await user.click(within(screen.getByRole('menu')).getByLabelText(/daily focus/i));
-    expect(screen.getByLabelText(/one focus is/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Set a focus' })).toBeInTheDocument();
   });
 
   it('opens the Privacy Policy and Terms of Service from the footer', async () => {
