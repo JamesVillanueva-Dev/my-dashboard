@@ -1,13 +1,27 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Settings from './index';
+import styles from './styles.module.css';
+import { DashboardDataProvider } from '../../hooks/DashboardDataProvider';
 import { THEMES } from '../../lib/themes';
+
+/**
+ * Renders the menu with the shared data provider behind it, which owns the
+ * notification setting — see `useDashboardData`.
+ */
+function renderSettings() {
+  return render(
+    <DashboardDataProvider>
+      <Settings />
+    </DashboardDataProvider>,
+  );
+}
 
 /** Opens the settings dropdown and returns the user-event session. */
 async function openMenu() {
   const user = userEvent.setup();
-  render(<Settings />);
+  renderSettings();
   await user.click(screen.getByRole('button', { name: /settings/i }));
   return user;
 }
@@ -32,21 +46,49 @@ function stubMouse() {
   })) as unknown as typeof window.matchMedia;
 }
 
+/** The stub's answer to `Notification.permission`. */
+let granted: NotificationPermission = 'default';
+
+/**
+ * Installs the Notification API, which jsdom does not provide — so by default
+ * every test above sees a browser that cannot notify, and the section is absent.
+ */
+function stubNotification() {
+  vi.stubGlobal(
+    'Notification',
+    class {
+      static get permission() {
+        return granted;
+      }
+      static requestPermission = vi.fn(() => {
+        granted = 'granted';
+        return Promise.resolve(granted);
+      });
+      close = vi.fn();
+    },
+  );
+}
+
+beforeEach(() => {
+  granted = 'default';
+});
+
 afterEach(() => {
   window.matchMedia = realMatchMedia;
   document.documentElement.removeAttribute('data-aura');
+  vi.unstubAllGlobals();
 });
 
 describe('Settings', () => {
   it('follows the system scheme until the user picks a palette', () => {
-    render(<Settings />);
+    renderSettings();
     // matchMedia is stubbed to report "not dark", so system resolves to light.
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
 
   it('keeps the menu closed until the trigger is clicked', async () => {
     const user = userEvent.setup();
-    render(<Settings />);
+    renderSettings();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /settings/i }));
@@ -93,13 +135,13 @@ describe('Settings', () => {
 
   it('restores a palette stored by a previous visit', () => {
     localStorage.setItem('theme', JSON.stringify('rose'));
-    render(<Settings />);
+    renderSettings();
     expect(document.documentElement.getAttribute('data-theme')).toBe('rose');
   });
 
   it('falls back to the system scheme when the stored value is unusable', () => {
     localStorage.setItem('theme', JSON.stringify('chartreuse'));
-    render(<Settings />);
+    renderSettings();
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
 
@@ -176,6 +218,61 @@ describe('Settings', () => {
       const user = await openMenu();
 
       await user.click(screen.getByRole('checkbox', { name: /aura/i }));
+
+      expect(screen.getAllByRole('radio')).toHaveLength(THEMES.length + 1);
+      expect(screen.getByRole('radio', { name: /follow system/i })).toBeChecked();
+    });
+  });
+
+  describe('due notices', () => {
+    it('is not offered where the browser cannot notify at all', async () => {
+      await openMenu();
+
+      expect(screen.queryByRole('checkbox', { name: /task is due/i })).not.toBeInTheDocument();
+      expect(screen.queryByText('Notifications')).not.toBeInTheDocument();
+    });
+
+    it('is offered, and off, where it is supported', async () => {
+      stubNotification();
+
+      await openMenu();
+
+      expect(screen.getByRole('checkbox', { name: /remind me when a task is due/i })).not.toBeChecked();
+    });
+
+    it('asks the browser for permission when switched on, and persists the choice', async () => {
+      stubNotification();
+      const user = await openMenu();
+
+      await user.click(screen.getByRole('checkbox', { name: /task is due/i }));
+
+      await waitFor(() =>
+        expect(screen.getByRole('checkbox', { name: /task is due/i })).toBeChecked(),
+      );
+      expect(localStorage.getItem('notify.tasks')).toBe(JSON.stringify(true));
+    });
+
+    it('says so, and refuses to switch on, once refused at the browser level', async () => {
+      granted = 'denied';
+      stubNotification();
+
+      const user = await openMenu();
+      const box = screen.getByRole('checkbox', { name: /task is due/i });
+
+      expect(box).toBeDisabled();
+      expect(screen.getByText('Blocked')).toBeInTheDocument();
+      expect(box.closest('label')).toHaveClass(styles.isBlocked);
+
+      await user.click(box);
+      expect(box).not.toBeChecked();
+      expect(localStorage.getItem('notify.tasks')).not.toBe(JSON.stringify(true));
+    });
+
+    it('leaves the palette picker alone', async () => {
+      stubNotification();
+      const user = await openMenu();
+
+      await user.click(screen.getByRole('checkbox', { name: /task is due/i }));
 
       expect(screen.getAllByRole('radio')).toHaveLength(THEMES.length + 1);
       expect(screen.getByRole('radio', { name: /follow system/i })).toBeChecked();
