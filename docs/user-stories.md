@@ -53,7 +53,16 @@ As a user, I want reminders with optional due times, so that I don't forget thin
 - Incomplete items sort first (soonest due first); done items sink.
 - Overdue, not-done items are visually highlighted.
 - I can check off or delete a reminder.
-- Planned — Local browser notifications at the due time.
+- I can switch on browser notifications from Appearance's neighbour section in
+  the settings menu, and I am told when a task comes due — including one that
+  came due while the tab sat in the background. The browser asks my permission
+  the moment I switch it on, never on page load, and if I refuse the row says
+  "Blocked" rather than silently failing.
+- A notice arrives once per due time: reloading the page does not repeat it, and
+  moving a task to a new time arms it again.
+- Nothing older than half an hour interrupts me — a task I let slide overnight
+  stays quietly overdue in the stat strip instead of greeting me with a backlog.
+- Calendar events are deliberately left out; Google already alerts on those.
 
 ### US-5 — To-do (done)
 As a user, I want a simple checklist separate from timed reminders, so that I can

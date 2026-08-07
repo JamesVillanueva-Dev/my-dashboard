@@ -80,6 +80,17 @@
   background: var(--bg);
 }
 
+/* Notifications refused at the browser level. Only the browser's own site
+   settings can undo that, so the row stays put and explains itself rather than
+   disappearing — but it drops every affordance that would suggest it still
+   responds to a click. */
+.container label.isBlocked,
+.container label.isBlocked:hover {
+  background: none;
+  cursor: default;
+  color: var(--text-muted);
+}
+
 /* The mode hint ("light" / "dark") trails the label, hard right. */
 .container small {
   margin-left: auto;
@@ -92,6 +103,10 @@
 .container label > svg:not(.swatch) {
   font-size: 1.15rem;
   color: var(--accent);
+}
+/* The alarm glyph gives up the accent along with the rest of a blocked row. */
+.container label.isBlocked > svg:not(.swatch) {
+  color: var(--text-muted);
 }
 
 /* Sits on the text colour so the swatch outline (which uses currentColor at low
