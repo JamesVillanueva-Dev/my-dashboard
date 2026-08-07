@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { useCalendarSync } from './useCalendarSync';
+import { useTaskNotifications } from './useTaskNotifications';
 import { useUpcomingEvents } from './useUpcomingEvents';
 import { DashboardDataContext, type DashboardData } from './useDashboardData';
 import { buildAgenda, countAgenda } from '../lib/agenda';
@@ -44,10 +45,17 @@ export function DashboardDataProvider({ children }: { children: ReactNode }) {
     (next) => setTasks(next),
   );
 
-  const value = useMemo<DashboardData>(() => {
-    const live = tasks.filter((t) => !t.deleted);
-    const agenda = buildAgenda(upcoming.events, live);
-    return {
+  // Hoisted out of the value below because the notification scheduler reads the
+  // agenda too, and because both want an identity that only changes when the
+  // underlying data does — a fresh array every render would have the scheduler
+  // re-checking on every tick of the clock.
+  const live = useMemo(() => tasks.filter((t) => !t.deleted), [tasks]);
+  const agenda = useMemo(() => buildAgenda(upcoming.events, live), [upcoming.events, live]);
+
+  const notify = useTaskNotifications(agenda, upcoming.now);
+
+  const value = useMemo<DashboardData>(
+    () => ({
       tasks,
       setTasks,
       toggleTask: (id) =>
@@ -56,9 +64,11 @@ export function DashboardDataProvider({ children }: { children: ReactNode }) {
       upcoming,
       agenda,
       counts: countAgenda(agenda, live, upcoming.now),
+      notify,
       now: upcoming.now,
-    };
-  }, [tasks, setTasks, cal, upcoming]);
+    }),
+    [tasks, setTasks, cal, upcoming, agenda, live, notify],
+  );
 
   return <DashboardDataContext.Provider value={value}>{children}</DashboardDataContext.Provider>;
 }
