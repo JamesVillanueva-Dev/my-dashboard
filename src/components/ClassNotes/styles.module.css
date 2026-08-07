@@ -1,0 +1,303 @@
+/* class-notes
+   `.container` is the root, handed to the shared <Widget> shell, which puts it
+   on the card element — so every rule below can be scoped to it. */
+
+/* Header action: reveal the add-a-class field. */
+.new {
+  composes: pill from '../../styles/controls.module.css';
+}
+
+/* ---------- Add a class ---------- */
+.form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.container .form input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.save {
+  composes: btn from '../../styles/controls.module.css';
+  flex: 0 0 auto;
+}
+
+/* ---------- Class tabs ----------
+   The same tab row the news and music panels use, so switching between things
+   the dashboard holds several of always looks and works the same way. */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.tabs > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tab {
+  composes: pill from '../../styles/controls.module.css';
+  max-width: 20ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab.isActive {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.drop {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 0;
+  padding: 0 2px 0 4px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.tabs > span:hover .drop,
+.drop:focus-visible {
+  opacity: 0.7;
+}
+.drop:hover {
+  opacity: 1;
+  color: var(--danger);
+}
+
+/* ---------- The selected class ---------- */
+.courseHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+/* The class name doubles as its rename control — the same click-to-edit the
+   greeting and the daily focus use, rather than a settings screen for one field. */
+.name {
+  padding: 0;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-align: left;
+  overflow-wrap: anywhere;
+  transition: border-bottom-color 0.15s;
+}
+.name:hover {
+  border-bottom-color: var(--card-border);
+}
+
+.rename {
+  font-size: 1.05rem;
+  font-weight: 650;
+  min-width: 0;
+  flex: 1;
+}
+
+.add {
+  composes: pill from '../../styles/controls.module.css';
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  font-size: 0.8rem;
+}
+
+/* ---------- Notes ----------
+   One column in a card. At full screen the room is spent on a second and third
+   column rather than a longer scroll — see the `[data-expanded]` rules below. */
+.notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+/* Each note is a raised card against the panel's recessed well, which is what
+   makes a list of them read as separate things rather than one long document. */
+.note {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  transition: border-color 0.15s;
+}
+.note:hover {
+  border-color: var(--accent-soft);
+}
+
+/* The whole resting card is the way in to editing it. */
+.open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  width: 100%;
+  padding: 11px 13px;
+  border: none;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+/* The title the user gave it. Set in the accent so a page of notes scans by
+   heading — which is the only structure this panel has, by design. */
+.open .label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+/* The note itself. `pre-wrap` because a pasted rubric arrives with its own line
+   breaks, and collapsing them would be losing what the user actually saved. */
+.open .body {
+  white-space: pre-wrap;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- A note being edited ---------- */
+.note.isEditing {
+  border-color: var(--accent);
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.container .isEditing .label {
+  width: 100%;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.container .isEditing .body {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+/* Done on the left, the destructive and reordering controls gathered right. */
+.noteBar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.noteBar > span {
+  flex: 1;
+}
+
+.done {
+  composes: btn from '../../styles/controls.module.css';
+  padding: 5px 13px;
+  font-size: 0.8rem;
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 0;
+  padding: 4px;
+  border-radius: 6px;
+}
+.iconBtn:hover:not(:disabled) {
+  color: var(--accent);
+}
+.iconBtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 0;
+  padding: 4px;
+  border-radius: 6px;
+}
+.remove:hover {
+  color: var(--danger);
+}
+
+/* ---------- Nothing here yet ---------- */
+.none {
+  composes: muted small from '../../styles/controls.module.css';
+  margin: 0;
+}
+
+/* The first-run state. Says what the panel is for without pretending to know
+   what the user will put in it. */
+.empty {
+  composes: empty from '../../styles/controls.module.css';
+  padding: 28px 20px;
+}
+.empty p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.empty p:first-child {
+  margin-bottom: 6px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+/* ---------- Full screen ----------
+   The reason this panel is worth expanding: a term's notes in columns, read
+   across rather than scrolled through. */
+.container[data-expanded] .notes {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  align-items: start;
+}
+.container[data-expanded] .isEditing .body {
+  min-height: 140px;
+}
+
+/* One column is too narrow to hold two of anything. */
+@media (max-width: 560px) {
+  .container[data-expanded] .notes {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (pointer: coarse) {
+  .drop {
+    opacity: 0.6;
+    padding: 8px 6px;
+  }
+  .iconBtn,
+  .remove {
+    padding: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note,
+  .name,
+  .drop {
+    transition: none;
+  }
+}

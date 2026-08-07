@@ -8,6 +8,8 @@ import alarm from './icons/alarm.svg?raw';
 import checkSquare from './icons/checkSquare.svg?raw';
 import newspaper from './icons/newspaper.svg?raw';
 import note from './icons/note.svg?raw';
+/** A ruled, open book: the class notebook. */
+import book from './icons/book.svg?raw';
 import link from './icons/link.svg?raw';
 import music from './icons/music.svg?raw';
 import mail from './icons/mail.svg?raw';
@@ -42,6 +44,8 @@ import expand from './icons/expand.svg?raw';
 import resize from './icons/resize.svg?raw';
 import chevronLeft from './icons/chevronLeft.svg?raw';
 import chevronRight from './icons/chevronRight.svg?raw';
+import chevronUp from './icons/chevronUp.svg?raw';
+import chevronDown from './icons/chevronDown.svg?raw';
 
 /* ---------- Media transport (Spotify player) ---------- */
 import play from './icons/play.svg?raw';
@@ -78,6 +82,7 @@ const FILES = {
   checkSquare,
   newspaper,
   note,
+  book,
   link,
   music,
   mail,
@@ -104,6 +109,8 @@ const FILES = {
   resize,
   chevronLeft,
   chevronRight,
+  chevronUp,
+  chevronDown,
   play,
   pause,
   skipBack,

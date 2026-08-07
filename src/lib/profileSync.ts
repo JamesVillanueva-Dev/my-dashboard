@@ -80,6 +80,11 @@ export const SHARED_KEYS = [
   'weather.unit',
   'news.sources',
   'news.feed',
+  // The class notebook: the courses (with their notes) and which tab was open.
+  // Typed by hand and impossible to refetch, so this is exactly the kind of key
+  // the allowlist exists for.
+  'classes.courses',
+  'classes.current',
   'youtube.sources',
   'youtube.current',
   'spotify.sources',

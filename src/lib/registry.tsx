@@ -8,6 +8,7 @@ import NotesWidget from '../components/NotesWidget';
 import SpotifyWidget from '../components/SpotifyWidget';
 import YouTubeWidget from '../components/YouTubeWidget';
 import MailWidget from '../components/MailWidget';
+import ClassNotes from '../components/ClassNotes';
 
 /**
  * How big a panel is. Both axes are set by dragging the handle in the panel's
@@ -115,6 +116,7 @@ export const WIDGETS: WidgetDef[] = [
   { id: 'reminders', title: 'Tasks', icon: 'checkSquare', cols: 2, render: () => <RemindersWidget /> },
   { id: 'calendar', title: 'Calendar', icon: 'calendar', cols: 2, render: () => <CalendarWidget /> },
   { id: 'weather', title: 'Weather', icon: 'cloudSun', cols: 1, render: () => <WeatherWidget /> },
+  { id: 'classes', title: 'Classes', icon: 'book', cols: 2, render: () => <ClassNotes /> },
   { id: 'news', title: 'News', icon: 'newspaper', cols: 2, render: () => <NewsWidget /> },
   { id: 'notes', title: 'Notes', icon: 'note', cols: 1, render: () => <NotesWidget /> },
   { id: 'youtube', title: 'YouTube', icon: 'video', cols: 2, render: () => <YouTubeWidget /> },
