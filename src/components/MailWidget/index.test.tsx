@@ -192,6 +192,16 @@ describe('MailWidget — ranked mail', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
+  it('shows only the top three, however deep the ranking runs', async () => {
+    connected();
+    state.rankMail.mockReturnValue(ranked(['a', 'b', 'c', 'd', 'e']));
+    render(<MailWidget />);
+
+    await screen.findByText('Subject a');
+    expect(screen.getByText('Subject c')).toBeInTheDocument();
+    expect(screen.queryByText('Subject d')).not.toBeInTheDocument();
+  });
+
   it('offers a refresh that costs nothing to take', async () => {
     connected();
     const user = userEvent.setup();
@@ -201,5 +211,122 @@ describe('MailWidget — ranked mail', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh mail now' }));
 
     await waitFor(() => expect(state.fetchInbox.mock.calls.length).toBeGreaterThan(1));
+  });
+});
+
+describe('MailWidget — dismissing a pick', () => {
+  /** Dismisses `subject`, which is what the button is labelled by. */
+  async function dismiss(user: ReturnType<typeof userEvent.setup>, subject: string) {
+    await user.click(screen.getByRole('button', { name: `Dismiss ${subject}` }));
+  }
+
+  it('pulls up the next most important message in its place', async () => {
+    connected();
+    state.rankMail.mockReturnValue(ranked(['a', 'b', 'c', 'd']));
+    const user = userEvent.setup();
+    render(<MailWidget />);
+
+    await screen.findByText('Subject a');
+    // The fourth is ranked but off the end of the panel's window.
+    expect(screen.queryByText('Subject d')).not.toBeInTheDocument();
+
+    await dismiss(user, 'Subject a');
+
+    expect(screen.queryByText('Subject a')).not.toBeInTheDocument();
+    expect(await screen.findByText('Subject d')).toBeInTheDocument();
+    // The survivors keep their order; only the gap closed up.
+    expect(screen.getByText('Subject b')).toBeInTheDocument();
+    expect(screen.getByText('Subject c')).toBeInTheDocument();
+  });
+
+  it('costs nothing to dismiss — no re-read, no round trip to Gmail', async () => {
+    connected();
+    const user = userEvent.setup();
+    render(<MailWidget />);
+
+    await screen.findByText('Subject a');
+    const readsBefore = state.fetchInbox.mock.calls.length;
+
+    await dismiss(user, 'Subject a');
+
+    // Promoting the next pick is a slice of a ranking already in hand. Going
+    // back to Gmail for it would make an instant act wait on the network.
+    expect(await screen.findByText('Subject b')).toBeInTheDocument();
+    expect(state.fetchInbox.mock.calls.length).toBe(readsBefore);
+    expect(state.rankMail.mock.calls.length).toBe(1);
+  });
+
+  it('keeps a dismissal across a reload, not just until the next poll', async () => {
+    connected();
+    const user = userEvent.setup();
+    const view = render(<MailWidget />);
+
+    await screen.findByText('Subject a');
+    await dismiss(user, 'Subject a');
+    await waitFor(() =>
+      expect(window.localStorage.getItem('mail.dismissed')).toBe(JSON.stringify(['a'])),
+    );
+
+    view.unmount();
+    render(<MailWidget />);
+
+    expect(await screen.findByText('Subject b')).toBeInTheDocument();
+    expect(screen.queryByText('Subject a')).not.toBeInTheDocument();
+  });
+
+  it('says how many it is holding back, and gives them all back', async () => {
+    connected();
+    const user = userEvent.setup();
+    render(<MailWidget />);
+
+    await screen.findByText('Subject a');
+    await dismiss(user, 'Subject a');
+    expect(await screen.findByText(/1 dismissed/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Restore' }));
+
+    expect(await screen.findByText('Subject a')).toBeInTheDocument();
+    expect(screen.queryByText(/1 dismissed/)).not.toBeInTheDocument();
+  });
+
+  it('offers the way back when every pick has been dismissed', async () => {
+    connected();
+    state.rankMail.mockReturnValue(ranked(['a']));
+    const user = userEvent.setup();
+    render(<MailWidget />);
+
+    await screen.findByText('Subject a');
+    await dismiss(user, 'Subject a');
+
+    // Distinct from an inbox that never had anything — this one you emptied.
+    expect(await screen.findByText(/you.ve dismissed the rest/i)).toBeInTheDocument();
+    expect(screen.queryByText(/nothing in the last week needs you/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeInTheDocument();
+  });
+
+  it('forgets a dismissal once that mail drops out of the ranking', async () => {
+    connected();
+    window.localStorage.setItem('mail.dismissed', JSON.stringify(['a', 'gone']));
+    render(<MailWidget />);
+
+    await screen.findByText('Subject b');
+    // `gone` is no longer ranked — remembering it forever would grow the list
+    // without bound. `a` is still ranked, so it stays dismissed.
+    await waitFor(() =>
+      expect(window.localStorage.getItem('mail.dismissed')).toBe(JSON.stringify(['a'])),
+    );
+    expect(screen.queryByText('Subject a')).not.toBeInTheDocument();
+  });
+
+  it('does not forget dismissals while the ranking is still loading', async () => {
+    connected();
+    window.localStorage.setItem('mail.dismissed', JSON.stringify(['a']));
+    // A read that never settles: the panel sits in `loading` with no ranking to
+    // prune against, and must not take that for "none of these exist".
+    state.fetchInbox.mockImplementation(() => new Promise(() => {}));
+    render(<MailWidget />);
+
+    await screen.findByRole('status', { name: 'Reading your inbox' });
+    expect(window.localStorage.getItem('mail.dismissed')).toBe(JSON.stringify(['a']));
   });
 });

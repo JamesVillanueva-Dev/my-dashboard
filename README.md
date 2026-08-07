@@ -86,7 +86,9 @@ Without a Clerk key there is no account, and the dashboard runs entirely from
 ### Optional: the Mail panel (Gmail)
 
 The **Mail** panel shows the three messages most worth your attention, with a
-one-line reason each. It's off by default — add it from the **Widgets** menu. It
+one-line reason each. Dismiss one and the next-highest-ranked message takes its
+place — a dismissal is local to the dashboard and never touches the mail itself.
+It's off by default — add it from the **Widgets** menu. It
 needs only `VITE_GOOGLE_CLIENT_ID` (Gmail is read through the same OAuth client
 as Calendar, so enable the Gmail API on that project). No API key, no account, no
 third party.
@@ -198,7 +200,7 @@ src/
 │   ├── feeds.ts                the news panel's built-in + user-added RSS sources
 │   ├── youtube.ts              oEmbed metadata lookups for the music panel
 │   ├── gmail.ts               read-only inbox metadata (never message bodies)
-│   ├── importantMail.ts       scores which three messages matter, and why
+│   ├── importantMail.ts       ranks which messages matter, and why
 │   ├── themes.ts              the colour schemes offered in settings
 │   ├── spotifyAuth.ts         Spotify OAuth (PKCE), opt-in
 │   ├── cache.ts               stale-while-revalidate store behind the hook above

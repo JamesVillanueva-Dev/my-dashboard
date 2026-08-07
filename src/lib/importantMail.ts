@@ -21,7 +21,13 @@
 
 import { senderAddress, type MailSummary } from './gmail';
 
-/** How many messages the panel shows. */
+/**
+ * How many messages the panel shows at once.
+ *
+ * A property of the panel, not of the ranking: {@link rankMail} orders
+ * everything worth showing and the panel takes this many off the top, so
+ * dismissing one can promote the next rather than leaving a gap.
+ */
 export const TOP_N = 3;
 
 /**
@@ -549,10 +555,16 @@ export function reasonFor(signals: Signal[]): string {
 }
 
 /**
- * Ranks `messages` and returns the top {@link TOP_N} that clear {@link FLOOR}.
+ * Ranks every message that clears {@link FLOOR}, most important first.
  *
- * Returning fewer than `TOP_N` — or none — is a correct outcome, not a
- * degraded one: an inbox of newsletters genuinely has nothing to show.
+ * Returns the whole ordering rather than the {@link TOP_N} the panel has room
+ * for, because the panel's window into it moves: dismissing a pick promotes the
+ * next one, and a ranking cut to three has nothing left to promote. Windowing is
+ * therefore the caller's job, and the honest division of labour anyway — this
+ * function knows what matters, not how much of it fits on screen.
+ *
+ * Returning fewer than `TOP_N` — or none — is a correct outcome, not a degraded
+ * one: an inbox of newsletters genuinely has nothing to show.
  *
  * @param messages - Candidates, as fetched by `fetchInbox`.
  * @param context - See {@link RankContext}. `senderCounts` is derived here.
@@ -582,7 +594,6 @@ export function rankMail(
         b.message.receivedAt - a.message.receivedAt ||
         a.message.id.localeCompare(b.message.id),
     )
-    .slice(0, TOP_N)
     .map(({ message, total, signals }) => ({
       message,
       reason: reasonFor(signals),
