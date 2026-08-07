@@ -1,20 +1,27 @@
-name: Deploy to GitHub Pages
+name: Build, test, and deploy
 
 on:
   push:
     branches: [master]
+  # Pull requests get the same lint/type/test/build gate as master, minus the
+  # deploy. Without this a broken PR is only found after merging, when the push
+  # it triggers fails at the lint step — which is how master has broken before.
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
-# Allow the workflow to publish to Pages.
+# Building needs nothing but the source. The Pages write permissions belong to
+# the deploy job alone, so a pull-request run — including one opened by
+# Dependabot — never holds a token that can publish.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# One deploy at a time; let an in-flight run finish rather than cancelling it.
+# Deploys share one group so two master pushes cannot race for Pages, and an
+# in-flight one is left to finish rather than cancelled. PR checks get a group
+# per branch and do cancel themselves: superseded commits are wasted minutes.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -22,15 +29,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Version comes from `.nvmrc` so CI and a local checkout cannot drift.
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
 
-      - run: npm run lint
-      - run: npm run test:run
+      # The gate CLAUDE.md asks for locally — lint, types, tests. Running the
+      # one script rather than three separate steps is what keeps "passes on my
+      # machine" and "passes in CI" the same claim.
+      - run: npm run check
 
       # Both integrations are optional — an unset value just leaves that feature
       # invisible, so the build succeeds either way. Anything prefixed `VITE_`
@@ -44,7 +54,10 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID || secrets.VITE_GOOGLE_CLIENT_ID }}
 
       # Fail loudly rather than shipping a build with sign-in silently missing.
+      # Deploy-only: a Dependabot pull request cannot read repository variables,
+      # so on PRs this would warn every single time and train you to ignore it.
       - name: Report which integrations were built in
+        if: github.event_name != 'pull_request'
         run: |
           grep -q 'pk_test_[A-Za-z0-9]\|pk_live_[A-Za-z0-9]' dist/assets/*.js \
             && echo "Clerk: enabled" \
@@ -54,13 +67,22 @@ jobs:
             || echo "::warning::Google Calendar sync is NOT in this build — set the VITE_GOOGLE_CLIENT_ID repository variable and re-run."
 
       - uses: actions/configure-pages@v6
+        if: github.event_name != 'pull_request'
+
       - uses: actions/upload-pages-artifact@v5
+        if: github.event_name != 'pull_request'
         with:
           path: dist
 
   deploy:
     needs: build
+    # A pull request builds and tests, but never publishes.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

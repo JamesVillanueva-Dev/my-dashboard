@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -10,6 +13,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
+    "check": "npm run lint && tsc -b && npm run test:run",
     "create:component": "node scripts/create-component.mjs"
   },
   "dependencies": {
