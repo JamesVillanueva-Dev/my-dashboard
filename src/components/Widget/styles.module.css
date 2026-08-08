@@ -250,11 +250,30 @@
   border-radius: 4px;
 }
 
+/* No panel may cost more than a screenful of scrolling on a phone. Past that it
+   caps and its body scrolls inside — the same arrangement a pinned height makes
+   above, and for the same reason. Content that genuinely wants the whole screen
+   has the expand button, which is a better answer than a panel you scroll past.
+
+   dvh, not vh, so the cap is the height actually visible with the address bar
+   showing rather than the taller figure it collapses to. */
+@media (max-width: 640px) {
+  .container {
+    max-height: 72dvh;
+  }
+  .container > div {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
+}
+
 /* One column, so a panel is already as wide as the screen and the handle's
    horizontal axis has nowhere to go — Dashboard clamps the width to the single
    column that exists. Say so with the cursor rather than implying a drag that
-   cannot happen. */
-@media (max-width: 640px) {
+   cannot happen. Above this width there are two columns to drag between, so the
+   handle keeps both axes. */
+@media (max-width: 340px) {
   .handle {
     cursor: ns-resize;
   }

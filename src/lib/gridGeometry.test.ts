@@ -6,8 +6,9 @@ const FALLBACK_ROW = 8;
 const FALLBACK_GAP = 12;
 
 /** An element whose computed style reports the given values. */
-function elementWithStyle(style: Partial<CSSStyleDeclaration>): HTMLElement {
+function elementWithStyle(style: Partial<CSSStyleDeclaration>, width = 0): HTMLElement {
   const element = document.createElement('div');
+  element.getBoundingClientRect = () => ({ width }) as DOMRect;
   vi.spyOn(window, 'getComputedStyle').mockReturnValue(style as CSSStyleDeclaration);
   return element;
 }
@@ -44,12 +45,16 @@ afterEach(() => {
 
 describe('gridMetrics', () => {
   it('reads row height, gaps and column width from the computed style', () => {
-    const grid = elementWithStyle({
-      gridAutoRows: '10px',
-      rowGap: '16px',
-      columnGap: '20px',
-      gridTemplateColumns: '240px 240px 240px',
-    });
+    const grid = elementWithStyle(
+      {
+        gridAutoRows: '10px',
+        rowGap: '16px',
+        columnGap: '20px',
+        gridTemplateColumns: '240px 240px 240px',
+      },
+      // Three 240px tracks and the two 20px gaps between them.
+      760,
+    );
 
     expect(gridMetrics(grid)).toEqual({
       row: 10,
@@ -58,6 +63,29 @@ describe('gridMetrics', () => {
       colWidth: 240,
       columns: 3,
     });
+  });
+
+  it('ignores the implicit tracks an over-wide panel adds', () => {
+    // The defect this arithmetic exists to prevent. A panel spanning 3 in a
+    // one-column grid makes Chrome report two extra 0px tracks; counting them
+    // told applySize it had three columns to cap at, so the cap never bit and
+    // the phantom tracks' gaps ate the real column's width.
+    const grid = elementWithStyle(
+      { columnGap: '10px', gridTemplateColumns: '350px 0px 0px' },
+      350,
+    );
+
+    expect(gridMetrics(grid).columns).toBe(1);
+  });
+
+  it('counts the columns a multi-track grid really has, phantom tracks and all', () => {
+    // Four real 301px tracks plus one implicit, at a 1280px desktop viewport.
+    const grid = elementWithStyle(
+      { columnGap: '12px', gridTemplateColumns: '301px 301px 301px 301px 0px' },
+      1240,
+    );
+
+    expect(gridMetrics(grid).columns).toBe(4);
   });
 
   it('falls back to the built-in row and gaps when the style is unreadable', () => {

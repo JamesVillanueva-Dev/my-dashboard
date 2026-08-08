@@ -100,9 +100,26 @@
   border: 0;
 }
 
-/* Narrower panels than this stop being readable, so below it the grid drops to a
-   single column and Dashboard caps every span at 1 to match. */
+/* Below this the grid stops asking for 288px tracks, because a phone cannot give
+   it two of them and one full-width column per panel makes the page enormous:
+   seven default panels, each as tall as its content. Two even columns instead
+   (~180px at 390px), so the one-column widgets — Weather, Notes, Spotify — pair
+   up rather than each costing a whole screen. Dashboard caps every span at 2 to
+   match, which is what keeps a panel stored wider from overflowing the page.
+
+   `minmax(0, 1fr)` rather than a bare `1fr`: the default minimum is `auto`, so a
+   panel with something unshrinkable in it (a long unbroken word, an embed) would
+   push its track past its share and take the page sideways with it. */
 @media (max-width: 640px) {
+  .body > main {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Two columns need a certain amount of phone to sit in. Below this they would be
+   ~145px each, which is past the point where a panel reads as a panel, so the
+   small phones that are already tightest for space get the single column. */
+@media (max-width: 340px) {
   .body > main {
     grid-template-columns: 1fr;
   }
