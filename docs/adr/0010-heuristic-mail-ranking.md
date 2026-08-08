@@ -85,6 +85,13 @@ entirely.**
    inbox with nothing above it gets the empty state. Returning fewer than three
    picks is a correct outcome, not a degraded one.
 
+   The floor judges a message's *merit* — its score before the recency factor.
+   Applying recency first made age disqualifying rather than ordering: a plain
+   unread note scores 28, so the curve's ×0.71 dropped it under the floor at
+   about two and a half days, and a read one lasted half a day. The ranking was
+   then only ever a day of mail deep, so dismissing a pick had nothing behind it
+   to promote. Recency orders the list; it does not shorten it.
+
 5. **The scorer is pure and explains itself.** `scoreMail(message, context, now)`
    — no `fetch`, no `Date.now()`, no React; `now` is injected so the same inbox
    always scores the same. Every score carries the `Signal`s that produced it,

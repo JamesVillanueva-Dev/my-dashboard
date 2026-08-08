@@ -37,6 +37,9 @@ export const TOP_N = 3;
  * is what lets the panel say "nothing" instead of dressing up junk. Calibrated
  * so that a plain note from a real person addressed only to you (~26) clears it
  * and nothing automated does without a genuine ask.
+ *
+ * Measured against {@link Score.merit} — the score *before* recency — so this is
+ * a bar on what a message is, not on how new it is. See {@link recencySignal}.
  */
 export const FLOOR = 20;
 
@@ -306,6 +309,13 @@ export interface Signal {
 export interface Score {
   /** `Σ points × Π factors`, rounded to one decimal for stable comparison. */
   total: number;
+  /**
+   * {@link Score.total} without the recency factor: what the message is worth on
+   * its own merits, at any age. This is what {@link FLOOR} judges, so that
+   * getting older reorders a message rather than deleting it. See
+   * {@link recencySignal}.
+   */
+  merit: number;
   /** Every signal that fired, in the order the scorers ran. */
   signals: Signal[];
 }
@@ -501,6 +511,13 @@ function automationSignals(message: MailSummary, matches: Matches): Signal[] {
  * A tie-breaker by construction: the curve spans 1.0 to {@link RECENCY_FLOOR},
  * so it can order two comparable messages but cannot lift a newsletter over a
  * real one. Nothing should ever be picked *because* it is newest.
+ *
+ * The converse matters just as much, and is why {@link FLOOR} is judged before
+ * this factor is applied. Multiplying first would make age *disqualifying*: a
+ * plain unread note scores 28, so a ×0.71 would put it under the floor — which
+ * this curve reaches in about two and a half days. The pool the panel windows
+ * would then hold little but the last day of mail, and dismissing a pick would
+ * find nothing left to promote.
  */
 function recencySignal(message: MailSummary, now: number): Signal {
   const hours = Math.max(0, (now - message.receivedAt) / 3_600_000);
@@ -518,7 +535,8 @@ function recencySignal(message: MailSummary, now: number): Signal {
  */
 export function scoreMail(message: MailSummary, context: RankContext, now: number): Score {
   const matches = readText(message);
-  const signals = [
+  // Everything the message *is*, scored without reference to the clock.
+  const merits = [
     ...labelSignals(message),
     ...addressingSignals(message, context.self),
     ...conversationSignals(message),
@@ -526,13 +544,20 @@ export function scoreMail(message: MailSummary, context: RankContext, now: numbe
     ...(message.unread ? [add('unread', 'unread', 3, UNREAD)] : []),
     ...senderSignals(message, context),
     ...automationSignals(message, matches),
-    recencySignal(message, now),
   ];
+  // Kept apart because the two answers are used for different things: merit
+  // decides whether a message is worth showing, the total decides the order.
+  const recency = recencySignal(message, now);
 
-  const points = signals.reduce((sum, s) => sum + s.points, 0);
-  const factor = signals.reduce((product, s) => product * s.factor, 1);
+  const points = merits.reduce((sum, s) => sum + s.points, 0);
+  const factor = merits.reduce((product, s) => product * s.factor, 1);
+  const round = (value: number) => Math.round(value * 10) / 10;
 
-  return { total: Math.round(points * factor * 10) / 10, signals };
+  return {
+    total: round(points * factor * recency.factor),
+    merit: round(points * factor),
+    signals: [...merits, recency],
+  };
 }
 
 /**
@@ -555,7 +580,8 @@ export function reasonFor(signals: Signal[]): string {
 }
 
 /**
- * Ranks every message that clears {@link FLOOR}, most important first.
+ * Ranks every message whose {@link Score.merit} clears {@link FLOOR}, most
+ * important first.
  *
  * Returns the whole ordering rather than the {@link TOP_N} the panel has room
  * for, because the panel's window into it moves: dismissing a pick promotes the
@@ -585,7 +611,8 @@ export function rankMail(
 
   return messages
     .map((message) => ({ message, ...scoreMail(message, { ...context, senderCounts }, now) }))
-    .filter((scored) => scored.total >= FLOOR)
+    // On merit, not on the total: age orders this list, it does not shorten it.
+    .filter((scored) => scored.merit >= FLOOR)
     // Ties break on recency, then on id — never on the order Gmail happened to
     // return, so the same inbox always ranks the same way.
     .sort(
