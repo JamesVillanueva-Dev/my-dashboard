@@ -58,6 +58,12 @@ export interface Metrics {
  * Read rather than assumed on purpose: `auto-fill` decides the column count from
  * the available width, so hard-coding it here would make these specs depend on
  * the viewport in a way rule 3 is meant to prevent.
+ *
+ * The column count is divided out of the grid's width rather than counted from
+ * the tracks, because the computed `grid-template-columns` includes the implicit
+ * 0px tracks an over-wide panel creates — the mirror of `gridMetrics`, and it has
+ * to stay a mirror or a spec here would pass against arithmetic the app does not
+ * actually do.
  */
 export async function metrics(page: Page): Promise<Metrics> {
   return page.evaluate(() => {
@@ -65,12 +71,15 @@ export async function metrics(page: Page): Promise<Metrics> {
     if (!grid) throw new Error('no grid');
     const style = getComputedStyle(grid);
     const tracks = style.gridTemplateColumns.split(' ').filter(Boolean);
+    const colGap = Number.parseFloat(style.columnGap);
+    const colWidth = Number.parseFloat(tracks[0]);
+    const width = grid.getBoundingClientRect().width;
     return {
       row: Number.parseFloat(style.gridAutoRows),
       gap: Number.parseFloat(style.rowGap),
-      colGap: Number.parseFloat(style.columnGap),
-      colWidth: Number.parseFloat(tracks[0]),
-      columns: tracks.length,
+      colGap,
+      colWidth,
+      columns: Math.max(1, Math.round((width + colGap) / (colWidth + colGap))),
     };
   });
 }

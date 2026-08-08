@@ -22,11 +22,18 @@ drag handle (⠿) for reordering and a remove (×) control on hover.
 Opened from the header; closes on outside-click or Escape. Unchecking a widget
 hides it from the grid; "Reset to default layout" restores the full set and order.
 
-## 3. Mobile / narrow (single column)
+## 3. Mobile / narrow
 
 ![Mobile wireframe](./wireframes/mobile.svg)
 
-Below ~300px per column the grid collapses to a single stacked column.
+Below 640px the grid stops asking for 288px tracks and drops to two even columns
+(~180px on a 390px phone), so the one-column widgets pair up instead of each
+costing a whole screen; panels stored wider are capped at two and fill the width.
+Below 340px there is not enough phone for two, and it becomes a single stacked
+column — which is what the wireframe above still shows.
+
+No panel may be taller than 72dvh here. Past that its body scrolls inside the
+card, and the expand button opens it full screen.
 
 ## 4. Empty state (all widgets removed)
 

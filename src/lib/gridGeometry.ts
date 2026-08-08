@@ -36,12 +36,26 @@ export interface GridMetrics {
 export function gridMetrics(grid: HTMLElement | null): GridMetrics {
   const style = grid ? getComputedStyle(grid) : null;
   const tracks = (style?.gridTemplateColumns ?? '').split(' ').filter(Boolean);
+  const colGap = Number.parseFloat(style?.columnGap ?? '') || GAP;
+  const colWidth = Number.parseFloat(tracks[0] ?? '') || 0;
+  const width = grid?.getBoundingClientRect().width ?? 0;
   return {
     row: Number.parseFloat(style?.gridAutoRows ?? '') || ROW,
     gap: Number.parseFloat(style?.rowGap ?? '') || GAP,
-    colGap: Number.parseFloat(style?.columnGap ?? '') || GAP,
-    colWidth: Number.parseFloat(tracks[0] ?? '') || 0,
-    columns: tracks.length,
+    colGap,
+    colWidth,
+    // Derived from the grid's own width, *not* counted from `tracks` — that is
+    // the whole point. A panel spanning more columns than the grid has creates
+    // implicit tracks, and the computed `grid-template-columns` includes them,
+    // so counting tracks measures the spans the count is supposed to be capping:
+    // three panels spanning 3 in a one-column grid report `350px 0px 0px`, and
+    // `applySize` then caps them at three rather than at one.
+    //
+    // Dividing instead is immune to that. Implicit tracks are 0px and are always
+    // appended *after* the explicit ones, so they change neither `colWidth` nor
+    // the grid's width, and this arithmetic is exactly what `auto-fill` did.
+    columns:
+      colWidth > 0 && width > 0 ? Math.max(1, Math.round((width + colGap) / (colWidth + colGap))) : 0,
   };
 }
 

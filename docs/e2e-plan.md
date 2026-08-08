@@ -18,8 +18,9 @@
 >   the mobile spec covers the media query and leaves the split to the manual
 >   checklist.
 >
-> The suite also found two defects, both recorded as `test.fail()` specs; they
-> are listed at the foot of [e2e-manual.md](e2e-manual.md).
+> The suite also found two defects. One is fixed — the uncapped panel spans, which
+> the phone layout now depends on being right; the other is still recorded as a
+> `test.fail()` spec. Both are at the foot of [e2e-manual.md](e2e-manual.md).
 
 ## Where things stand
 

@@ -162,12 +162,19 @@ Playwright project the first time something below actually breaks.
 
 ## Known defects
 
-Two are recorded as `test.fail()` specs, so the suite stays green while the bug
-stays on the record — and reports an *unexpected pass* the moment either is
-fixed. Neither is a regression; both are gaps found when the plan's phases were
-first written.
+One is recorded as a `test.fail()` spec, so the suite stays green while the bug
+stays on the record — and reports an *unexpected pass* the moment it is fixed. It
+is not a regression; it is a gap found when the plan's phases were first written.
 
 | Where | What |
 | --- | --- |
 | `e2e/lifecycle.spec.ts` | A stored `null` under `reminders`, `quicklinks` or `youtube.sources` — or `{}` under `user.name` — blanks the whole page. `useLocalStorage`'s `read` treats a successful `JSON.parse('null')` as a value, so the fallback never runs. Contradicts US-12. |
-| `e2e/layout.mobile.spec.ts` | Below 640px, panel spans are not capped at 1 as `Dashboard/styles.module.css` states. `gridMetrics` counts tracks from the computed `grid-template-columns`, which includes the implicit columns those very spans created. Costs ~20px of width and leaves panels at unequal widths. |
+
+### Fixed
+
+- **Panel spans were not capped to the columns on screen.** `gridMetrics` counted
+  tracks from the computed `grid-template-columns`, which includes the implicit
+  columns those very spans had created — so the cap read its ceiling off the
+  thing it was capping. It cost ~20px of width on a phone and left panels at
+  unequal widths. The count is now divided out of the grid's own width, which
+  implicit 0px tracks cannot affect. `e2e/layout.mobile.spec.ts` guards it.
