@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'test-results', 'playwright-report']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -38,6 +38,19 @@ export default defineConfig([
       // useSpotifyPlayer assigns `volumeRef.current` during render, so the
       // player callbacks read the live volume without re-subscribing.
       'react-hooks/refs': 'off',
+    },
+  },
+  {
+    // The e2e suite runs in Node, drives a browser, and is not React. It needs
+    // the Node globals the app config does not provide (`process`, `Buffer`),
+    // and none of the React rules above apply to it.
+    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'react-refresh/only-export-components': 'off',
     },
   },
 ])
