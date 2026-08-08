@@ -17,6 +17,11 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: true,
     restoreMocks: true,
+    // Tests are co-located with the code they cover, so this is the whole suite.
+    // Stated explicitly because Vitest's default pattern also matches `e2e/`,
+    // and a Playwright spec collected into jsdom fails on its first import —
+    // `@playwright/test` is not a thing that runs in a browser environment.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     // Vitest loads `.env.local` like the app does, so without this the suite
     // would behave differently on a machine that has the optional integrations
     // configured — Clerk would try to mount <UserButton> with no provider, and

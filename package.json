@@ -14,6 +14,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "check": "npm run lint && tsc -b && npm run test:run",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "create:component": "node scripts/create-component.mjs"
   },
   "dependencies": {
@@ -25,6 +27,7 @@
     "@emnapi/core": "^1.11.3",
     "@emnapi/runtime": "^1.11.3",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",

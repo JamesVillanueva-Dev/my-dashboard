@@ -1,5 +1,26 @@
 # Plan: end-to-end tests
 
+> **Status: built.** All six phases are in `e2e/`, run with `npm run e2e`
+> (47 specs, ~60s, one worker). The manual checklist Phase 6 called for is
+> [e2e-manual.md](e2e-manual.md). The four open decisions at the foot of this
+> document were settled as: e2e does **not** gate `npm run check`; all phases
+> were built, not just 1–2; specs live in `e2e/` with their own
+> `tsconfig.e2e.json` and eslint block; and the ADR 0011 measurements are now
+> regenerable from `drag.spec.ts` rather than from a lost script.
+>
+> Two things the plan assumed turned out not to hold, and the sections below
+> still describe the assumption rather than what was built:
+>
+> - **Demo mode is not reachable with auth off**, so Phase 4's demo round trip
+>   needed the gate switched back on from the browser — see
+>   `e2e/fixtures/authGate.ts`.
+> - **ADR 0008's device split is account-synced state**, not `localStorage`, so
+>   the mobile spec covers the media query and leaves the split to the manual
+>   checklist.
+>
+> The suite also found two defects, both recorded as `test.fail()` specs; they
+> are listed at the foot of [e2e-manual.md](e2e-manual.md).
+
 ## Where things stand
 
 There are **no end-to-end tests**. The suite is 67 Vitest files / ~1250 tests,
