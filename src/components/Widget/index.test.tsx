@@ -5,7 +5,7 @@ import { WidgetChromeProvider, type WidgetChrome } from './chrome';
 import styles from './styles.module.css';
 
 /** Chrome as the dashboard grid supplies it, overridable per test. */
-function chrome(over: Partial<WidgetChrome> = {}): WidgetChrome {
+function chrome(overrides: Partial<WidgetChrome> = {}): WidgetChrome {
   return {
     id: 'weather',
     size: { cols: 2, height: null },
@@ -17,24 +17,30 @@ function chrome(over: Partial<WidgetChrome> = {}): WidgetChrome {
     onGripKeyDown: vi.fn(),
     isDragging: false,
     isResizing: false,
-    ...over,
+    ...overrides,
   };
 }
 
 /** Renders a widget inside the grid, as the dashboard does. */
-function renderInGrid(over: Partial<WidgetChrome> = {}, props: { expandable?: boolean } = {}) {
-  const value = chrome(over);
-  const utils = render(
+function renderInGrid(
+  chromeOverrides: Partial<WidgetChrome> = {},
+  props: { expandable?: boolean } = {},
+) {
+  const value = chrome(chromeOverrides);
+  const view = render(
     <WidgetChromeProvider value={value}>
       <Widget title="Weather" icon="cloudSun" {...props}>
         <p>18°C</p>
       </Widget>
     </WidgetChromeProvider>,
   );
-  return { ...utils, chrome: value };
+  return { ...view, chrome: value, card: () => view.container.querySelector('section')! };
 }
 
-describe('Widget', () => {
+const resizeHandle = () => screen.getByRole('button', { name: /^Resize/ });
+const dragHandle = () => screen.getByRole('button', { name: /^Reorder/ });
+
+describe('Widget card', () => {
   it('renders its title and body', () => {
     render(<Widget title="Weather">18°C</Widget>);
 
@@ -43,7 +49,11 @@ describe('Widget', () => {
   });
 
   it('renders an icon beside the title when given one', () => {
-    const { container } = render(<Widget title="Weather" icon="cloudSun">body</Widget>);
+    const { container } = render(
+      <Widget title="Weather" icon="cloudSun">
+        body
+      </Widget>,
+    );
 
     expect(container.querySelector('h2 svg')).toBeInTheDocument();
   });
@@ -75,194 +85,228 @@ describe('Widget', () => {
     expect(card).toHaveClass(styles.container);
     expect(card).toHaveClass('weather-root');
   });
+});
 
-  describe('full screen', () => {
-    it('offers no expand button unless the widget asks for one', () => {
-      render(<Widget title="Weather">18°C</Widget>);
+describe('Widget full screen', () => {
+  it('offers no expand button unless the widget asks for one', () => {
+    render(<Widget title="Weather">18°C</Widget>);
 
-      expect(screen.queryByRole('button', { name: /full screen/ })).not.toBeInTheDocument();
-    });
-
-    it('reopens the body in a dialog, and hands it back on close', () => {
-      render(
-        <Widget title="Notes" expandable>
-          <p>my note</p>
-        </Widget>,
-      );
-
-      fireEvent.click(screen.getByRole('button', { name: 'Show Notes full screen' }));
-
-      const dialog = screen.getByRole('dialog');
-      expect(within(dialog).getByText('my note')).toBeInTheDocument();
-
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Close Notes' }));
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.getByText('my note')).toBeInTheDocument();
-    });
-
-    it('draws the body in one place at a time, so nothing is mounted twice', () => {
-      render(
-        <Widget title="Notes" expandable>
-          <p>my note</p>
-        </Widget>,
-      );
-
-      fireEvent.click(screen.getByRole('button', { name: 'Show Notes full screen' }));
-
-      // Would throw on a second copy behind the dialog.
-      expect(screen.getByText('my note')).toBeInTheDocument();
-    });
-
-    it('leaves the card its slot in the grid, with a way back', () => {
-      const { container } = renderInGrid({}, { expandable: true });
-
-      fireEvent.click(screen.getByRole('button', { name: 'Show Weather full screen' }));
-      expect(container.querySelector('section')).toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Bring it back' }));
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    });
+    expect(screen.queryByRole('button', { name: /full screen/ })).not.toBeInTheDocument();
   });
 
-  describe('outside the dashboard grid', () => {
-    it('renders no management controls', () => {
-      render(<Widget title="Weather">body</Widget>);
+  it('reopens the body in a dialog', () => {
+    render(
+      <Widget title="Notes" expandable>
+        <p>my note</p>
+      </Widget>,
+    );
 
-      expect(screen.queryByRole('button', { name: /^Reorder/ })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /^Resize/ })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /^Remove/ })).not.toBeInTheDocument();
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Show Notes full screen' }));
 
-    it('still renders the title, body, and action', () => {
-      render(
-        <Widget title="Weather" action={<span>now</span>}>
-          18°C
-        </Widget>,
-      );
-
-      expect(screen.getByRole('heading', { name: 'Weather' })).toBeInTheDocument();
-      expect(screen.getByText('18°C')).toBeInTheDocument();
-      expect(screen.getByText('now')).toBeInTheDocument();
-    });
+    expect(within(screen.getByRole('dialog')).getByText('my note')).toBeInTheDocument();
   });
 
-  describe('inside the dashboard grid', () => {
-    it('renders the drag handle, resize, and remove controls', () => {
-      renderInGrid();
+  it('hands the body back to the card on close', () => {
+    render(
+      <Widget title="Notes" expandable>
+        <p>my note</p>
+      </Widget>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Show Notes full screen' }));
 
-      expect(
-        screen.getByRole('button', { name: 'Reorder Weather. Use the arrow keys to move it.' }),
-      ).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^Resize Weather/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Remove Weather widget' })).toBeInTheDocument();
-    });
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Close Notes' }));
 
-    it('starts a resize drag from the corner handle, passing the widget id', () => {
-      const { chrome } = renderInGrid();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByText('my note')).toBeInTheDocument();
+  });
 
-      fireEvent.pointerDown(screen.getByRole('button', { name: /^Resize/ }));
+  it('draws the body in one place at a time, so nothing is mounted twice', () => {
+    render(
+      <Widget title="Notes" expandable>
+        <p>my note</p>
+      </Widget>,
+    );
 
-      expect(chrome.onResizeStart).toHaveBeenCalledWith(expect.anything(), 'weather');
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Show Notes full screen' }));
 
-    it('forwards arrow keys from the handle, so resizing works without a pointer', () => {
-      const { chrome } = renderInGrid();
+    // Would throw on a second copy behind the dialog.
+    expect(screen.getByText('my note')).toBeInTheDocument();
+  });
 
-      fireEvent.keyDown(screen.getByRole('button', { name: /^Resize/ }), { key: 'ArrowRight' });
+  it('leaves the card its slot in the grid', () => {
+    const { card } = renderInGrid({}, { expandable: true });
 
-      expect(chrome.onResizeKeyDown).toHaveBeenCalledWith(expect.anything(), 'weather');
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Show Weather full screen' }));
 
-    it('fits the height to the content when the handle is double-clicked', () => {
-      const { chrome } = renderInGrid({ size: { cols: 2, height: 300 } });
+    expect(card()).toBeInTheDocument();
+  });
 
-      fireEvent.doubleClick(screen.getByRole('button', { name: /^Resize/ }));
+  it('offers a way back to the card', () => {
+    renderInGrid({}, { expandable: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Show Weather full screen' }));
 
-      expect(chrome.onFitHeight).toHaveBeenCalledWith('weather');
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Bring it back' }));
 
-    it('states both dimensions on the handle, so its size is readable without sight', () => {
-      renderInGrid({ size: { cols: 1, height: 300 } });
-      expect(screen.getByRole('button', { name: /^Resize/ })).toHaveAccessibleName(
-        /1 column wide, 300 pixels tall/,
-      );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
 
-      const auto = renderInGrid({ size: { cols: 3, height: null } });
-      expect(
-        within(auto.container).getByRole('button', { name: /^Resize/ }),
-      ).toHaveAccessibleName(/3 columns wide, height fits the content/);
-    });
+describe('Widget outside the dashboard grid', () => {
+  it('renders no management controls', () => {
+    render(<Widget title="Weather">body</Widget>);
 
-    it('keeps the resize handle reachable by keyboard', () => {
-      renderInGrid();
+    expect(screen.queryByRole('button', { name: /^Reorder/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Resize/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Remove/ })).not.toBeInTheDocument();
+  });
 
-      expect(screen.getByRole('button', { name: /^Resize/ })).toHaveAttribute('tabindex', '0');
-    });
+  it('still renders the title, body, and action', () => {
+    render(
+      <Widget title="Weather" action={<span>now</span>}>
+        18°C
+      </Widget>,
+    );
 
-    it('lets its body scroll only once the height is pinned', () => {
-      const { container } = renderInGrid({ size: { cols: 2, height: 300 } });
-      expect(container.querySelector('section')).toHaveClass(styles.isPinned);
+    expect(screen.getByRole('heading', { name: 'Weather' })).toBeInTheDocument();
+    expect(screen.getByText('18°C')).toBeInTheDocument();
+    expect(screen.getByText('now')).toBeInTheDocument();
+  });
+});
 
-      const auto = renderInGrid();
-      expect(auto.container.querySelector('section')).not.toHaveClass(styles.isPinned);
-    });
+describe('Widget inside the dashboard grid', () => {
+  it('renders the drag handle, resize, and remove controls', () => {
+    renderInGrid();
 
-    it('marks itself as being resized only while it is the panel under the pointer', () => {
-      const { container } = renderInGrid({ isResizing: true });
-      expect(container.querySelector('section')).toHaveClass(styles.isResizing);
+    expect(
+      screen.getByRole('button', { name: 'Reorder Weather. Use the arrow keys to move it.' }),
+    ).toBeInTheDocument();
+    expect(resizeHandle()).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Weather widget' })).toBeInTheDocument();
+  });
 
-      const still = renderInGrid();
-      expect(still.container.querySelector('section')).not.toHaveClass(styles.isResizing);
-    });
+  it('removes the widget when remove is clicked', () => {
+    const { chrome } = renderInGrid();
 
-    it('removes the widget when remove is clicked', () => {
-      const { chrome } = renderInGrid();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Weather widget' }));
 
-      fireEvent.click(screen.getByRole('button', { name: 'Remove Weather widget' }));
+    expect(chrome.onRemove).toHaveBeenCalledTimes(1);
+  });
+});
 
-      expect(chrome.onRemove).toHaveBeenCalledTimes(1);
-    });
+describe('Widget resize handle', () => {
+  it('starts a resize drag from the corner, passing the widget id', () => {
+    const { chrome } = renderInGrid();
 
-    it('starts a drag from the handle, passing the widget id', () => {
-      const { chrome } = renderInGrid();
+    fireEvent.pointerDown(resizeHandle());
 
-      fireEvent.pointerDown(screen.getByRole('button', { name: /^Reorder/ }));
+    expect(chrome.onResizeStart).toHaveBeenCalledWith(expect.anything(), 'weather');
+  });
 
-      expect(chrome.onGrab).toHaveBeenCalledWith(expect.anything(), 'weather');
-    });
+  it('forwards arrow keys, so resizing works without a pointer', () => {
+    const { chrome } = renderInGrid();
 
-    it('forwards arrow keys from the handle, so reordering works without a pointer', () => {
-      const { chrome } = renderInGrid();
+    fireEvent.keyDown(resizeHandle(), { key: 'ArrowRight' });
 
-      fireEvent.keyDown(screen.getByRole('button', { name: /^Reorder/ }), { key: 'ArrowDown' });
+    expect(chrome.onResizeKeyDown).toHaveBeenCalledWith(expect.anything(), 'weather');
+  });
 
-      expect(chrome.onGripKeyDown).toHaveBeenCalledWith(expect.anything(), 'weather');
-    });
+  it('fits the height to the content when double-clicked', () => {
+    const { chrome } = renderInGrid({ size: { cols: 2, height: 300 } });
 
-    it('keeps the handle reachable by keyboard', () => {
-      renderInGrid();
+    fireEvent.doubleClick(resizeHandle());
 
-      expect(screen.getByRole('button', { name: /^Reorder/ })).toHaveAttribute('tabindex', '0');
-    });
+    expect(chrome.onFitHeight).toHaveBeenCalledWith('weather');
+  });
 
-    it('marks itself compact at one column wide, for the tighter type scale', () => {
-      const { container } = renderInGrid({ size: { cols: 1, height: null } });
+  it('states a pinned height on the handle, so the size is readable without sight', () => {
+    renderInGrid({ size: { cols: 1, height: 300 } });
 
-      expect(container.querySelector('section')).toHaveClass(styles.isCompact);
-    });
+    expect(resizeHandle()).toHaveAccessibleName(/1 column wide, 300 pixels tall/);
+  });
 
-    it('is not compact once it has been widened', () => {
-      const { container } = renderInGrid({ size: { cols: 3, height: null } });
+  it('says so on the handle when the height fits the content', () => {
+    renderInGrid({ size: { cols: 3, height: null } });
 
-      expect(container.querySelector('section')).not.toHaveClass(styles.isCompact);
-    });
+    expect(resizeHandle()).toHaveAccessibleName(/3 columns wide, height fits the content/);
+  });
 
-    it('marks itself as lifted only while it is the panel being dragged', () => {
-      const { container } = renderInGrid({ isDragging: true });
-      expect(container.querySelector('section')).toHaveClass(styles.isDragging);
+  it('is reachable by keyboard', () => {
+    renderInGrid();
 
-      const still = renderInGrid({ isDragging: false });
-      expect(still.container.querySelector('section')).not.toHaveClass(styles.isDragging);
-    });
+    expect(resizeHandle()).toHaveAttribute('tabindex', '0');
+  });
+});
+
+describe('Widget drag handle', () => {
+  it('starts a drag, passing the widget id', () => {
+    const { chrome } = renderInGrid();
+
+    fireEvent.pointerDown(dragHandle());
+
+    expect(chrome.onGrab).toHaveBeenCalledWith(expect.anything(), 'weather');
+  });
+
+  it('forwards arrow keys, so reordering works without a pointer', () => {
+    const { chrome } = renderInGrid();
+
+    fireEvent.keyDown(dragHandle(), { key: 'ArrowDown' });
+
+    expect(chrome.onGripKeyDown).toHaveBeenCalledWith(expect.anything(), 'weather');
+  });
+
+  it('is reachable by keyboard', () => {
+    renderInGrid();
+
+    expect(dragHandle()).toHaveAttribute('tabindex', '0');
+  });
+});
+
+describe('Widget state classes', () => {
+  it('lets its body scroll once the height is pinned', () => {
+    const { card } = renderInGrid({ size: { cols: 2, height: 300 } });
+
+    expect(card()).toHaveClass(styles.isPinned);
+  });
+
+  it('does not pin a panel whose height fits its content', () => {
+    const { card } = renderInGrid();
+
+    expect(card()).not.toHaveClass(styles.isPinned);
+  });
+
+  it('marks itself as being resized while it is the panel under the pointer', () => {
+    const { card } = renderInGrid({ isResizing: true });
+
+    expect(card()).toHaveClass(styles.isResizing);
+  });
+
+  it('is not marked as being resized otherwise', () => {
+    const { card } = renderInGrid();
+
+    expect(card()).not.toHaveClass(styles.isResizing);
+  });
+
+  it('marks itself compact at one column wide, for the tighter type scale', () => {
+    const { card } = renderInGrid({ size: { cols: 1, height: null } });
+
+    expect(card()).toHaveClass(styles.isCompact);
+  });
+
+  it('is not compact once it has been widened', () => {
+    const { card } = renderInGrid({ size: { cols: 3, height: null } });
+
+    expect(card()).not.toHaveClass(styles.isCompact);
+  });
+
+  it('marks itself as lifted while it is the panel being dragged', () => {
+    const { card } = renderInGrid({ isDragging: true });
+
+    expect(card()).toHaveClass(styles.isDragging);
+  });
+
+  it('is not marked as lifted otherwise', () => {
+    const { card } = renderInGrid({ isDragging: false });
+
+    expect(card()).not.toHaveClass(styles.isDragging);
   });
 });

@@ -20,10 +20,18 @@ import {
 } from './profileSync';
 
 const SCOPE = 'user_abc';
-const at = (scope: string, key: string) => `${scope}:${key}`;
+
+/** The keys holding content a user authored, which is shared across devices. */
+const AUTHORED_KEYS = ['notes.text', 'reminders', 'quicklinks', 'youtube.sources'];
+
+/** A scoped localStorage key, the way the dashboard stores it. */
+const scopedKey = (scope: string, key: string) => `${scope}:${key}`;
+
+/** The key under {@link SCOPE}, which is the scope nearly every case uses. */
+const key = (name: string) => scopedKey(SCOPE, name);
 
 /** A snapshot with shared `data` filled in and a fixed stamp. */
-const snap = (
+const snapshot = (
   data: Record<string, string>,
   updatedAt = 1000,
   devices: ProfileSnapshot['devices'] = {},
@@ -39,86 +47,116 @@ describe('SYNCED_KEYS', () => {
   });
 
   it('excludes credentials and the response cache', () => {
-    for (const key of SYNCED_KEYS) {
-      expect(key.startsWith('cache:')).toBe(false);
-      expect(key).not.toBe('spotify.token');
-      expect(key).not.toBe('spotify.pkce_verifier');
+    for (const syncedKey of SYNCED_KEYS) {
+      expect(syncedKey.startsWith('cache:')).toBe(false);
+      expect(syncedKey).not.toBe('spotify.token');
+      expect(syncedKey).not.toBe('spotify.pkce_verifier');
     }
   });
 
   it('carries the data a user actually authored', () => {
-    for (const key of ['notes.text', 'reminders', 'quicklinks', 'youtube.sources', 'layout']) {
-      expect(SYNCED_KEYS).toContain(key);
+    for (const authoredKey of [...AUTHORED_KEYS, 'layout']) {
+      expect(SYNCED_KEYS).toContain(authoredKey);
     }
   });
 });
 
 describe('collect', () => {
-  it('gathers only the synced keys that are actually set', () => {
-    localStorage.setItem(at(SCOPE, 'notes.text'), '"hello"');
-    localStorage.setItem(at(SCOPE, 'cache:weather'), '{"big":true}');
-    localStorage.setItem(at(SCOPE, 'gcal.syncToken'), '"tok"');
+  it('gathers the synced keys that are set', () => {
+    localStorage.setItem(key('notes.text'), '"hello"');
 
-    const result = collect(SCOPE, 'desktop');
+    expect(collect(SCOPE, 'desktop').data['notes.text']).toBe('"hello"');
+  });
 
-    expect(result.data['notes.text']).toBe('"hello"');
-    expect(result.data['cache:weather']).toBeUndefined();
-    expect(result.data['gcal.syncToken']).toBeUndefined();
-    // Unset keys are absent rather than defaulted, so a fresh browser cannot
-    // publish a wall of defaults that later beats a device with real data.
-    expect(result.data['quicklinks']).toBeUndefined();
+  it('skips the keys that are not synced', () => {
+    localStorage.setItem(key('cache:weather'), '{"big":true}');
+    localStorage.setItem(key('gcal.syncToken'), '"tok"');
+
+    const collected = collect(SCOPE, 'desktop');
+
+    expect(collected.data['cache:weather']).toBeUndefined();
+    expect(collected.data['gcal.syncToken']).toBeUndefined();
+  });
+
+  it('omits an unset key rather than publishing a default for it', () => {
+    // A fresh browser must not publish a wall of defaults that later beats a
+    // device holding real data.
+    expect(collect(SCOPE, 'desktop').data['quicklinks']).toBeUndefined();
   });
 
   it('reads another account’s namespace as empty', () => {
-    localStorage.setItem(at('user_other', 'notes.text'), '"theirs"');
+    localStorage.setItem(scopedKey('user_other', 'notes.text'), '"theirs"');
+
     expect(collect(SCOPE, 'desktop').data['notes.text']).toBeUndefined();
   });
 
-  it('dates a never-stamped browser as older than any account copy', () => {
+  it('dates a never-stamped browser to zero', () => {
     // The dangerous case: dating a fresh device to "now" would make it beat the
     // account on every comparison, and signing in on a new laptop would push an
     // empty dashboard over the real one.
     expect(collect(SCOPE, 'desktop').updatedAt).toBe(0);
-    expect(resolve(collect(SCOPE, 'desktop'), snap({ 'notes.text': '"real data"' }, 123))).toBe('pull');
+  });
+
+  it('loses to any account copy, however old', () => {
+    const fresh = collect(SCOPE, 'desktop');
+
+    expect(resolve(fresh, snapshot({ 'notes.text': '"real data"' }, 123))).toBe('pull');
   });
 });
 
 describe('apply', () => {
-  it('writes the snapshot into this browser and stamps it', () => {
-    apply(SCOPE, snap({ 'notes.text': '"from account"' }, 555), 'desktop');
+  it('writes the snapshot into this browser', () => {
+    apply(SCOPE, snapshot({ 'notes.text': '"from account"' }, 555), 'desktop');
 
-    expect(localStorage.getItem(at(SCOPE, 'notes.text'))).toBe('"from account"');
+    expect(localStorage.getItem(key('notes.text'))).toBe('"from account"');
+  });
+
+  it('stamps this browser with the snapshot’s revision', () => {
+    apply(SCOPE, snapshot({ 'notes.text': '"from account"' }, 555), 'desktop');
+
     expect(localStamp(SCOPE)).toBe(555);
   });
 
   it('removes a key the account no longer has', () => {
     // Deleted on another device: it must not survive here and be pushed back.
-    localStorage.setItem(at(SCOPE, 'youtube.sources'), '[{"id":"1"}]');
+    localStorage.setItem(key('youtube.sources'), '[{"id":"1"}]');
 
-    apply(SCOPE, snap({ 'notes.text': '"kept"' }), 'desktop');
+    apply(SCOPE, snapshot({ 'notes.text': '"kept"' }), 'desktop');
 
-    expect(localStorage.getItem(at(SCOPE, 'youtube.sources'))).toBeNull();
+    expect(localStorage.getItem(key('youtube.sources'))).toBeNull();
   });
 
   it('leaves unsynced local keys alone', () => {
-    localStorage.setItem(at(SCOPE, 'gcal.syncToken'), '"mine"');
-    apply(SCOPE, snap({}), 'desktop');
-    expect(localStorage.getItem(at(SCOPE, 'gcal.syncToken'))).toBe('"mine"');
+    localStorage.setItem(key('gcal.syncToken'), '"mine"');
+
+    apply(SCOPE, snapshot({}), 'desktop');
+
+    expect(localStorage.getItem(key('gcal.syncToken'))).toBe('"mine"');
   });
 });
 
 describe('readSnapshot', () => {
   it('reads a well-formed snapshot out of Clerk metadata', () => {
-    const stored = { [METADATA_KEY]: snap({ 'notes.text': '"x"' }, 7) };
+    const stored = { [METADATA_KEY]: snapshot({ 'notes.text': '"x"' }, 7) };
+
     expect(readSnapshot(stored, 'desktop')?.updatedAt).toBe(7);
   });
 
-  it('rejects junk rather than handing widgets a broken shape', () => {
+  it('rejects metadata with no snapshot in it', () => {
     expect(readSnapshot(null, 'desktop')).toBeNull();
     expect(readSnapshot({}, 'desktop')).toBeNull();
-    // A version from the future, and a snapshot with no stamp to compare on.
-    expect(readSnapshot({ [METADATA_KEY]: { v: 99, updatedAt: 1, data: {} } }, 'desktop')).toBeNull();
-    expect(readSnapshot({ [METADATA_KEY]: { v: 1, data: {} } }, 'desktop')).toBeNull();
+  });
+
+  it('rejects a snapshot from a future version', () => {
+    const fromTheFuture = { [METADATA_KEY]: { v: 99, updatedAt: 1, data: {} } };
+
+    expect(readSnapshot(fromTheFuture, 'desktop')).toBeNull();
+  });
+
+  it('rejects a snapshot with no stamp to compare on', () => {
+    const unstamped = { [METADATA_KEY]: { v: 1, data: {} } };
+
+    expect(readSnapshot(unstamped, 'desktop')).toBeNull();
   });
 
   it('upgrades a pre-split v1 snapshot into this device’s layout', () => {
@@ -130,41 +168,51 @@ describe('readSnapshot', () => {
       },
     };
 
-    const result = readSnapshot(v1, 'desktop');
+    const upgraded = readSnapshot(v1, 'desktop');
 
     // Content stays shared; the layout it was arranged with becomes this
     // device's, since that is the only form factor it could have come from.
-    expect(result?.data['notes.text']).toBe('"shared"');
-    expect(result?.data['layout']).toBeUndefined();
-    expect(result?.devices.desktop?.data['layout']).toBe('["notes"]');
+    expect(upgraded?.data['notes.text']).toBe('"shared"');
+    expect(upgraded?.data['layout']).toBeUndefined();
+    expect(upgraded?.devices.desktop?.data['layout']).toBe('["notes"]');
   });
 });
 
 describe('the desktop/mobile split', () => {
-  it('separates layout from content', () => {
-    for (const key of DEVICE_KEYS) expect(SHARED_KEYS).not.toContain(key);
-    // Content a user authored must never be duplicated per device.
-    for (const key of ['notes.text', 'reminders', 'youtube.sources', 'quicklinks']) {
-      expect(SHARED_KEYS).toContain(key);
-      expect(DEVICE_KEYS).not.toContain(key);
+  it('keeps the per-device keys out of the shared set', () => {
+    for (const deviceKey of DEVICE_KEYS) {
+      expect(SHARED_KEYS).not.toContain(deviceKey);
+    }
+  });
+
+  it('keeps authored content shared rather than duplicated per device', () => {
+    for (const authoredKey of AUTHORED_KEYS) {
+      expect(SHARED_KEYS).toContain(authoredKey);
+      expect(DEVICE_KEYS).not.toContain(authoredKey);
     }
   });
 
   it('files this browser’s layout under its own form factor', () => {
-    localStorage.setItem(at(SCOPE, 'layout'), '["notes","weather"]');
-    localStorage.setItem(at(SCOPE, 'notes.text'), '"shared"');
+    localStorage.setItem(key('layout'), '["notes","weather"]');
 
-    const mobile = collect(SCOPE, 'mobile');
+    const collected = collect(SCOPE, 'mobile');
 
-    expect(mobile.devices.mobile?.data['layout']).toBe('["notes","weather"]');
-    expect(mobile.devices.desktop).toBeUndefined();
-    expect(mobile.data['notes.text']).toBe('"shared"');
-    expect(mobile.data['layout']).toBeUndefined();
+    expect(collected.devices.mobile?.data['layout']).toBe('["notes","weather"]');
+    expect(collected.devices.desktop).toBeUndefined();
+    expect(collected.data['layout']).toBeUndefined();
+  });
+
+  it('keeps shared content out of the device slice', () => {
+    localStorage.setItem(key('notes.text'), '"shared"');
+
+    const collected = collect(SCOPE, 'mobile');
+
+    expect(collected.data['notes.text']).toBe('"shared"');
   });
 
   it('carries the other device’s layout through a push untouched', () => {
-    const remote = snap({}, 100, { desktop: { data: { layout: '["a","b","c"]' } } });
-    const localMobile = snap({}, 200, { mobile: { data: { layout: '["a"]' } } });
+    const remote = snapshot({}, 100, { desktop: { data: { layout: '["a","b","c"]' } } });
+    const localMobile = snapshot({}, 200, { mobile: { data: { layout: '["a"]' } } });
 
     const merged = merge(localMobile, remote);
 
@@ -174,87 +222,94 @@ describe('the desktop/mobile split', () => {
   });
 
   it('applies only this device’s layout, ignoring the other’s', () => {
-    apply(
-      SCOPE,
-      snap({}, 1, {
-        desktop: { data: { layout: '["desktop-order"]' } },
-        mobile: { data: { layout: '["mobile-order"]' } },
-      }),
-      'mobile',
-    );
+    const bothDevices = snapshot({}, 1, {
+      desktop: { data: { layout: '["desktop-order"]' } },
+      mobile: { data: { layout: '["mobile-order"]' } },
+    });
 
-    expect(localStorage.getItem(at(SCOPE, 'layout'))).toBe('["mobile-order"]');
+    apply(SCOPE, bothDevices, 'mobile');
+
+    expect(localStorage.getItem(key('layout'))).toBe('["mobile-order"]');
   });
 
   it('leaves a layout alone when the account has none for this device yet', () => {
     // First phone signing in to a desktop-only account: there is no mobile slice
     // to prefer, and clearing the local one would replace it with an absence.
-    localStorage.setItem(at(SCOPE, 'layout'), '["arranged-here"]');
+    localStorage.setItem(key('layout'), '["arranged-here"]');
 
-    apply(SCOPE, snap({}, 1, { desktop: { data: { layout: '["pc"]' } } }), 'mobile');
+    apply(SCOPE, snapshot({}, 1, { desktop: { data: { layout: '["pc"]' } } }), 'mobile');
 
-    expect(localStorage.getItem(at(SCOPE, 'layout'))).toBe('["arranged-here"]');
+    expect(localStorage.getItem(key('layout'))).toBe('["arranged-here"]');
+  });
+});
+
+describe('detectFormFactor', () => {
+  it('calls a device with a precise pointer a desktop', () => {
+    expect(detectFormFactor()).toBe('desktop');
   });
 
-  it('calls a coarse pointer mobile and everything else desktop', () => {
-    expect(detectFormFactor()).toBe('desktop');
+  it('calls a device with a coarse pointer a mobile', () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) => ({ matches: query.includes('coarse') }) as MediaQueryList,
+    );
 
-    const coarse = (query: string) => ({ matches: query.includes('coarse') }) as MediaQueryList;
-    vi.spyOn(window, 'matchMedia').mockImplementation(coarse);
     expect(detectFormFactor()).toBe('mobile');
   });
 });
 
 describe('overBudget', () => {
   it('passes an ordinary dashboard', () => {
-    expect(overBudget(snap({ 'notes.text': '"a short note"' }))).toEqual([]);
+    expect(overBudget(snapshot({ 'notes.text': '"a short note"' }))).toEqual([]);
   });
 
   it('names the largest offender first when the cap is blown', () => {
-    const huge = snap({
+    const huge = snapshot({
       'notes.text': JSON.stringify('x'.repeat(BUDGET_BYTES)),
       'user.name': '"me"',
     });
 
-    const culprits = overBudget(huge);
-
-    expect(culprits[0]).toBe('notes.text');
     expect(measure(huge)).toBeGreaterThan(BUDGET_BYTES);
+    expect(overBudget(huge)[0]).toBe('notes.text');
   });
 });
 
 describe('resolve', () => {
   it('pulls when the account is newer than this browser', () => {
-    expect(resolve(snap({}, 100), snap({}, 200))).toBe('pull');
+    expect(resolve(snapshot({}, 100), snapshot({}, 200))).toBe('pull');
   });
 
   it('pushes when this browser is newer', () => {
-    expect(resolve(snap({}, 300), snap({}, 200))).toBe('push');
+    expect(resolve(snapshot({}, 300), snapshot({}, 200))).toBe('push');
   });
 
   it('pushes a first-ever sync that has local data', () => {
-    expect(resolve(snap({ 'notes.text': '"x"' }, 1), null)).toBe('push');
+    expect(resolve(snapshot({ 'notes.text': '"x"' }, 1), null)).toBe('push');
   });
 
-  it('does nothing for a brand-new account with nothing anywhere', () => {
-    expect(resolve(snap({}, 0), null)).toBe('idle');
+  it('is idle for a brand-new account with nothing anywhere', () => {
+    expect(resolve(snapshot({}, 0), null)).toBe('idle');
   });
 
-  it('does nothing when both sides are at the same revision', () => {
-    expect(resolve(snap({}, 200), snap({}, 200))).toBe('idle');
+  it('is idle when both sides are at the same revision', () => {
+    expect(resolve(snapshot({}, 200), snapshot({}, 200))).toBe('idle');
   });
 });
 
-describe('markLocal / localStamp', () => {
+describe('markLocal and localStamp', () => {
   it('round-trips the change stamp', () => {
     markLocal(SCOPE, 4242);
+
     expect(localStamp(SCOPE)).toBe(4242);
-    expect(localStorage.getItem(at(SCOPE, LOCAL_STAMP_KEY))).toBe('4242');
+    expect(localStorage.getItem(key(LOCAL_STAMP_KEY))).toBe('4242');
   });
 
-  it('reads a missing or corrupt stamp as zero, so the account wins', () => {
+  it('reads a missing stamp as zero, so the account wins', () => {
     expect(localStamp(SCOPE)).toBe(0);
-    localStorage.setItem(at(SCOPE, LOCAL_STAMP_KEY), 'not json');
+  });
+
+  it('reads a corrupt stamp as zero, so the account wins', () => {
+    localStorage.setItem(key(LOCAL_STAMP_KEY), 'not json');
+
     expect(localStamp(SCOPE)).toBe(0);
   });
 });

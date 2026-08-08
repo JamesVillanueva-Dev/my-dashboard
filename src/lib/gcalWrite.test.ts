@@ -20,15 +20,27 @@ vi.mock('./googleAuth', () => ({
   clearAccessToken: vi.fn(),
 }));
 
+/** The event being edited in the write cases. */
+const EVENT_REF = { calendarId: 'cal-1', eventId: 'e1' };
+
 /** Converts a raw Google event the way the read path does. */
 function read(raw: Record<string, unknown>): CalendarEvent {
-  const ev = toEvent({ id: 'e1', summary: 'Thing', ...raw }, 'cal-1', { canWrite: true });
-  if (!ev) throw new Error('fixture did not convert');
-  return ev;
+  const event = toEvent({ id: 'e1', summary: 'Thing', ...raw }, 'cal-1', { canWrite: true });
+  if (!event) throw new Error('fixture did not convert');
+  return event;
 }
 
+/** A raw all-day event, as Google reports 3–5 August: an exclusive end of the 6th. */
+const RAW_ALL_DAY = { start: { date: '2026-08-03' }, end: { date: '2026-08-06' } };
+
+/** A raw timed event, 09:30–10:45 local on 3 August. */
+const RAW_TIMED = {
+  start: { dateTime: new Date(2026, 7, 3, 9, 30).toISOString() },
+  end: { dateTime: new Date(2026, 7, 3, 10, 45).toISOString() },
+};
+
 /** A valid timed draft, overridable per test. */
-function draft(over: Partial<EventDraft> = {}): EventDraft {
+function draft(overrides: Partial<EventDraft> = {}): EventDraft {
   return {
     calendarId: 'cal-1',
     title: 'Standup',
@@ -39,7 +51,7 @@ function draft(over: Partial<EventDraft> = {}): EventDraft {
     endTime: '10:00',
     location: '',
     description: '',
-    ...over,
+    ...overrides,
   };
 }
 
@@ -64,52 +76,63 @@ describe('shiftDay', () => {
 describe('blankDraft', () => {
   it('starts at the next whole hour, on the chosen day', () => {
     const now = new Date(2026, 7, 3, 14, 37).getTime();
-    const d = blankDraft('2026-08-11', 'cal-1', now);
 
-    expect(d.startDate).toBe('2026-08-11');
-    expect(d.startTime).toBe('15:00');
-    expect(d.endDate).toBe('2026-08-11');
-    expect(d.endTime).toBe('16:00');
-    expect(d.allDay).toBe(false);
-    expect(d.calendarId).toBe('cal-1');
+    const blank = blankDraft('2026-08-11', 'cal-1', now);
+
+    expect(blank.startDate).toBe('2026-08-11');
+    expect(blank.startTime).toBe('15:00');
+    expect(blank.endDate).toBe('2026-08-11');
+    expect(blank.endTime).toBe('16:00');
   });
 
-  it('rolls the end onto the next day when it would pass midnight', () => {
+  it('starts as a timed event on the calendar it was opened from', () => {
+    const now = new Date(2026, 7, 3, 14, 37).getTime();
+
+    const blank = blankDraft('2026-08-11', 'cal-1', now);
+
+    expect(blank.allDay).toBe(false);
+    expect(blank.calendarId).toBe('cal-1');
+  });
+
+  it('wraps to the start of the day when the next hour would pass midnight', () => {
     const now = new Date(2026, 7, 3, 23, 10).getTime();
-    const d = blankDraft('2026-08-03', 'cal-1', now);
 
-    expect(d.startTime).toBe('00:00');
-    expect(d.endDate).toBe('2026-08-03');
-    expect(d.endTime).toBe('01:00');
+    const blank = blankDraft('2026-08-03', 'cal-1', now);
+
+    expect(blank.startTime).toBe('00:00');
+    expect(blank.endDate).toBe('2026-08-03');
+    expect(blank.endTime).toBe('01:00');
   });
 
-  it('produces a draft that validates', () => {
-    expect(validateDraft({ ...blankDraft('2026-08-03', 'cal-1', Date.now()), title: 'X' })).toBe('');
+  it('produces a draft that validates once titled', () => {
+    const titled = { ...blankDraft('2026-08-03', 'cal-1', Date.now()), title: 'X' };
+
+    expect(validateDraft(titled)).toBe('');
   });
 });
 
 describe('draftFromEvent', () => {
   it('shows the last day an all-day event covers, not Google’s exclusive end', () => {
-    // 3–5 August arrives from Google as end.date 2026-08-06.
-    const d = draftFromEvent(read({ start: { date: '2026-08-03' }, end: { date: '2026-08-06' } }));
+    const fromAllDay = draftFromEvent(read(RAW_ALL_DAY));
 
-    expect(d.allDay).toBe(true);
-    expect(d.startDate).toBe('2026-08-03');
-    expect(d.endDate).toBe('2026-08-05');
+    expect(fromAllDay.allDay).toBe(true);
+    expect(fromAllDay.startDate).toBe('2026-08-03');
+    expect(fromAllDay.endDate).toBe('2026-08-05');
   });
 
   it('keeps a one-day all-day event on one day', () => {
-    const d = draftFromEvent(read({ start: { date: '2026-08-03' }, end: { date: '2026-08-04' } }));
-    expect(d.startDate).toBe('2026-08-03');
-    expect(d.endDate).toBe('2026-08-03');
+    const fromOneDay = draftFromEvent(
+      read({ start: { date: '2026-08-03' }, end: { date: '2026-08-04' } }),
+    );
+
+    expect(fromOneDay.startDate).toBe('2026-08-03');
+    expect(fromOneDay.endDate).toBe('2026-08-03');
   });
 
   it('splits a timed event into local date and time fields', () => {
-    const start = new Date(2026, 7, 3, 9, 30).toISOString();
-    const end = new Date(2026, 7, 3, 10, 45).toISOString();
-    const d = draftFromEvent(read({ start: { dateTime: start }, end: { dateTime: end } }));
+    const fromTimed = draftFromEvent(read(RAW_TIMED));
 
-    expect(d).toMatchObject({
+    expect(fromTimed).toMatchObject({
       allDay: false,
       startDate: '2026-08-03',
       startTime: '09:30',
@@ -119,40 +142,46 @@ describe('draftFromEvent', () => {
   });
 
   it('blanks the placeholder title rather than writing it back', () => {
-    const d = draftFromEvent(read({ summary: '', start: { date: '2026-08-03' }, end: { date: '2026-08-04' } }));
-    expect(d.title).toBe('');
+    const untitled = draftFromEvent(read({ summary: '', ...RAW_ALL_DAY }));
+
+    expect(untitled.title).toBe('');
   });
 
   it('carries location, notes and calendar through', () => {
-    const d = draftFromEvent(
-      read({
-        location: 'Room 2',
-        description: 'Bring the deck',
-        start: { date: '2026-08-03' },
-        end: { date: '2026-08-04' },
-      }),
+    const withDetails = draftFromEvent(
+      read({ location: 'Room 2', description: 'Bring the deck', ...RAW_ALL_DAY }),
     );
-    expect(d).toMatchObject({ location: 'Room 2', description: 'Bring the deck', calendarId: 'cal-1' });
+
+    expect(withDetails).toMatchObject({
+      location: 'Room 2',
+      description: 'Bring the deck',
+      calendarId: 'cal-1',
+    });
   });
 });
 
 describe('toResource', () => {
   it('puts the exclusive end back on an all-day event', () => {
-    const r = toResource(draft({ allDay: true, startDate: '2026-08-03', endDate: '2026-08-05' }));
-    expect(r.start).toEqual({ date: '2026-08-03' });
-    expect(r.end).toEqual({ date: '2026-08-06' });
+    const resource = toResource(
+      draft({ allDay: true, startDate: '2026-08-03', endDate: '2026-08-05' }),
+    );
+
+    expect(resource.start).toEqual({ date: '2026-08-03' });
+    expect(resource.end).toEqual({ date: '2026-08-06' });
   });
 
   it('sends a timed event as instants', () => {
-    const r = toResource(draft({ startTime: '09:30', endTime: '10:45' }));
-    expect(r.start).toEqual({ dateTime: new Date(2026, 7, 3, 9, 30).toISOString() });
-    expect(r.end).toEqual({ dateTime: new Date(2026, 7, 3, 10, 45).toISOString() });
+    const resource = toResource(draft({ startTime: '09:30', endTime: '10:45' }));
+
+    expect(resource.start).toEqual({ dateTime: new Date(2026, 7, 3, 9, 30).toISOString() });
+    expect(resource.end).toEqual({ dateTime: new Date(2026, 7, 3, 10, 45).toISOString() });
   });
 
   it('sends cleared fields as empty strings, so a PATCH actually clears them', () => {
-    const r = toResource(draft({ location: '   ', description: '' }));
-    expect(r.location).toBe('');
-    expect(r.description).toBe('');
+    const resource = toResource(draft({ location: '   ', description: '' }));
+
+    expect(resource.location).toBe('');
+    expect(resource.description).toBe('');
   });
 
   it('trims the title', () => {
@@ -160,20 +189,17 @@ describe('toResource', () => {
   });
 
   it('round-trips an all-day event unchanged', () => {
-    const raw = { start: { date: '2026-08-03' }, end: { date: '2026-08-06' } };
-    const r = toResource(draftFromEvent(read(raw)));
-    expect(r.start).toEqual(raw.start);
-    expect(r.end).toEqual(raw.end);
+    const resource = toResource(draftFromEvent(read(RAW_ALL_DAY)));
+
+    expect(resource.start).toEqual(RAW_ALL_DAY.start);
+    expect(resource.end).toEqual(RAW_ALL_DAY.end);
   });
 
   it('round-trips a timed event unchanged', () => {
-    const raw = {
-      start: { dateTime: new Date(2026, 7, 3, 9, 30).toISOString() },
-      end: { dateTime: new Date(2026, 7, 3, 10, 45).toISOString() },
-    };
-    const r = toResource(draftFromEvent(read(raw)));
-    expect(r.start).toEqual(raw.start);
-    expect(r.end).toEqual(raw.end);
+    const resource = toResource(draftFromEvent(read(RAW_TIMED)));
+
+    expect(resource.start).toEqual(RAW_TIMED.start);
+    expect(resource.end).toEqual(RAW_TIMED.end);
   });
 });
 
@@ -200,9 +226,9 @@ describe('validateDraft', () => {
   });
 
   it('allows an all-day event that starts and ends on the same day', () => {
-    expect(
-      validateDraft(draft({ allDay: true, startDate: '2026-08-03', endDate: '2026-08-03' })),
-    ).toBe('');
+    const oneDay = draft({ allDay: true, startDate: '2026-08-03', endDate: '2026-08-03' });
+
+    expect(validateDraft(oneDay)).toBe('');
   });
 
   it('rejects malformed dates and times', () => {
@@ -216,31 +242,40 @@ describe('validateDraft', () => {
 });
 
 describe('needsMove', () => {
-  it('is true only when the target calendar changed', () => {
-    const ref = { calendarId: 'cal-1', eventId: 'e1' };
-    expect(needsMove(ref, draft())).toBe(false);
-    expect(needsMove(ref, draft({ calendarId: 'cal-2' }))).toBe(true);
-    expect(needsMove(ref, draft({ calendarId: '' }))).toBe(false);
+  it('is false while the draft keeps the same calendar', () => {
+    expect(needsMove(EVENT_REF, draft())).toBe(false);
+  });
+
+  it('is true once the draft names a different calendar', () => {
+    expect(needsMove(EVENT_REF, draft({ calendarId: 'cal-2' }))).toBe(true);
+  });
+
+  it('is false for a draft with no calendar at all', () => {
+    expect(needsMove(EVENT_REF, draft({ calendarId: '' }))).toBe(false);
   });
 });
 
-describe('writes', () => {
+describe('writing to Google', () => {
   /** Every request the module made: method, path and parsed body. */
-  let calls: { method: string; url: string; body: Record<string, unknown> | undefined }[];
+  let requests: { method: string; url: string; body: Record<string, unknown> | undefined }[];
 
   /** Stubs fetch, failing with `status` on the nth call when asked. */
   function stubFetch(fail?: { onCall: number; status: number }) {
-    calls = [];
+    requests = [];
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string, init?: RequestInit) => {
-        calls.push({
+        requests.push({
           method: init?.method ?? 'GET',
           url,
           body: init?.body ? JSON.parse(init.body as string) : undefined,
         });
-        if (fail && calls.length === fail.onCall) {
-          return Promise.resolve({ ok: false, status: fail.status, json: () => Promise.resolve({}) });
+        if (fail && requests.length === fail.onCall) {
+          return Promise.resolve({
+            ok: false,
+            status: fail.status,
+            json: () => Promise.resolve({}),
+          });
         }
         return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ id: 'e1' }) });
       }),
@@ -253,64 +288,79 @@ describe('writes', () => {
   it('creates an event by POSTing to the chosen calendar', async () => {
     await createEvent(draft({ calendarId: 'work@group.calendar.google.com' }));
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0].method).toBe('POST');
-    expect(calls[0].url).toContain('/calendars/work%40group.calendar.google.com/events');
-    expect(calls[0].body).toMatchObject({ summary: 'Standup' });
+    expect(requests).toHaveLength(1);
+    expect(requests[0].method).toBe('POST');
+    expect(requests[0].url).toContain('/calendars/work%40group.calendar.google.com/events');
+    expect(requests[0].body).toMatchObject({ summary: 'Standup' });
   });
 
   it('updates in place with a PATCH when the calendar is unchanged', async () => {
-    await updateEvent({ calendarId: 'cal-1', eventId: 'e1' }, draft({ title: 'Retro' }));
+    await updateEvent(EVENT_REF, draft({ title: 'Retro' }));
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0].method).toBe('PATCH');
-    expect(calls[0].url).toContain('/calendars/cal-1/events/e1');
-    expect(calls[0].body).toMatchObject({ summary: 'Retro' });
+    expect(requests).toHaveLength(1);
+    expect(requests[0].method).toBe('PATCH');
+    expect(requests[0].url).toContain('/calendars/cal-1/events/e1');
+    expect(requests[0].body).toMatchObject({ summary: 'Retro' });
   });
 
   it('moves first, then patches, when the calendar changed', async () => {
-    await updateEvent({ calendarId: 'cal-1', eventId: 'e1' }, draft({ calendarId: 'cal-2' }));
+    await updateEvent(EVENT_REF, draft({ calendarId: 'cal-2' }));
 
-    expect(calls.map((c) => c.method)).toEqual(['POST', 'PATCH']);
-    expect(calls[0].url).toContain('/calendars/cal-1/events/e1/move?destination=cal-2');
+    expect(requests.map((request) => request.method)).toEqual(['POST', 'PATCH']);
+    expect(requests[0].url).toContain('/calendars/cal-1/events/e1/move?destination=cal-2');
     // The patch must land on the *new* calendar, not the old one.
-    expect(calls[1].url).toContain('/calendars/cal-2/events/e1');
+    expect(requests[1].url).toContain('/calendars/cal-2/events/e1');
   });
 
   it('does not patch when the move fails', async () => {
     stubFetch({ onCall: 1, status: 403 });
 
-    await expect(
-      updateEvent({ calendarId: 'cal-1', eventId: 'e1' }, draft({ calendarId: 'cal-2' })),
-    ).rejects.toThrow();
-    expect(calls).toHaveLength(1);
+    await expect(updateEvent(EVENT_REF, draft({ calendarId: 'cal-2' }))).rejects.toThrow();
+
+    expect(requests).toHaveLength(1);
   });
 
   it('deletes by id', async () => {
-    await deleteEvent({ calendarId: 'cal-1', eventId: 'e1' });
+    await deleteEvent(EVENT_REF);
 
-    expect(calls[0].method).toBe('DELETE');
-    expect(calls[0].url).toContain('/calendars/cal-1/events/e1');
+    expect(requests[0].method).toBe('DELETE');
+    expect(requests[0].url).toContain('/calendars/cal-1/events/e1');
   });
 
   it('treats an already-deleted event as success', async () => {
     stubFetch({ onCall: 1, status: 404 });
+
     await expect(deleteEvent({ calendarId: 'cal-1', eventId: 'gone' })).resolves.toBeUndefined();
   });
 
   it('still reports a real delete failure', async () => {
     stubFetch({ onCall: 1, status: 403 });
-    await expect(deleteEvent({ calendarId: 'cal-1', eventId: 'e1' })).rejects.toThrow();
+
+    await expect(deleteEvent(EVENT_REF)).rejects.toThrow();
   });
 });
 
 describe('describeError', () => {
-  it('explains the codes a user can act on', () => {
-    const withCode = (code: number) => Object.assign(new Error('boom'), { code });
-    expect(describeError(withCode(403))).toMatch(/permission/i);
-    expect(describeError(withCode(404))).toMatch(/no longer exists/i);
-    expect(describeError(withCode(401))).toMatch(/expired/i);
+  /** An API failure carrying an HTTP status code. */
+  const failureWithCode = (code: number) => Object.assign(new Error('boom'), { code });
+
+  it('explains a permission failure', () => {
+    expect(describeError(failureWithCode(403))).toMatch(/permission/i);
+  });
+
+  it('explains an event that is already gone', () => {
+    expect(describeError(failureWithCode(404))).toMatch(/no longer exists/i);
+  });
+
+  it('explains an expired session', () => {
+    expect(describeError(failureWithCode(401))).toMatch(/expired/i);
+  });
+
+  it('passes an ordinary error message through', () => {
     expect(describeError(new Error('offline'))).toBe('offline');
+  });
+
+  it('falls back to something sayable for a non-error', () => {
     expect(describeError(null)).toMatch(/went wrong/i);
   });
 });

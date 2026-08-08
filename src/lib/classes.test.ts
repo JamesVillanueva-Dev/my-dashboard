@@ -15,22 +15,26 @@ import {
   type CourseEntry,
 } from './classes';
 
-/** A course with `notes` titled by their id, for readable assertions. */
-const course = (id: string, ...labels: string[]): CourseEntry => ({
+/** A course whose notes are titled by their id, for readable assertions. */
+const course = (id: string, ...noteLabels: string[]): CourseEntry => ({
   id,
   name: `Class ${id}`,
-  notes: labels.map((label) => ({ id: `${id}-${label}`, label, body: `about ${label}` })),
+  notes: noteLabels.map((label) => ({ id: `${id}-${label}`, label, body: `about ${label}` })),
 });
 
 /** The labels of one course's notes, in order. */
-const labels = (courses: CourseEntry[], id: string) =>
-  courses.find((c) => c.id === id)!.notes.map((n) => n.label);
+const labelsOf = (courses: CourseEntry[], courseId: string) =>
+  courses.find((each) => each.id === courseId)!.notes.map((note) => note.label);
+
+/** The ids of the courses, in order. */
+const idsOf = (courses: CourseEntry[]) => courses.map((each) => each.id);
 
 describe('newId', () => {
   it('does not collide within a single millisecond', () => {
     // Adding notes by holding the button lands several in the same tick, and
     // duplicate ids would make React edit the wrong one.
     const ids = Array.from({ length: 500 }, newId);
+
     expect(new Set(ids).size).toBe(ids.length);
   });
 });
@@ -38,70 +42,102 @@ describe('newId', () => {
 describe('normalizeCourses', () => {
   it('reads back what was stored', () => {
     const stored = [course('a', 'Midterm')];
+
     expect(normalizeCourses(stored)).toEqual(stored);
   });
 
   it('treats anything that is not a list as no classes at all', () => {
-    for (const junk of [null, undefined, 42, 'courses', { a: 1 }]) {
-      expect(normalizeCourses(junk)).toEqual([]);
+    for (const notAList of [null, undefined, 42, 'courses', { a: 1 }]) {
+      expect(normalizeCourses(notAList)).toEqual([]);
     }
   });
 
   it('drops entries that could not be rendered, keeping the rest', () => {
-    const out = normalizeCourses([course('a', 'Final'), null, { notes: [] }, 7, course('b')]);
-    expect(out.map((c) => c.id)).toEqual(['a', 'b']);
+    const normalized = normalizeCourses([
+      course('a', 'Final'),
+      null,
+      { notes: [] },
+      7,
+      course('b'),
+    ]);
+
+    expect(idsOf(normalized)).toEqual(['a', 'b']);
   });
 
   it('gives an entry an id when storage lost it, rather than dropping the notes', () => {
-    const [only] = normalizeCourses([{ name: 'CSE 101', notes: [{ label: 'Final', body: '9am' }] }]);
-    expect(only.id).toBeTruthy();
-    expect(only.notes[0].id).toBeTruthy();
-    expect(only.notes[0].label).toBe('Final');
+    const [onlyCourse] = normalizeCourses([
+      { name: 'CSE 101', notes: [{ label: 'Final', body: '9am' }] },
+    ]);
+
+    expect(onlyCourse.id).toBeTruthy();
+    expect(onlyCourse.notes[0].id).toBeTruthy();
+    expect(onlyCourse.notes[0].label).toBe('Final');
   });
 
-  it('tolerates a note with only one of its two halves written', () => {
-    const [only] = normalizeCourses([
-      { id: 'a', name: 'A', notes: [{ id: '1', body: 'no title yet' }, { id: '2', label: 'no body yet' }] },
+  it('fills in the missing half of a partly written note', () => {
+    const [onlyCourse] = normalizeCourses([
+      {
+        id: 'a',
+        name: 'A',
+        notes: [
+          { id: '1', body: 'no title yet' },
+          { id: '2', label: 'no body yet' },
+        ],
+      },
     ]);
-    expect(only.notes).toEqual([
+
+    expect(onlyCourse.notes).toEqual([
       { id: '1', label: '', body: 'no title yet' },
       { id: '2', label: 'no body yet', body: '' },
     ]);
   });
 
   it('caps a name that would otherwise run off the tab row', () => {
-    const [only] = normalizeCourses([{ id: 'a', name: 'x'.repeat(200), notes: [] }]);
-    expect(only.name).toHaveLength(NAME_MAX);
+    const [onlyCourse] = normalizeCourses([{ id: 'a', name: 'x'.repeat(200), notes: [] }]);
+
+    expect(onlyCourse.name).toHaveLength(NAME_MAX);
   });
 });
 
 describe('addCourse', () => {
   it('adds a course under the name as typed, trimmed', () => {
-    const out = addCourse([], '  CSE 101  ');
-    expect(out).toHaveLength(1);
-    expect(out[0].name).toBe('CSE 101');
-    expect(out[0].notes).toEqual([]);
+    const courses = addCourse([], '  CSE 101  ');
+
+    expect(courses).toHaveLength(1);
+    expect(courses[0].name).toBe('CSE 101');
+    expect(courses[0].notes).toEqual([]);
   });
 
-  it('refuses a blank name by handing back exactly what it was given', () => {
+  it('returns the same list for a blank name', () => {
     // Identity is the signal the caller uses to know nothing happened — an
     // unnamed class is a tab nobody could identify.
     const courses = [course('a')];
+
     expect(addCourse(courses, '   ')).toBe(courses);
     expect(addCourse(courses, '')).toBe(courses);
   });
 });
 
-describe('removeCourse / renameCourse', () => {
+describe('removeCourse', () => {
   it('removes a course and everything under it', () => {
-    expect(removeCourse([course('a'), course('b')], 'a').map((c) => c.id)).toEqual(['b']);
+    const remaining = removeCourse([course('a'), course('b')], 'a');
+
+    expect(idsOf(remaining)).toEqual(['b']);
+  });
+});
+
+describe('renameCourse', () => {
+  it('renames one course and leaves its notes alone', () => {
+    const courses = renameCourse([course('a', 'Final'), course('b')], 'a', 'Organic Chem');
+
+    expect(courses[0].name).toBe('Organic Chem');
+    expect(courses[0].notes).toHaveLength(1);
   });
 
-  it('renames one course and leaves its notes alone', () => {
-    const out = renameCourse([course('a', 'Final'), course('b')], 'a', 'Organic Chem');
-    expect(out[0].name).toBe('Organic Chem');
-    expect(out[0].notes).toHaveLength(1);
-    expect(out[1].name).toBe('Class b');
+  it('leaves the other courses alone', () => {
+    const courses = renameCourse([course('a', 'Final'), course('b')], 'a', 'Organic Chem');
+
+    expect(courses[1].name).toBe('Class b');
   });
 
   it('ignores a blank rename, so a tab cannot lose its label', () => {
@@ -109,53 +145,74 @@ describe('removeCourse / renameCourse', () => {
   });
 });
 
-describe('addNote / editNote / removeNote', () => {
+describe('addNote', () => {
   it('adds an empty note for the user to name and fill', () => {
-    const out = addNote([course('a', 'Final')], 'a');
-    expect(out[0].notes).toHaveLength(2);
-    expect(out[0].notes[1]).toMatchObject({ label: '', body: '' });
+    const courses = addNote([course('a', 'Final')], 'a');
+
+    expect(courses[0].notes).toHaveLength(2);
+    expect(courses[0].notes[1]).toMatchObject({ label: '', body: '' });
   });
 
-  it('leaves other courses untouched when adding', () => {
-    const out = addNote([course('a'), course('b', 'Rubric')], 'a');
-    expect(out[1].notes).toHaveLength(1);
-  });
+  it('leaves the other courses untouched', () => {
+    const courses = addNote([course('a'), course('b', 'Rubric')], 'a');
 
+    expect(courses[1].notes).toHaveLength(1);
+  });
+});
+
+describe('editNote', () => {
   it('patches only the field given, on only the note named', () => {
-    const out = editNote([course('a', 'Final', 'Rubric')], 'a', 'a-Final', { body: '9am, Peterson' });
-    expect(out[0].notes[0]).toEqual({ id: 'a-Final', label: 'Final', body: '9am, Peterson' });
-    expect(out[0].notes[1].body).toBe('about Rubric');
-  });
+    const courses = editNote([course('a', 'Final', 'Rubric')], 'a', 'a-Final', {
+      body: '9am, Peterson',
+    });
 
+    expect(courses[0].notes[0]).toEqual({ id: 'a-Final', label: 'Final', body: '9am, Peterson' });
+    expect(courses[0].notes[1].body).toBe('about Rubric');
+  });
+});
+
+describe('removeNote', () => {
   it('removes one note and nothing else', () => {
-    const out = removeNote([course('a', 'Final', 'Rubric')], 'a', 'a-Final');
-    expect(labels(out, 'a')).toEqual(['Rubric']);
+    const courses = removeNote([course('a', 'Final', 'Rubric')], 'a', 'a-Final');
+
+    expect(labelsOf(courses, 'a')).toEqual(['Rubric']);
   });
 });
 
 describe('moveNote', () => {
-  it('moves a note up and down its own course', () => {
-    const start = [course('a', 'one', 'two', 'three')];
-    expect(labels(moveNote(start, 'a', 'a-three', -1), 'a')).toEqual(['one', 'three', 'two']);
-    expect(labels(moveNote(start, 'a', 'a-one', 1), 'a')).toEqual(['two', 'one', 'three']);
+  it('moves a note up its course', () => {
+    const courses = [course('a', 'one', 'two', 'three')];
+
+    expect(labelsOf(moveNote(courses, 'a', 'a-three', -1), 'a')).toEqual(['one', 'three', 'two']);
+  });
+
+  it('moves a note down its course', () => {
+    const courses = [course('a', 'one', 'two', 'three')];
+
+    expect(labelsOf(moveNote(courses, 'a', 'a-one', 1), 'a')).toEqual(['two', 'one', 'three']);
   });
 
   it('does nothing at either end, rather than wrapping around', () => {
-    const start = [course('a', 'one', 'two')];
-    expect(labels(moveNote(start, 'a', 'a-one', -1), 'a')).toEqual(['one', 'two']);
-    expect(labels(moveNote(start, 'a', 'a-two', 1), 'a')).toEqual(['one', 'two']);
+    const courses = [course('a', 'one', 'two')];
+
+    expect(labelsOf(moveNote(courses, 'a', 'a-one', -1), 'a')).toEqual(['one', 'two']);
+    expect(labelsOf(moveNote(courses, 'a', 'a-two', 1), 'a')).toEqual(['one', 'two']);
   });
 
   it('ignores a note that is not in the course named', () => {
-    const start = [course('a', 'one'), course('b', 'other')];
-    expect(moveNote(start, 'a', 'b-other', 1)).toEqual(start);
+    const courses = [course('a', 'one'), course('b', 'other')];
+
+    expect(moveNote(courses, 'a', 'b-other', 1)).toEqual(courses);
   });
 });
 
 describe('isBlank', () => {
-  it('is true only when both halves are empty or whitespace', () => {
+  it('is true when both halves are empty or whitespace', () => {
     expect(isBlank({ id: '1', label: '', body: '' })).toBe(true);
     expect(isBlank({ id: '1', label: '  ', body: '\n' })).toBe(true);
+  });
+
+  it('is false when either half has something in it', () => {
     expect(isBlank({ id: '1', label: 'Final', body: '' })).toBe(false);
     expect(isBlank({ id: '1', label: '', body: 'note to self' })).toBe(false);
   });
@@ -166,7 +223,7 @@ describe('selectedCourse', () => {
     expect(selectedCourse([course('a'), course('b')], 'b')?.id).toBe('b');
   });
 
-  it('falls back to the first when the saved one was removed', () => {
+  it('falls back to the first course when the saved one was removed', () => {
     // Otherwise the panel would show nothing, with no way back to a class that
     // does exist.
     expect(selectedCourse([course('a')], 'gone')?.id).toBe('a');

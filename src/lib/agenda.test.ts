@@ -26,45 +26,65 @@ const DAY = 24 * HOUR;
 /** Local midnight on the day containing NOW. */
 const TODAY_0 = startOfDay(NOW);
 
-function event(over: Partial<CalendarEvent> & { id: string }): CalendarEvent {
+function event(overrides: Partial<CalendarEvent> & { id: string }): CalendarEvent {
   return {
     calendarId: 'cal',
     title: 'Event',
     start: NOW + HOUR,
     end: NOW + 2 * HOUR,
     allDay: false,
-    ...over,
+    ...overrides,
   };
 }
 
-/** Builds a task with a `datetime-local`-shaped due string from a timestamp. */
-function task(over: Partial<Reminder> & { id: string }, dueAt?: number): Reminder {
-  const due =
-    dueAt === undefined
-      ? ''
-      : (() => {
-          const d = new Date(dueAt);
-          const p = (n: number) => String(n).padStart(2, '0');
-          return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-        })();
-  return { text: 'Task', due, done: false, ...over };
+/** Formats a timestamp the way a `datetime-local` input stores it. */
+function dueString(dueAt: number): string {
+  const due = new Date(dueAt);
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${due.getFullYear()}-${pad(due.getMonth() + 1)}-${pad(due.getDate())}T${pad(due.getHours())}:${pad(due.getMinutes())}`;
 }
 
+/** Builds a task, due at `dueAt` — or undated when it is left out. */
+function task(overrides: Partial<Reminder> & { id: string }, dueAt?: number): Reminder {
+  return {
+    text: 'Task',
+    due: dueAt === undefined ? '' : dueString(dueAt),
+    done: false,
+    ...overrides,
+  };
+}
+
+/** An agenda item at a single instant, for the label cases. */
+const itemAt = (ms: number): AgendaItem => ({
+  key: 'k',
+  source: 'event',
+  id: 'i',
+  title: 't',
+  start: ms,
+  end: ms,
+  allDay: false,
+  done: false,
+});
+
+/** The titles of a list of agenda items, in order. */
+const titlesOf = (items: AgendaItem[]) => items.map((item) => item.title);
+
 describe('fromTask', () => {
-  it('drops undated tasks — they cannot be placed on a timeline', () => {
+  it('drops an undated task, which cannot be placed on a timeline', () => {
     expect(fromTask(task({ id: 'a' }))).toBeNull();
   });
 
-  it('drops tombstoned tasks awaiting a sync', () => {
+  it('drops a tombstoned task awaiting a sync', () => {
     expect(fromTask(task({ id: 'a', deleted: true }, NOW))).toBeNull();
   });
 
-  it('drops tasks whose due string will not parse', () => {
+  it('drops a task whose due string will not parse', () => {
     expect(fromTask({ id: 'a', text: 'x', due: 'not-a-date', done: false })).toBeNull();
   });
 
   it('parses a datetime-local due string as local time', () => {
     const item = fromTask(task({ id: 'a' }, NOW))!;
+
     // Minute precision: the due string carries no seconds.
     expect(item.start).toBe(new Date(2026, 7, 3, 14, 0, 0).getTime());
     expect(item.end).toBe(item.start);
@@ -77,30 +97,27 @@ describe('fromTask', () => {
 });
 
 describe('occursOn', () => {
-  const on = (item: Partial<AgendaItem>) =>
-    occursOn(
-      { key: 'k', source: 'event', id: 'i', title: 't', allDay: false, done: false, start: 0, end: 0, ...item },
-      NOW,
-    );
+  /** Whether an item spanning the given times falls on the day containing NOW. */
+  const occursToday = (span: Partial<AgendaItem>) => occursOn({ ...itemAt(0), ...span }, NOW);
 
   it('includes an item starting at local midnight today', () => {
-    expect(on({ start: TODAY_0, end: TODAY_0 })).toBe(true);
+    expect(occursToday({ start: TODAY_0, end: TODAY_0 })).toBe(true);
   });
 
   it('excludes an item at the last instant of yesterday', () => {
-    expect(on({ start: TODAY_0 - 1, end: TODAY_0 - 1 })).toBe(false);
+    expect(occursToday({ start: TODAY_0 - 1, end: TODAY_0 - 1 })).toBe(false);
   });
 
   it('excludes an item at midnight starting tomorrow', () => {
-    expect(on({ start: TODAY_0 + DAY, end: TODAY_0 + DAY })).toBe(false);
+    expect(occursToday({ start: TODAY_0 + DAY, end: TODAY_0 + DAY })).toBe(false);
   });
 
   it('includes a multi-day event that started before today and ends after', () => {
-    expect(on({ start: TODAY_0 - 2 * DAY, end: TODAY_0 + 2 * DAY })).toBe(true);
+    expect(occursToday({ start: TODAY_0 - 2 * DAY, end: TODAY_0 + 2 * DAY })).toBe(true);
   });
 
   it('includes an all-day event covering exactly today', () => {
-    expect(on({ start: TODAY_0, end: TODAY_0 + DAY, allDay: true })).toBe(true);
+    expect(occursToday({ start: TODAY_0, end: TODAY_0 + DAY, allDay: true })).toBe(true);
   });
 });
 
@@ -113,32 +130,47 @@ describe('sortAgenda', () => {
       ],
       [],
     );
-    expect(items.map((i) => i.title)).toEqual(['All day', 'Timed']);
+
+    expect(titlesOf(items)).toEqual(['All day', 'Timed']);
   });
 
   it('lets chronology win across different days', () => {
     const items = buildAgenda(
       [
-        event({ id: 'a', title: 'Tomorrow all-day', start: TODAY_0 + DAY, end: TODAY_0 + 2 * DAY, allDay: true }),
-        event({ id: 'b', title: 'Today timed', start: TODAY_0 + 9 * HOUR, end: TODAY_0 + 10 * HOUR }),
+        event({
+          id: 'a',
+          title: 'Tomorrow all-day',
+          start: TODAY_0 + DAY,
+          end: TODAY_0 + 2 * DAY,
+          allDay: true,
+        }),
+        event({
+          id: 'b',
+          title: 'Today timed',
+          start: TODAY_0 + 9 * HOUR,
+          end: TODAY_0 + 10 * HOUR,
+        }),
       ],
       [],
     );
-    expect(items.map((i) => i.title)).toEqual(['Today timed', 'Tomorrow all-day']);
+
+    expect(titlesOf(items)).toEqual(['Today timed', 'Tomorrow all-day']);
   });
 
   it('is stable for identical times, breaking ties on title then key', () => {
-    const base = { start: NOW, end: NOW, allDay: false, done: false, source: 'event' as const };
+    const sameTime = { start: NOW, end: NOW, allDay: false, done: false, source: 'event' as const };
+
     const items = sortAgenda([
-      { ...base, key: 'b', id: 'b', title: 'Same' },
-      { ...base, key: 'a', id: 'a', title: 'Same' },
+      { ...sameTime, key: 'b', id: 'b', title: 'Same' },
+      { ...sameTime, key: 'a', id: 'a', title: 'Same' },
     ]);
-    expect(items.map((i) => i.key)).toEqual(['a', 'b']);
+
+    expect(items.map((item) => item.key)).toEqual(['a', 'b']);
   });
 });
 
 describe('todayItems', () => {
-  it('keeps today and drops other days', () => {
+  it('keeps today and drops the other days', () => {
     const items = buildAgenda(
       [
         event({ id: 'today', title: 'Today', start: NOW + HOUR, end: NOW + 2 * HOUR }),
@@ -147,7 +179,8 @@ describe('todayItems', () => {
       ],
       [],
     );
-    expect(todayItems(items, NOW).map((i) => i.title)).toEqual(['Today']);
+
+    expect(titlesOf(todayItems(items, NOW))).toEqual(['Today']);
   });
 
   it('keeps a multi-day event spanning today', () => {
@@ -155,24 +188,29 @@ describe('todayItems', () => {
       [event({ id: 'trip', title: 'Trip', start: NOW - 2 * DAY, end: NOW + 2 * DAY, allDay: true })],
       [],
     );
+
     expect(todayItems(items, NOW)).toHaveLength(1);
   });
 });
 
-describe('isInProgress and nextUp', () => {
-  it('flags an event that has started but not ended', () => {
+describe('isInProgress', () => {
+  it('is true for an event that has started but not ended', () => {
     const [item] = buildAgenda([event({ id: 'a', start: NOW - HOUR, end: NOW + HOUR })], []);
+
     expect(isInProgress(item, NOW)).toBe(true);
   });
 
-  it('does not flag all-day events as in progress', () => {
+  it('is false for an all-day event, which runs all day by definition', () => {
     const [item] = buildAgenda(
       [event({ id: 'a', start: TODAY_0, end: TODAY_0 + DAY, allDay: true })],
       [],
     );
+
     expect(isInProgress(item, NOW)).toBe(false);
   });
+});
 
+describe('nextUp', () => {
   it('prefers an in-progress event over a later one', () => {
     const items = buildAgenda(
       [
@@ -181,10 +219,11 @@ describe('isInProgress and nextUp', () => {
       ],
       [],
     );
+
     expect(nextUp(items, NOW)!.title).toBe('Running');
   });
 
-  it('skips finished items', () => {
+  it('skips events that have already finished', () => {
     const items = buildAgenda(
       [
         event({ id: 'done', title: 'Done', start: NOW - 3 * HOUR, end: NOW - 2 * HOUR }),
@@ -192,25 +231,31 @@ describe('isInProgress and nextUp', () => {
       ],
       [],
     );
+
     expect(nextUp(items, NOW)!.title).toBe('Soon');
   });
 
-  it('skips completed tasks', () => {
+  it('skips tasks that are already ticked off', () => {
     const items = buildAgenda(
       [],
-      [task({ id: 'a', text: 'Ticked', done: true }, NOW + HOUR), task({ id: 'b', text: 'Open' }, NOW + 2 * HOUR)],
+      [
+        task({ id: 'a', text: 'Ticked', done: true }, NOW + HOUR),
+        task({ id: 'b', text: 'Open' }, NOW + 2 * HOUR),
+      ],
     );
+
     expect(nextUp(items, NOW)!.title).toBe('Open');
   });
 
-  it('returns null when nothing is left', () => {
+  it('is null when nothing is left', () => {
     const items = buildAgenda([event({ id: 'a', start: NOW - 3 * HOUR, end: NOW - 2 * HOUR })], []);
+
     expect(nextUp(items, NOW)).toBeNull();
   });
 });
 
 describe('overdueItems', () => {
-  it('counts unfinished past-due tasks and never events', () => {
+  it('lists unfinished past-due tasks, and never events', () => {
     const items = buildAgenda(
       [event({ id: 'past', start: NOW - 2 * HOUR, end: NOW - HOUR })],
       [
@@ -219,7 +264,8 @@ describe('overdueItems', () => {
         task({ id: 'future', text: 'Future' }, NOW + HOUR),
       ],
     );
-    expect(overdueItems(items, NOW).map((i) => i.title)).toEqual(['Late']);
+
+    expect(titlesOf(overdueItems(items, NOW))).toEqual(['Late']);
   });
 });
 
@@ -239,6 +285,7 @@ describe('countAgenda', () => {
     ];
 
     const counts = countAgenda(buildAgenda(events, tasks), tasks, NOW);
+
     // "Due today" and "Overdue" are both today and unfinished.
     expect(counts.remainingToday).toBe(2);
     expect(counts.overdue).toBe(1);
@@ -256,36 +303,31 @@ describe('countAgenda', () => {
   });
 });
 
-describe('labels', () => {
-  const at = (ms: number): AgendaItem => ({
-    key: 'k',
-    source: 'event',
-    id: 'i',
-    title: 't',
-    start: ms,
-    end: ms,
-    allDay: false,
-    done: false,
-  });
-
+describe('relativeLabel', () => {
   it('says "now" while an event is running', () => {
-    const item = { ...at(NOW - HOUR), end: NOW + HOUR };
-    expect(relativeLabel(item, NOW)).toBe('now');
+    const running = { ...itemAt(NOW - HOUR), end: NOW + HOUR };
+
+    expect(relativeLabel(running, NOW)).toBe('now');
   });
 
   it('counts forward in minutes, hours, then days', () => {
-    expect(relativeLabel(at(NOW + 40 * MIN), NOW)).toBe('in 40m');
-    expect(relativeLabel(at(NOW + 3 * HOUR), NOW)).toBe('in 3h');
-    expect(relativeLabel(at(NOW + 2 * DAY), NOW)).toBe('in 2d');
+    expect(relativeLabel(itemAt(NOW + 40 * MIN), NOW)).toBe('in 40m');
+    expect(relativeLabel(itemAt(NOW + 3 * HOUR), NOW)).toBe('in 3h');
+    expect(relativeLabel(itemAt(NOW + 2 * DAY), NOW)).toBe('in 2d');
   });
 
   it('counts backward for past items', () => {
-    expect(relativeLabel(at(NOW - 40 * MIN), NOW)).toBe('40m ago');
-    expect(relativeLabel(at(NOW - 2 * DAY), NOW)).toBe('2d ago');
+    expect(relativeLabel(itemAt(NOW - 40 * MIN), NOW)).toBe('40m ago');
+    expect(relativeLabel(itemAt(NOW - 2 * DAY), NOW)).toBe('2d ago');
+  });
+});
+
+describe('timeLabel', () => {
+  it('labels an all-day item rather than printing midnight', () => {
+    expect(timeLabel({ ...itemAt(TODAY_0), allDay: true })).toBe('All day');
   });
 
-  it('labels all-day items rather than printing midnight', () => {
-    expect(timeLabel({ ...at(TODAY_0), allDay: true })).toBe('All day');
-    expect(timeLabel(at(TODAY_0 + 9 * HOUR))).toMatch(/9/);
+  it('prints the clock time of a timed item', () => {
+    expect(timeLabel(itemAt(TODAY_0 + 9 * HOUR))).toMatch(/9/);
   });
 });

@@ -16,29 +16,32 @@ vi.mock('../lib/gcalWrite', async (importOriginal) => ({
 
 const NOW = new Date(2026, 7, 3, 10, 15).getTime();
 
-function calendar(over: Partial<CalendarOption> = {}): CalendarOption {
-  return { id: 'cal-1', title: 'Work', primary: false, canWrite: true, ...over };
+/** The event {@link event} builds, as the editor addresses it. */
+const EVENT_REF = { calendarId: 'cal-1', eventId: 'e1' };
+
+function calendar(overrides: Partial<CalendarOption> = {}): CalendarOption {
+  return { id: 'cal-1', title: 'Work', primary: false, canWrite: true, ...overrides };
 }
 
 /** A calendar event as the read path produces one. */
-function event(over: Record<string, unknown> = {}): CalendarEvent {
-  const ev = toEvent(
+function event(overrides: Record<string, unknown> = {}): CalendarEvent {
+  const converted = toEvent(
     {
       id: 'e1',
       summary: 'Standup',
       start: { dateTime: new Date(2026, 7, 3, 9).toISOString() },
       end: { dateTime: new Date(2026, 7, 3, 10).toISOString() },
-      ...over,
+      ...overrides,
     },
     'cal-1',
     { canWrite: true },
   );
-  if (!ev) throw new Error('fixture did not convert');
-  return ev;
+  if (!converted) throw new Error('fixture did not convert');
+  return converted;
 }
 
 /** A valid draft the editor will accept. */
-function draft(over: Partial<EventDraft> = {}): EventDraft {
+function draft(overrides: Partial<EventDraft> = {}): EventDraft {
   return {
     calendarId: 'cal-1',
     title: 'Standup',
@@ -49,14 +52,25 @@ function draft(over: Partial<EventDraft> = {}): EventDraft {
     endTime: '10:00',
     location: '',
     description: '',
-    ...over,
+    ...overrides,
   };
 }
 
-function setup(calendars: CalendarOption[] = [calendar()]) {
+function renderEventEditor(calendars: CalendarOption[] = [calendar()]) {
   const onChanged = vi.fn();
-  const { result } = renderHook(() => useEventEditor(calendars, NOW, onChanged));
-  return { result, onChanged };
+  const { result, unmount } = renderHook(() => useEventEditor(calendars, NOW, onChanged));
+  return { result, unmount, onChanged };
+}
+
+/** A write that stays in flight until the returned function is called. */
+function pendingWrite(write: ReturnType<typeof vi.fn>) {
+  let finish!: () => void;
+  vi.mocked(write).mockReturnValue(
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    }),
+  );
+  return () => finish();
 }
 
 beforeEach(() => {
@@ -65,9 +79,9 @@ beforeEach(() => {
   vi.mocked(deleteEvent).mockResolvedValue(undefined);
 });
 
-describe('useEventEditor', () => {
+describe('useEventEditor before anything is opened', () => {
   it('starts with no form open', () => {
-    const { result } = setup();
+    const { result } = renderEventEditor();
 
     expect(result.current).toMatchObject({
       mode: 'none',
@@ -78,243 +92,226 @@ describe('useEventEditor', () => {
       error: '',
     });
   });
+});
 
-  describe('startNew', () => {
-    it('opens a blank form on the chosen day', () => {
-      const { result } = setup();
+describe('useEventEditor startNew', () => {
+  it('opens a blank form on the chosen day', () => {
+    const { result } = renderEventEditor();
 
-      act(() => result.current.startNew('2026-08-05'));
+    act(() => result.current.startNew('2026-08-05'));
 
-      expect(result.current.mode).toBe('new');
-      expect(result.current.draft).toMatchObject({ title: '', startDate: '2026-08-05' });
-      // Nothing to update — this is a create.
-      expect(result.current.target).toBeNull();
-    });
-
-    it('defaults to the primary calendar', () => {
-      const { result } = setup([
-        calendar({ id: 'other' }),
-        calendar({ id: 'mine', primary: true }),
-      ]);
-
-      act(() => result.current.startNew('2026-08-05'));
-
-      expect(result.current.draft?.calendarId).toBe('mine');
-    });
-
-    it('falls back to the first writable calendar when none is primary', () => {
-      const { result } = setup([
-        calendar({ id: 'readonly', canWrite: false }),
-        calendar({ id: 'writable' }),
-      ]);
-
-      act(() => result.current.startNew('2026-08-05'));
-
-      expect(result.current.draft?.calendarId).toBe('writable');
-    });
-
-    it('leaves the calendar empty when nothing is writable', () => {
-      const { result } = setup([calendar({ canWrite: false })]);
-
-      act(() => result.current.startNew('2026-08-05'));
-
-      expect(result.current.draft?.calendarId).toBe('');
-    });
+    expect(result.current.mode).toBe('new');
+    expect(result.current.draft).toMatchObject({ title: '', startDate: '2026-08-05' });
+    // Nothing to update — this is a create.
+    expect(result.current.target).toBeNull();
   });
 
-  describe('startEdit', () => {
-    it('loads the event into the form and remembers what to update', () => {
-      const { result } = setup();
+  it('defaults to the primary calendar', () => {
+    const { result } = renderEventEditor([
+      calendar({ id: 'other' }),
+      calendar({ id: 'mine', primary: true }),
+    ]);
 
-      act(() => result.current.startEdit(event()));
+    act(() => result.current.startNew('2026-08-05'));
 
-      expect(result.current.mode).toBe('edit');
-      expect(result.current.draft).toMatchObject({ title: 'Standup', startDate: '2026-08-03' });
-      expect(result.current.target).toEqual({ calendarId: 'cal-1', eventId: 'e1' });
-    });
-
-    it('flags one occurrence of a recurring series, so the form can say so', () => {
-      const { result } = setup();
-
-      act(() => result.current.startEdit(event({ recurringEventId: 'series-1' })));
-
-      expect(result.current.recurring).toBe(true);
-    });
-
-    it('does not flag a one-off event as recurring', () => {
-      const { result } = setup();
-
-      act(() => result.current.startEdit(event()));
-
-      expect(result.current.recurring).toBe(false);
-    });
+    expect(result.current.draft?.calendarId).toBe('mine');
   });
 
-  describe('cancel', () => {
-    it('closes the form and discards the draft', () => {
-      const { result } = setup();
-      act(() => result.current.startEdit(event({ recurringEventId: 'series-1' })));
+  it('falls back to the first writable calendar when none is primary', () => {
+    const { result } = renderEventEditor([
+      calendar({ id: 'readonly', canWrite: false }),
+      calendar({ id: 'writable' }),
+    ]);
 
-      act(() => result.current.cancel());
+    act(() => result.current.startNew('2026-08-05'));
 
-      expect(result.current).toMatchObject({
-        mode: 'none',
-        draft: null,
-        target: null,
-        recurring: false,
-        error: '',
-      });
-    });
+    expect(result.current.draft?.calendarId).toBe('writable');
   });
 
-  describe('save', () => {
-    it('creates a new event, reloads the month, and closes', async () => {
-      const { result, onChanged } = setup();
-      act(() => result.current.startNew('2026-08-03'));
+  it('leaves the calendar empty when nothing is writable', () => {
+    const { result } = renderEventEditor([calendar({ canWrite: false })]);
 
-      await act(async () => result.current.save(draft()));
+    act(() => result.current.startNew('2026-08-05'));
 
-      expect(createEvent).toHaveBeenCalledWith(draft());
-      expect(updateEvent).not.toHaveBeenCalled();
-      expect(onChanged).toHaveBeenCalledTimes(1);
-      expect(result.current.mode).toBe('none');
-    });
+    expect(result.current.draft?.calendarId).toBe('');
+  });
+});
 
-    it('updates the event being edited rather than creating a second one', async () => {
-      const { result, onChanged } = setup();
-      act(() => result.current.startEdit(event()));
+describe('useEventEditor startEdit', () => {
+  it('loads the event into the form and remembers what to update', () => {
+    const { result } = renderEventEditor();
 
-      await act(async () => result.current.save(draft({ title: 'Standup (moved)' })));
+    act(() => result.current.startEdit(event()));
 
-      expect(updateEvent).toHaveBeenCalledWith(
-        { calendarId: 'cal-1', eventId: 'e1' },
-        draft({ title: 'Standup (moved)' }),
-      );
-      expect(createEvent).not.toHaveBeenCalled();
-      expect(onChanged).toHaveBeenCalledTimes(1);
-    });
-
-    it('refuses an invalid draft without touching the network', async () => {
-      const { result } = setup();
-      act(() => result.current.startNew('2026-08-03'));
-
-      await act(async () => result.current.save(draft({ title: '  ' })));
-
-      expect(createEvent).not.toHaveBeenCalled();
-      expect(result.current.error).toBe('Give the event a title.');
-      // The form stays open on the user's input.
-      expect(result.current.mode).toBe('new');
-    });
-
-    it('refuses a draft that ends before it starts', async () => {
-      const { result } = setup();
-      act(() => result.current.startNew('2026-08-03'));
-
-      await act(async () => result.current.save(draft({ endTime: '08:00' })));
-
-      expect(createEvent).not.toHaveBeenCalled();
-      expect(result.current.error).toBe('The event must end after it starts.');
-    });
-
-    it('reports saving while the write is in flight', async () => {
-      let finish!: () => void;
-      vi.mocked(createEvent).mockReturnValue(
-        new Promise<void>((resolve) => {
-          finish = resolve;
-        }),
-      );
-      const { result } = setup();
-      act(() => result.current.startNew('2026-08-03'));
-
-      act(() => result.current.save(draft()));
-      expect(result.current.saving).toBe(true);
-
-      await act(async () => {
-        finish();
-      });
-      expect(result.current.saving).toBe(false);
-    });
-
-    it('keeps the form open holding the input when the save fails', async () => {
-      vi.mocked(createEvent).mockRejectedValue(Object.assign(new Error('nope'), { code: 403 }));
-      const { result, onChanged } = setup();
-      act(() => result.current.startNew('2026-08-03'));
-
-      await act(async () => result.current.save(draft({ title: 'Precious' })));
-
-      expect(result.current.mode).toBe('new');
-      expect(result.current.saving).toBe(false);
-      expect(result.current.error).toBe('You do not have permission to change that calendar.');
-      // Nothing changed, so the month must not be reloaded.
-      expect(onChanged).not.toHaveBeenCalled();
-    });
-
-    it('clears a previous error when a retry succeeds', async () => {
-      vi.mocked(createEvent).mockRejectedValueOnce(new Error('flaky'));
-      const { result } = setup();
-      act(() => result.current.startNew('2026-08-03'));
-
-      await act(async () => result.current.save(draft()));
-      expect(result.current.error).toBe('flaky');
-
-      await act(async () => result.current.save(draft()));
-
-      await waitFor(() => expect(result.current.mode).toBe('none'));
-      expect(result.current.error).toBe('');
-    });
+    expect(result.current.mode).toBe('edit');
+    expect(result.current.draft).toMatchObject({ title: 'Standup', startDate: '2026-08-03' });
+    expect(result.current.target).toEqual(EVENT_REF);
   });
 
-  describe('remove', () => {
-    it('deletes the event being edited, reloads, and closes', async () => {
-      const { result, onChanged } = setup();
-      act(() => result.current.startEdit(event()));
+  it('flags one occurrence of a recurring series, so the form can say so', () => {
+    const { result } = renderEventEditor();
 
-      await act(async () => result.current.remove());
+    act(() => result.current.startEdit(event({ recurringEventId: 'series-1' })));
 
-      expect(deleteEvent).toHaveBeenCalledWith({ calendarId: 'cal-1', eventId: 'e1' });
-      expect(onChanged).toHaveBeenCalledTimes(1);
-      expect(result.current.mode).toBe('none');
-    });
-
-    it('does nothing when there is no event to delete', async () => {
-      const { result } = setup();
-      act(() => result.current.startNew('2026-08-03'));
-
-      await act(async () => result.current.remove());
-
-      expect(deleteEvent).not.toHaveBeenCalled();
-      expect(result.current.mode).toBe('new');
-    });
-
-    it('keeps the form open and explains a failed delete', async () => {
-      vi.mocked(deleteEvent).mockRejectedValue(Object.assign(new Error('gone'), { code: 404 }));
-      const { result, onChanged } = setup();
-      act(() => result.current.startEdit(event()));
-
-      await act(async () => result.current.remove());
-
-      expect(result.current.mode).toBe('edit');
-      expect(result.current.error).toBe('That event no longer exists.');
-      expect(onChanged).not.toHaveBeenCalled();
-    });
+    expect(result.current.recurring).toBe(true);
   });
 
-  it('sets no state after unmount', async () => {
-    let finish!: () => void;
-    vi.mocked(createEvent).mockReturnValue(
-      new Promise<void>((resolve) => {
-        finish = resolve;
-      }),
-    );
-    const onChanged = vi.fn();
-    const { result, unmount } = renderHook(() => useEventEditor([calendar()], NOW, onChanged));
+  it('does not flag a one-off event as recurring', () => {
+    const { result } = renderEventEditor();
+
+    act(() => result.current.startEdit(event()));
+
+    expect(result.current.recurring).toBe(false);
+  });
+});
+
+describe('useEventEditor cancel', () => {
+  it('closes the form and discards the draft', () => {
+    const { result } = renderEventEditor();
+    act(() => result.current.startEdit(event({ recurringEventId: 'series-1' })));
+
+    act(() => result.current.cancel());
+
+    expect(result.current).toMatchObject({
+      mode: 'none',
+      draft: null,
+      target: null,
+      recurring: false,
+      error: '',
+    });
+  });
+});
+
+describe('useEventEditor save', () => {
+  it('creates a new event, reloads the month, and closes', async () => {
+    const { result, onChanged } = renderEventEditor();
+    act(() => result.current.startNew('2026-08-03'));
+
+    await act(async () => result.current.save(draft()));
+
+    expect(createEvent).toHaveBeenCalledWith(draft());
+    expect(updateEvent).not.toHaveBeenCalled();
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    expect(result.current.mode).toBe('none');
+  });
+
+  it('updates the event being edited rather than creating a second one', async () => {
+    const { result, onChanged } = renderEventEditor();
+    act(() => result.current.startEdit(event()));
+
+    await act(async () => result.current.save(draft({ title: 'Standup (moved)' })));
+
+    expect(updateEvent).toHaveBeenCalledWith(EVENT_REF, draft({ title: 'Standup (moved)' }));
+    expect(createEvent).not.toHaveBeenCalled();
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses an untitled draft without touching the network', async () => {
+    const { result } = renderEventEditor();
+    act(() => result.current.startNew('2026-08-03'));
+
+    await act(async () => result.current.save(draft({ title: '  ' })));
+
+    expect(createEvent).not.toHaveBeenCalled();
+    expect(result.current.error).toBe('Give the event a title.');
+    // The form stays open on the user's input.
+    expect(result.current.mode).toBe('new');
+  });
+
+  it('refuses a draft that ends before it starts', async () => {
+    const { result } = renderEventEditor();
+    act(() => result.current.startNew('2026-08-03'));
+
+    await act(async () => result.current.save(draft({ endTime: '08:00' })));
+
+    expect(createEvent).not.toHaveBeenCalled();
+    expect(result.current.error).toBe('The event must end after it starts.');
+  });
+
+  it('reports saving while the write is in flight', async () => {
+    const finishSave = pendingWrite(vi.mocked(createEvent));
+    const { result } = renderEventEditor();
+    act(() => result.current.startNew('2026-08-03'));
+
+    act(() => result.current.save(draft()));
+    expect(result.current.saving).toBe(true);
+
+    await act(async () => finishSave());
+    expect(result.current.saving).toBe(false);
+  });
+
+  it('keeps the form open holding the input when the save fails', async () => {
+    vi.mocked(createEvent).mockRejectedValue(Object.assign(new Error('nope'), { code: 403 }));
+    const { result, onChanged } = renderEventEditor();
+    act(() => result.current.startNew('2026-08-03'));
+
+    await act(async () => result.current.save(draft({ title: 'Precious' })));
+
+    expect(result.current.mode).toBe('new');
+    expect(result.current.saving).toBe(false);
+    expect(result.current.error).toBe('You do not have permission to change that calendar.');
+    // Nothing changed, so the month must not be reloaded.
+    expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  it('clears a previous error when a retry succeeds', async () => {
+    vi.mocked(createEvent).mockRejectedValueOnce(new Error('flaky'));
+    const { result } = renderEventEditor();
+    act(() => result.current.startNew('2026-08-03'));
+    await act(async () => result.current.save(draft()));
+    expect(result.current.error).toBe('flaky');
+
+    await act(async () => result.current.save(draft()));
+
+    await waitFor(() => expect(result.current.mode).toBe('none'));
+    expect(result.current.error).toBe('');
+  });
+});
+
+describe('useEventEditor remove', () => {
+  it('deletes the event being edited, reloads, and closes', async () => {
+    const { result, onChanged } = renderEventEditor();
+    act(() => result.current.startEdit(event()));
+
+    await act(async () => result.current.remove());
+
+    expect(deleteEvent).toHaveBeenCalledWith(EVENT_REF);
+    expect(onChanged).toHaveBeenCalledTimes(1);
+    expect(result.current.mode).toBe('none');
+  });
+
+  it('does nothing when there is no event to delete', async () => {
+    const { result } = renderEventEditor();
+    act(() => result.current.startNew('2026-08-03'));
+
+    await act(async () => result.current.remove());
+
+    expect(deleteEvent).not.toHaveBeenCalled();
+    expect(result.current.mode).toBe('new');
+  });
+
+  it('keeps the form open and explains a failed delete', async () => {
+    vi.mocked(deleteEvent).mockRejectedValue(Object.assign(new Error('gone'), { code: 404 }));
+    const { result, onChanged } = renderEventEditor();
+    act(() => result.current.startEdit(event()));
+
+    await act(async () => result.current.remove());
+
+    expect(result.current.mode).toBe('edit');
+    expect(result.current.error).toBe('That event no longer exists.');
+    expect(onChanged).not.toHaveBeenCalled();
+  });
+});
+
+describe('useEventEditor after unmount', () => {
+  it('sets no state when a save lands late', async () => {
+    const finishSave = pendingWrite(vi.mocked(createEvent));
+    const { result, unmount, onChanged } = renderEventEditor();
     act(() => result.current.startNew('2026-08-03'));
     act(() => result.current.save(draft()));
 
     unmount();
-    await act(async () => {
-      finish();
-    });
+    await act(async () => finishSave());
 
     // The month view is gone; reloading it would be an update on a dead tree.
     expect(onChanged).not.toHaveBeenCalled();

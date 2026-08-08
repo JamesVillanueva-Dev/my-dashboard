@@ -12,7 +12,7 @@ const CALENDARS: CalendarOption[] = [
   { id: 'holidays', title: 'Holidays in the UK', primary: false, canWrite: false },
 ];
 
-function draft(over: Partial<EventDraft> = {}): EventDraft {
+function draft(overrides: Partial<EventDraft> = {}): EventDraft {
   return {
     calendarId: 'primary',
     title: 'Standup',
@@ -23,11 +23,12 @@ function draft(over: Partial<EventDraft> = {}): EventDraft {
     endTime: '10:00',
     location: '',
     description: '',
-    ...over,
+    ...overrides,
   };
 }
 
-function setup(props: Partial<ComponentProps<typeof EventForm>> = {}) {
+/** Renders the form, returning its callbacks and a user-event session. */
+function renderEventForm(props: Partial<ComponentProps<typeof EventForm>> = {}) {
   const handlers = { onSave: vi.fn(), onDelete: vi.fn(), onCancel: vi.fn() };
   render(
     <EventForm
@@ -44,9 +45,12 @@ function setup(props: Partial<ComponentProps<typeof EventForm>> = {}) {
   return { ...handlers, user: userEvent.setup() };
 }
 
-describe('EventForm', () => {
+const saveButton = () => screen.getByRole('button', { name: 'Save' });
+const deleteButton = () => screen.getByRole('button', { name: 'Delete' });
+
+describe('EventForm fields', () => {
   it('shows the draft it was given', () => {
-    setup({ draft: draft({ location: 'Room 2', description: 'Bring the deck' }) });
+    renderEventForm({ draft: draft({ location: 'Room 2', description: 'Bring the deck' }) });
 
     expect(screen.getByLabelText('Title')).toHaveValue('Standup');
     expect(screen.getByLabelText('Starts')).toHaveValue('2026-08-03');
@@ -57,14 +61,16 @@ describe('EventForm', () => {
   });
 
   it('offers only the calendars the user can write to', () => {
-    setup();
-    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Personal', 'Work']);
+    renderEventForm();
+
+    const offered = screen.getAllByRole('option').map((option) => option.textContent);
+    expect(offered).toEqual(['Personal', 'Work']);
   });
 
   it('hides the time fields for an all-day event', async () => {
-    const { user } = setup();
-
+    const { user } = renderEventForm();
     expect(screen.getByLabelText('Start time')).toBeInTheDocument();
+
     await user.click(screen.getByLabelText('All day'));
 
     expect(screen.queryByLabelText('Start time')).not.toBeInTheDocument();
@@ -73,24 +79,26 @@ describe('EventForm', () => {
   });
 
   it('drags the end date along when the start moves past it', async () => {
-    const { user, onSave } = setup();
+    const { user, onSave } = renderEventForm();
 
     await user.clear(screen.getByLabelText('Starts'));
     await user.type(screen.getByLabelText('Starts'), '2026-08-20');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(saveButton());
 
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({ startDate: '2026-08-20', endDate: '2026-08-20' }),
     );
   });
+});
 
-  it('hands the edited draft back on save', async () => {
-    const { user, onSave } = setup();
+describe('EventForm saving', () => {
+  it('hands the edited draft back', async () => {
+    const { user, onSave } = renderEventForm();
 
     await user.clear(screen.getByLabelText('Title'));
     await user.type(screen.getByLabelText('Title'), 'Retro');
     await user.selectOptions(screen.getByLabelText('Calendar'), 'work');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(saveButton());
 
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave).toHaveBeenCalledWith(
@@ -98,58 +106,75 @@ describe('EventForm', () => {
     );
   });
 
+  it('locks the controls while saving', () => {
+    renderEventForm({ editing: true, saving: true });
+
+    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expect(deleteButton()).toBeDisabled();
+  });
+
+  it('cancels without saving', async () => {
+    const { user, onCancel, onSave } = renderEventForm();
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+});
+
+describe('EventForm deleting', () => {
   it('offers no delete when creating', () => {
-    setup({ editing: false });
+    renderEventForm({ editing: false });
+
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
   });
 
-  it('takes two clicks to delete', async () => {
-    const { user, onDelete } = setup({ editing: true });
+  it('asks for confirmation on the first click', async () => {
+    const { user, onDelete } = renderEventForm({ editing: true });
 
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(deleteButton());
+
     expect(onDelete).not.toHaveBeenCalled();
     expect(screen.getByText('Delete this event?')).toBeInTheDocument();
+  });
 
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+  it('deletes on the second click', async () => {
+    const { user, onDelete } = renderEventForm({ editing: true });
+
+    await user.click(deleteButton());
+    await user.click(deleteButton());
+
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
   it('backs out of a delete on Keep', async () => {
-    const { user, onDelete } = setup({ editing: true });
+    const { user, onDelete } = renderEventForm({ editing: true });
 
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(deleteButton());
     await user.click(screen.getByRole('button', { name: 'Keep' }));
 
     expect(onDelete).not.toHaveBeenCalled();
     expect(screen.queryByText('Delete this event?')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(saveButton()).toBeInTheDocument();
   });
+});
 
+describe('EventForm notices', () => {
   it('surfaces an error without clearing what was typed', () => {
-    setup({ error: 'Give the event a title.', draft: draft({ title: 'Half typed' }) });
+    renderEventForm({
+      error: 'Give the event a title.',
+      draft: draft({ title: 'Half typed' }),
+    });
 
     expect(screen.getByRole('alert')).toHaveTextContent('Give the event a title.');
     expect(screen.getByLabelText('Title')).toHaveValue('Half typed');
   });
 
   it('warns that editing a repeating event touches one occurrence', () => {
-    setup({ editing: true, recurring: true });
+    renderEventForm({ editing: true, recurring: true });
+
     expect(screen.getByText(/occurrence only/i)).toBeInTheDocument();
-  });
-
-  it('locks the controls while saving', () => {
-    setup({ editing: true, saving: true });
-
-    expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
-  });
-
-  it('cancels without saving', async () => {
-    const { user, onCancel, onSave } = setup();
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    expect(onCancel).toHaveBeenCalledTimes(1);
-    expect(onSave).not.toHaveBeenCalled();
   });
 });

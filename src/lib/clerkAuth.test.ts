@@ -1,12 +1,14 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
 /**
+ * Imports the module with the given publishable key in the environment.
+ *
  * The key is read once, at module load, so each case re-imports the module with
  * its own environment rather than mutating a value already captured.
  */
-async function loadWith(key: string) {
+async function importClerkAuthWithKey(publishableKey: string | undefined) {
   vi.resetModules();
-  vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', key);
+  vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', publishableKey);
   return import('./clerkAuth');
 }
 
@@ -15,24 +17,30 @@ afterEach(() => {
 });
 
 describe('hasClerkKey', () => {
-  it('is off when no key is configured — the zero-setup path', async () => {
-    const { hasClerkKey } = await loadWith('');
+  it('is false when the key is empty', async () => {
+    // The zero-setup path: the dashboard runs without sign-in configured.
+    const { hasClerkKey } = await importClerkAuthWithKey('');
 
     expect(hasClerkKey()).toBe(false);
   });
 
-  it('is on once a publishable key is set', async () => {
-    const { hasClerkKey, CLERK_PUBLISHABLE_KEY } = await loadWith('pk_test_abc123');
+  it('is false when the variable is unset', async () => {
+    const { hasClerkKey } = await importClerkAuthWithKey(undefined);
+
+    expect(hasClerkKey()).toBe(false);
+  });
+
+  it('is true once a publishable key is set', async () => {
+    const { hasClerkKey } = await importClerkAuthWithKey('pk_test_abc123');
 
     expect(hasClerkKey()).toBe(true);
-    expect(CLERK_PUBLISHABLE_KEY).toBe('pk_test_abc123');
   });
+});
 
-  it('treats an unset variable as off', async () => {
-    vi.resetModules();
-    vi.stubEnv('VITE_CLERK_PUBLISHABLE_KEY', undefined);
-    const { hasClerkKey } = await import('./clerkAuth');
+describe('CLERK_PUBLISHABLE_KEY', () => {
+  it('exposes the configured key for the Clerk provider to use', async () => {
+    const { CLERK_PUBLISHABLE_KEY } = await importClerkAuthWithKey('pk_test_abc123');
 
-    expect(hasClerkKey()).toBe(false);
+    expect(CLERK_PUBLISHABLE_KEY).toBe('pk_test_abc123');
   });
 });

@@ -19,12 +19,24 @@ function renderSettings() {
 }
 
 /** Opens the settings dropdown and returns the user-event session. */
-async function openMenu() {
+async function openSettingsMenu() {
   const user = userEvent.setup();
   renderSettings();
   await user.click(screen.getByRole('button', { name: /settings/i }));
   return user;
 }
+
+/** The palette currently written to the document root. */
+const activeTheme = () => document.documentElement.getAttribute('data-theme');
+
+/** One of the palette radios. */
+const themeRadio = (name: RegExp) => screen.getByRole('radio', { name });
+
+/** The cursor-aura checkbox. */
+const auraToggle = () => screen.getByRole('checkbox', { name: /aura/i });
+
+/** The due-notices checkbox. */
+const noticesToggle = () => screen.getByRole('checkbox', { name: /task is due/i });
 
 /** The global stub from `src/test/setup.ts`, which reports no mouse. */
 const realMatchMedia = window.matchMedia;
@@ -37,17 +49,13 @@ function stubMouse() {
   window.matchMedia = ((query: string) => ({
     matches: query.includes('pointer: fine'),
     media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
   })) as unknown as typeof window.matchMedia;
 }
 
 /** The stub's answer to `Notification.permission`. */
-let granted: NotificationPermission = 'default';
+let currentPermission: NotificationPermission = 'default';
 
 /**
  * Installs the Notification API, which jsdom does not provide — so by default
@@ -58,11 +66,11 @@ function stubNotification() {
     'Notification',
     class {
       static get permission() {
-        return granted;
+        return currentPermission;
       }
       static requestPermission = vi.fn(() => {
-        granted = 'granted';
-        return Promise.resolve(granted);
+        currentPermission = 'granted';
+        return Promise.resolve(currentPermission);
       });
       close = vi.fn();
     },
@@ -70,7 +78,7 @@ function stubNotification() {
 }
 
 beforeEach(() => {
-  granted = 'default';
+  currentPermission = 'default';
 });
 
 afterEach(() => {
@@ -79,203 +87,241 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('Settings', () => {
-  it('follows the system scheme until the user picks a palette', () => {
-    renderSettings();
-    // matchMedia is stubbed to report "not dark", so system resolves to light.
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
-  });
-
+describe('Settings menu', () => {
   it('keeps the menu closed until the trigger is clicked', async () => {
     const user = userEvent.setup();
     renderSettings();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /settings/i }));
+
     expect(screen.getByRole('menu')).toBeInTheDocument();
   });
 
+  it('closes on Escape', async () => {
+    const user = await openSettingsMenu();
+
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('closes on an outside click', async () => {
+    const user = await openSettingsMenu();
+
+    await user.click(document.body);
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+});
+
+describe('Settings theme picker', () => {
+  it('follows the system scheme until the user picks a palette', () => {
+    renderSettings();
+
+    // matchMedia is stubbed to report "not dark", so system resolves to light.
+    expect(activeTheme()).toBe('light');
+  });
+
   it('offers every theme plus a "follow system" option', async () => {
-    await openMenu();
+    await openSettingsMenu();
+
     for (const theme of THEMES) {
-      expect(screen.getByRole('radio', { name: new RegExp(theme.label, 'i') })).toBeInTheDocument();
+      expect(themeRadio(new RegExp(theme.label, 'i'))).toBeInTheDocument();
     }
-    expect(screen.getByRole('radio', { name: /follow system/i })).toBeInTheDocument();
+    expect(themeRadio(/follow system/i)).toBeInTheDocument();
     expect(screen.getAllByRole('radio')).toHaveLength(THEMES.length + 1);
   });
 
-  it('applies a chosen palette to the document root and persists it', async () => {
-    const user = await openMenu();
-    await user.click(screen.getByRole('radio', { name: /forest/i }));
+  it('applies a chosen palette to the document root', async () => {
+    const user = await openSettingsMenu();
 
-    expect(document.documentElement.getAttribute('data-theme')).toBe('forest');
+    await user.click(themeRadio(/forest/i));
+
+    expect(activeTheme()).toBe('forest');
+    expect(themeRadio(/forest/i)).toBeChecked();
+  });
+
+  it('persists the chosen palette', async () => {
+    const user = await openSettingsMenu();
+
+    await user.click(themeRadio(/forest/i));
+
     expect(localStorage.getItem('theme')).toBe(JSON.stringify('forest'));
-    expect(screen.getByRole('radio', { name: /forest/i })).toBeChecked();
   });
 
   it('switches between palettes', async () => {
-    const user = await openMenu();
-    await user.click(screen.getByRole('radio', { name: /solarized/i }));
-    expect(document.documentElement.getAttribute('data-theme')).toBe('solarized');
+    const user = await openSettingsMenu();
+    await user.click(themeRadio(/solarized/i));
+    expect(activeTheme()).toBe('solarized');
 
-    await user.click(screen.getByRole('radio', { name: /purple & blue/i }));
-    expect(document.documentElement.getAttribute('data-theme')).toBe('midnight');
-    expect(screen.getByRole('radio', { name: /solarized/i })).not.toBeChecked();
+    await user.click(themeRadio(/purple & blue/i));
+
+    expect(activeTheme()).toBe('midnight');
+    expect(themeRadio(/solarized/i)).not.toBeChecked();
   });
 
   it('returns to the system scheme when "follow system" is reselected', async () => {
-    const user = await openMenu();
-    await user.click(screen.getByRole('radio', { name: /ocean/i }));
-    expect(document.documentElement.getAttribute('data-theme')).toBe('ocean');
+    const user = await openSettingsMenu();
+    await user.click(themeRadio(/ocean/i));
+    expect(activeTheme()).toBe('ocean');
 
-    await user.click(screen.getByRole('radio', { name: /follow system/i }));
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+    await user.click(themeRadio(/follow system/i));
+
+    expect(activeTheme()).toBe('light');
     expect(localStorage.getItem('theme')).toBe(JSON.stringify('system'));
   });
 
   it('restores a palette stored by a previous visit', () => {
     localStorage.setItem('theme', JSON.stringify('rose'));
+
     renderSettings();
-    expect(document.documentElement.getAttribute('data-theme')).toBe('rose');
+
+    expect(activeTheme()).toBe('rose');
   });
 
   it('falls back to the system scheme when the stored value is unusable', () => {
     localStorage.setItem('theme', JSON.stringify('chartreuse'));
+
     renderSettings();
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+
+    expect(activeTheme()).toBe('light');
   });
 
   it('recolours the favicon to match the active theme', async () => {
-    const user = await openMenu();
-    await user.click(screen.getByRole('radio', { name: /black & yellow/i }));
+    const user = await openSettingsMenu();
+
+    await user.click(themeRadio(/black & yellow/i));
 
     const href = document.querySelector<HTMLLinkElement>('link[rel="icon"]')?.href ?? '';
     expect(decodeURIComponent(href)).toContain('#ffd21e');
   });
+});
 
-  it('closes on Escape', async () => {
-    const user = await openMenu();
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+describe('Settings cursor aura', () => {
+  it('is not offered on a device with no pointer to follow', async () => {
+    await openSettingsMenu();
+
+    expect(screen.queryByRole('checkbox', { name: /aura/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Background')).not.toBeInTheDocument();
   });
 
-  it('closes on an outside click', async () => {
-    const user = await openMenu();
-    await user.click(document.body);
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  it('is offered, and off, on a device with a mouse', async () => {
+    stubMouse();
+
+    await openSettingsMenu();
+
+    expect(screen.getByRole('checkbox', { name: /aura follows the cursor/i })).not.toBeChecked();
   });
 
-  describe('the cursor aura', () => {
-    it('is not offered on a device with no pointer to follow', async () => {
-      await openMenu();
+  it('starts following when switched on', async () => {
+    stubMouse();
+    const user = await openSettingsMenu();
 
-      expect(screen.queryByRole('checkbox', { name: /aura/i })).not.toBeInTheDocument();
-      expect(screen.queryByText('Background')).not.toBeInTheDocument();
-    });
+    await user.click(auraToggle());
 
-    it('is offered, and off, on a device with a mouse', async () => {
-      stubMouse();
-
-      await openMenu();
-
-      expect(screen.getByRole('checkbox', { name: /aura follows the cursor/i })).not.toBeChecked();
-    });
-
-    it('starts following when switched on, and persists the choice', async () => {
-      stubMouse();
-      const user = await openMenu();
-
-      await user.click(screen.getByRole('checkbox', { name: /aura/i }));
-
-      expect(screen.getByRole('checkbox', { name: /aura/i })).toBeChecked();
-      expect(document.documentElement).toHaveAttribute('data-aura', 'pointer');
-      expect(localStorage.getItem('aura.follow')).toBe(JSON.stringify(true));
-    });
-
-    it('gives the corner position back when switched off', async () => {
-      stubMouse();
-      localStorage.setItem('aura.follow', JSON.stringify(true));
-      const user = await openMenu();
-
-      await user.click(screen.getByRole('checkbox', { name: /aura/i }));
-
-      await waitFor(() => expect(document.documentElement).not.toHaveAttribute('data-aura'));
-      expect(localStorage.getItem('aura.follow')).toBe(JSON.stringify(false));
-    });
-
-    it('restores a choice stored by a previous visit', async () => {
-      stubMouse();
-      localStorage.setItem('aura.follow', JSON.stringify(true));
-
-      await openMenu();
-
-      expect(screen.getByRole('checkbox', { name: /aura/i })).toBeChecked();
-      expect(document.documentElement).toHaveAttribute('data-aura', 'pointer');
-    });
-
-    it('leaves the palette picker alone', async () => {
-      stubMouse();
-      const user = await openMenu();
-
-      await user.click(screen.getByRole('checkbox', { name: /aura/i }));
-
-      expect(screen.getAllByRole('radio')).toHaveLength(THEMES.length + 1);
-      expect(screen.getByRole('radio', { name: /follow system/i })).toBeChecked();
-    });
+    expect(auraToggle()).toBeChecked();
+    expect(document.documentElement).toHaveAttribute('data-aura', 'pointer');
   });
 
-  describe('due notices', () => {
-    it('is not offered where the browser cannot notify at all', async () => {
-      await openMenu();
+  it('persists that choice', async () => {
+    stubMouse();
+    const user = await openSettingsMenu();
 
-      expect(screen.queryByRole('checkbox', { name: /task is due/i })).not.toBeInTheDocument();
-      expect(screen.queryByText('Notifications')).not.toBeInTheDocument();
-    });
+    await user.click(auraToggle());
 
-    it('is offered, and off, where it is supported', async () => {
-      stubNotification();
+    expect(localStorage.getItem('aura.follow')).toBe(JSON.stringify(true));
+  });
 
-      await openMenu();
+  it('gives the corner position back when switched off', async () => {
+    stubMouse();
+    localStorage.setItem('aura.follow', JSON.stringify(true));
+    const user = await openSettingsMenu();
 
-      expect(screen.getByRole('checkbox', { name: /remind me when a task is due/i })).not.toBeChecked();
-    });
+    await user.click(auraToggle());
 
-    it('asks the browser for permission when switched on, and persists the choice', async () => {
-      stubNotification();
-      const user = await openMenu();
+    await waitFor(() => expect(document.documentElement).not.toHaveAttribute('data-aura'));
+    expect(localStorage.getItem('aura.follow')).toBe(JSON.stringify(false));
+  });
 
-      await user.click(screen.getByRole('checkbox', { name: /task is due/i }));
+  it('restores a choice stored by a previous visit', async () => {
+    stubMouse();
+    localStorage.setItem('aura.follow', JSON.stringify(true));
 
-      await waitFor(() =>
-        expect(screen.getByRole('checkbox', { name: /task is due/i })).toBeChecked(),
-      );
-      expect(localStorage.getItem('notify.tasks')).toBe(JSON.stringify(true));
-    });
+    await openSettingsMenu();
 
-    it('says so, and refuses to switch on, once refused at the browser level', async () => {
-      granted = 'denied';
-      stubNotification();
+    expect(auraToggle()).toBeChecked();
+    expect(document.documentElement).toHaveAttribute('data-aura', 'pointer');
+  });
 
-      const user = await openMenu();
-      const box = screen.getByRole('checkbox', { name: /task is due/i });
+  it('leaves the palette picker alone', async () => {
+    stubMouse();
+    const user = await openSettingsMenu();
 
-      expect(box).toBeDisabled();
-      expect(screen.getByText('Blocked')).toBeInTheDocument();
-      expect(box.closest('label')).toHaveClass(styles.isBlocked);
+    await user.click(auraToggle());
 
-      await user.click(box);
-      expect(box).not.toBeChecked();
-      expect(localStorage.getItem('notify.tasks')).not.toBe(JSON.stringify(true));
-    });
+    expect(screen.getAllByRole('radio')).toHaveLength(THEMES.length + 1);
+    expect(themeRadio(/follow system/i)).toBeChecked();
+  });
+});
 
-    it('leaves the palette picker alone', async () => {
-      stubNotification();
-      const user = await openMenu();
+describe('Settings due notices', () => {
+  it('are not offered where the browser cannot notify at all', async () => {
+    await openSettingsMenu();
 
-      await user.click(screen.getByRole('checkbox', { name: /task is due/i }));
+    expect(screen.queryByRole('checkbox', { name: /task is due/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('Notifications')).not.toBeInTheDocument();
+  });
 
-      expect(screen.getAllByRole('radio')).toHaveLength(THEMES.length + 1);
-      expect(screen.getByRole('radio', { name: /follow system/i })).toBeChecked();
-    });
+  it('are offered, and off, where they are supported', async () => {
+    stubNotification();
+
+    await openSettingsMenu();
+
+    expect(
+      screen.getByRole('checkbox', { name: /remind me when a task is due/i }),
+    ).not.toBeChecked();
+  });
+
+  it('ask the browser for permission when switched on', async () => {
+    stubNotification();
+    const user = await openSettingsMenu();
+
+    await user.click(noticesToggle());
+
+    await waitFor(() => expect(noticesToggle()).toBeChecked());
+    expect(localStorage.getItem('notify.tasks')).toBe(JSON.stringify(true));
+  });
+
+  it('read as blocked once refused at the browser level', async () => {
+    currentPermission = 'denied';
+    stubNotification();
+
+    await openSettingsMenu();
+
+    expect(noticesToggle()).toBeDisabled();
+    expect(screen.getByText('Blocked')).toBeInTheDocument();
+    expect(noticesToggle().closest('label')).toHaveClass(styles.isBlocked);
+  });
+
+  it('refuse to switch on once blocked', async () => {
+    currentPermission = 'denied';
+    stubNotification();
+    const user = await openSettingsMenu();
+
+    await user.click(noticesToggle());
+
+    expect(noticesToggle()).not.toBeChecked();
+    expect(localStorage.getItem('notify.tasks')).not.toBe(JSON.stringify(true));
+  });
+
+  it('leave the palette picker alone', async () => {
+    stubNotification();
+    const user = await openSettingsMenu();
+
+    await user.click(noticesToggle());
+
+    expect(screen.getAllByRole('radio')).toHaveLength(THEMES.length + 1);
+    expect(themeRadio(/follow system/i)).toBeChecked();
   });
 });

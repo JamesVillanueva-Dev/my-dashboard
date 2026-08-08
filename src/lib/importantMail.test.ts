@@ -31,16 +31,17 @@ const NOW = Date.UTC(2026, 7, 5, 12, 0, 0);
 /** The signed-in user. */
 const SELF = 'you@example.com';
 
-const hoursAgo = (h: number) => NOW - h * 3_600_000;
+const hoursAgo = (hours: number) => NOW - hours * 3_600_000;
 
-type Over = Partial<Omit<MailSummary, 'labels'>> & { labels?: Partial<MailLabels> };
+/** The fields a case switches on, on top of the neutral message below. */
+type MailOverrides = Partial<Omit<MailSummary, 'labels'>> & { labels?: Partial<MailLabels> };
 
 /**
  * A message on which nothing fires: no ask, no addressing, no automation, and
  * received exactly `NOW` so the recency factor is 1. Each test switches on the
  * single thing it is about, which is what makes `total` readable as the weight.
  */
-const mail = (id: string, over: Over = {}): MailSummary => ({
+const mail = (id: string, overrides: MailOverrides = {}): MailSummary => ({
   id,
   from: 'Someone <someone@example.com>',
   subject: 'Notes',
@@ -53,178 +54,204 @@ const mail = (id: string, over: Over = {}): MailSummary => ({
   listHeaders: false,
   autoHeaders: false,
   threaded: false,
-  ...over,
-  labels: { important: false, starred: false, updates: false, forums: false, ...over.labels },
+  ...overrides,
+  labels: {
+    important: false,
+    starred: false,
+    updates: false,
+    forums: false,
+    ...overrides.labels,
+  },
 });
 
 /** Scores with no context at all, so only the message itself can contribute. */
-const bare = (over: Over) => scoreMail(mail('x', over), { self: null }, NOW).total;
+const scoreWithoutContext = (overrides: MailOverrides) =>
+  scoreMail(mail('x', overrides), { self: null }, NOW).total;
 
-/** Scores as the signed-in user. */
-const asSelf = (over: Over) => scoreMail(mail('x', over), { self: SELF }, NOW).total;
+/** Scores as the signed-in user, so the addressing signals can fire. */
+const scoreAsSelf = (overrides: MailOverrides) =>
+  scoreMail(mail('x', overrides), { self: SELF }, NOW).total;
 
-describe('scoreMail — one signal at a time', () => {
+/** The ids of a ranking, in order. */
+const pickedIds = (picks: ReturnType<typeof rankMail>) => picks.map((pick) => pick.message.id);
+
+describe('scoreMail, one signal at a time', () => {
   it('scores a star above anything it can infer', () => {
-    expect(bare({ labels: { starred: true } })).toBe(STARRED);
+    expect(scoreWithoutContext({ labels: { starred: true } })).toBe(STARRED);
   });
 
   it('scores Gmail’s own importance flag', () => {
-    expect(bare({ labels: { important: true } })).toBe(IMPORTANT);
+    expect(scoreWithoutContext({ labels: { important: true } })).toBe(IMPORTANT);
   });
 
   it('scores being in To, without the small-group bonus on a wide send', () => {
-    const to = [SELF, 'a@x.com', 'b@x.com', 'c@x.com', 'd@x.com', 'e@x.com'];
-    expect(asSelf({ to })).toBe(TO_DIRECT);
+    const wideSend = [SELF, 'a@x.com', 'b@x.com', 'c@x.com', 'd@x.com', 'e@x.com'];
+
+    expect(scoreAsSelf({ to: wideSend })).toBe(TO_DIRECT);
   });
 
   it('scores being copied lower than being addressed', () => {
-    const to = ['a@x.com', 'b@x.com', 'c@x.com', 'd@x.com', 'e@x.com', 'f@x.com'];
-    expect(asSelf({ to, cc: [SELF] })).toBe(CC_ONLY);
+    const others = ['a@x.com', 'b@x.com', 'c@x.com', 'd@x.com', 'e@x.com', 'f@x.com'];
+
+    expect(scoreAsSelf({ to: others, cc: [SELF] })).toBe(CC_ONLY);
     expect(CC_ONLY).toBeLessThan(TO_DIRECT);
   });
 
   it('adds the sole-recipient bonus to a one-to-one message', () => {
-    expect(asSelf({ to: [SELF] })).toBe(TO_DIRECT + SOLE_RECIPIENT);
+    expect(scoreAsSelf({ to: [SELF] })).toBe(TO_DIRECT + SOLE_RECIPIENT);
   });
 
   it('adds a smaller bonus to a small group', () => {
-    expect(asSelf({ to: [SELF, 'a@x.com', 'b@x.com'] })).toBe(TO_DIRECT + SMALL_GROUP);
+    expect(scoreAsSelf({ to: [SELF, 'a@x.com', 'b@x.com'] })).toBe(TO_DIRECT + SMALL_GROUP);
   });
 
   it('skips addressing entirely when the user’s address is unknown', () => {
     // The profile lookup fails soft; it should cost this signal, not the panel.
-    expect(bare({ to: [SELF] })).toBe(0);
+    expect(scoreWithoutContext({ to: [SELF] })).toBe(0);
   });
 
   it('falls back to Delivered-To when the profile address is missing', () => {
-    expect(bare({ to: ['alias@example.com'], deliveredTo: ['alias@example.com'] })).toBe(
-      TO_DIRECT + SOLE_RECIPIENT,
-    );
+    const toAnAlias = { to: ['alias@example.com'], deliveredTo: ['alias@example.com'] };
+
+    expect(scoreWithoutContext(toAnAlias)).toBe(TO_DIRECT + SOLE_RECIPIENT);
   });
 
   it('scores a threaded reply', () => {
-    expect(bare({ threaded: true })).toBe(THREADED);
+    expect(scoreWithoutContext({ threaded: true })).toBe(THREADED);
   });
 
   it('scores a Re: subject on its own, for clients that drop the header', () => {
-    expect(bare({ subject: 'Re: hello' })).toBe(RE_SUBJECT);
+    expect(scoreWithoutContext({ subject: 'Re: hello' })).toBe(RE_SUBJECT);
   });
 
   it('scores a forward lower than a reply', () => {
-    expect(bare({ subject: 'Fwd: hello' })).toBe(FWD_SUBJECT);
+    expect(scoreWithoutContext({ subject: 'Fwd: hello' })).toBe(FWD_SUBJECT);
     expect(FWD_SUBJECT).toBeLessThan(RE_SUBJECT);
   });
 
   it('scores transactional language', () => {
-    expect(bare({ subject: 'Action required' })).toBe(TRANSACTIONAL);
+    expect(scoreWithoutContext({ subject: 'Action required' })).toBe(TRANSACTIONAL);
   });
 
   it('scores a direct request', () => {
-    expect(bare({ snippet: 'can you look at this' })).toBe(DIRECT_REQUEST);
+    expect(scoreWithoutContext({ snippet: 'can you look at this' })).toBe(DIRECT_REQUEST);
   });
 
   it('scores a question in the subject above one in the preview', () => {
-    expect(bare({ subject: 'ready to ship?' })).toBe(QUESTION_SUBJECT);
-    expect(bare({ snippet: 'ready to ship?' })).toBe(QUESTION_SNIPPET);
+    expect(scoreWithoutContext({ subject: 'ready to ship?' })).toBe(QUESTION_SUBJECT);
+    expect(scoreWithoutContext({ snippet: 'ready to ship?' })).toBe(QUESTION_SNIPPET);
   });
 
   it('scores a deadline', () => {
-    expect(bare({ snippet: 'the report is due by noon' })).toBe(DEADLINE);
+    expect(scoreWithoutContext({ snippet: 'the report is due by noon' })).toBe(DEADLINE);
   });
 
   it('does not read "due" inside another word', () => {
     // A substring match would score "duetto" as a deadline.
-    expect(bare({ snippet: 'we listened to a duetto' })).toBe(0);
+    expect(scoreWithoutContext({ snippet: 'we listened to a duetto' })).toBe(0);
   });
 
   it('scores unread modestly', () => {
-    expect(bare({ unread: true })).toBe(UNREAD);
+    expect(scoreWithoutContext({ unread: true })).toBe(UNREAD);
     expect(UNREAD).toBeLessThan(TO_DIRECT);
   });
 
   it('scores a sender the user has written to before', () => {
-    const score = scoreMail(mail('x'), { self: null, knownSenders: new Set(['someone@example.com']) }, NOW);
-    expect(score.total).toBe(KNOWN_SENDER);
+    const knownSenders = new Set(['someone@example.com']);
+
+    const scored = scoreMail(mail('x'), { self: null, knownSenders }, NOW);
+
+    expect(scored.total).toBe(KNOWN_SENDER);
   });
 
   it('penalises a sender that fills the candidate set', () => {
-    const score = scoreMail(
-      mail('x'),
-      { self: null, senderCounts: new Map([['someone@example.com', 4]]) },
-      NOW,
-    );
-    expect(score.total).toBe(REPEAT_SENDER);
+    const senderCounts = new Map([['someone@example.com', 4]]);
+
+    const scored = scoreMail(mail('x'), { self: null, senderCounts }, NOW);
+
+    expect(scored.total).toBe(REPEAT_SENDER);
   });
 });
 
-describe('scoreMail — the bulk gate', () => {
+describe('scoreMail and the bulk gate', () => {
   it('quarters a mailing', () => {
-    expect(bare({ listHeaders: true, unread: true })).toBeCloseTo(UNREAD * 0.25, 5);
+    expect(scoreWithoutContext({ listHeaders: true, unread: true })).toBeCloseTo(UNREAD * 0.25, 5);
   });
 
   it('recognises a mailing from either list header, automation, or the sender', () => {
-    for (const over of [
+    const bulkTells: MailOverrides[] = [
       { listHeaders: true },
       { autoHeaders: true },
       { labels: { updates: true } },
       { labels: { forums: true } },
       { from: 'Alerts <no-reply@x.com>' },
       { from: 'GitHub <notifications@github.com>' },
-    ] as Over[]) {
-      expect(bare({ ...over, unread: true })).toBeLessThan(UNREAD);
+    ];
+
+    for (const tell of bulkTells) {
+      expect(scoreWithoutContext({ ...tell, unread: true })).toBeLessThan(UNREAD);
     }
   });
 
   it('halves rather than quarters a machine relaying a conversation', () => {
     // A pull-request comment is automated *and* a reply. Treating it like a
     // newsletter is what buries the one that actually asks you something.
-    const score = bare({ listHeaders: true, threaded: true });
-    expect(score).toBeCloseTo(THREADED * 0.5, 5);
+    const relayed = scoreWithoutContext({ listHeaders: true, threaded: true });
+
+    expect(relayed).toBeCloseTo(THREADED * 0.5, 5);
   });
 
   it('lets transactional language cancel the gate outright', () => {
     // The case a blanket demotion of automated mail gets wrong.
-    expect(bare({ from: 'Stripe <no-reply@stripe.com>', subject: 'Action required' })).toBe(
-      TRANSACTIONAL,
-    );
+    const paymentFailed = { from: 'Stripe <no-reply@stripe.com>', subject: 'Action required' };
+
+    expect(scoreWithoutContext(paymentFailed)).toBe(TRANSACTIONAL);
   });
 
   it('does not let marketing urgency buy that rescue', () => {
     // "Your trial expires Friday — 30% off to renew" is a sales tactic wearing
     // a consequence's clothes. Marketing vetoes the transactional cancel.
-    const score = bare({ listHeaders: true, subject: 'Your trial expires — 30% off' });
-    expect(score).toBeCloseTo(TRANSACTIONAL * 0.25 * 0.5, 5);
+    const salesUrgency = { listHeaders: true, subject: 'Your trial expires — 30% off' };
+
+    expect(scoreWithoutContext(salesUrgency)).toBeCloseTo(TRANSACTIONAL * 0.25 * 0.5, 5);
   });
 
   it('scales marketing language down even from a human', () => {
-    expect(bare({ subject: 'introducing our new thing', unread: true })).toBeCloseTo(
-      UNREAD * 0.5,
-      5,
-    );
+    const marketing = { subject: 'introducing our new thing', unread: true };
+
+    expect(scoreWithoutContext(marketing)).toBeCloseTo(UNREAD * 0.5, 5);
   });
 });
 
-describe('scoreMail — recency', () => {
-  it('is worth less than any real signal, so nothing wins on being newest', () => {
-    const fresh = bare({ labels: { starred: true } });
-    const week = scoreMail(mail('x', { labels: { starred: true }, receivedAt: hoursAgo(168) }), { self: null }, NOW);
+describe('scoreMail and recency', () => {
+  /** A starred message of the given age, so only recency varies. */
+  const scoreAtAge = (hours: number) =>
+    scoreMail(
+      mail('x', { labels: { starred: true }, receivedAt: hoursAgo(hours) }),
+      { self: null },
+      NOW,
+    ).total;
 
-    expect(week.total).toBeLessThan(fresh);
+  it('lowers the score of an older message', () => {
+    expect(scoreAtAge(168)).toBeLessThan(scoreAtAge(0));
+  });
+
+  it('is worth less than any real signal, so nothing wins on being newest', () => {
     // The whole curve spans 1.0 → 0.6; it orders comparable messages and
     // nothing more.
-    expect(week.total).toBeGreaterThan(fresh * 0.6);
+    expect(scoreAtAge(168)).toBeGreaterThan(scoreAtAge(0) * 0.6);
   });
 
   it('decays smoothly rather than at a cliff', () => {
-    const at = (h: number) =>
-      scoreMail(mail('x', { labels: { starred: true }, receivedAt: hoursAgo(h) }), { self: null }, NOW).total;
+    const scoresByAge = [0, 12, 24, 48, 96, 168].map(scoreAtAge);
 
-    const steps = [0, 12, 24, 48, 96, 168].map(at);
-    for (let i = 1; i < steps.length; i++) expect(steps[i]).toBeLessThan(steps[i - 1]);
+    for (let step = 1; step < scoresByAge.length; step++) {
+      expect(scoresByAge[step]).toBeLessThan(scoresByAge[step - 1]);
+    }
   });
 
   it('does not blow up on a message with an unreadable date', () => {
-    expect(Number.isFinite(bare({ receivedAt: 0 }))).toBe(true);
+    expect(Number.isFinite(scoreWithoutContext({ receivedAt: 0 }))).toBe(true);
   });
 });
 
@@ -247,6 +274,7 @@ describe('reasonFor', () => {
 
   it('does not say the same thing twice', () => {
     const { signals } = scoreMail(mail('x', { to: [SELF] }), { self: SELF }, NOW);
+
     expect(reasonFor(signals)).toBe('Addressed to you alone');
   });
 
@@ -268,7 +296,12 @@ describe('reasonFor', () => {
   });
 
   it('never speaks for a gate', () => {
-    const { signals } = scoreMail(mail('x', { listHeaders: true, unread: true }), { self: null }, NOW);
+    const { signals } = scoreMail(
+      mail('x', { listHeaders: true, unread: true }),
+      { self: null },
+      NOW,
+    );
+
     expect(reasonFor(signals)).toBe('Unread');
   });
 });
@@ -300,44 +333,52 @@ describe('rankMail', () => {
       NOW,
     );
 
-    expect(picks).toHaveLength(1);
-    expect(picks[0].message.id).toBe('good');
+    expect(pickedIds(picks)).toEqual(['good']);
   });
 
   it('ranks past what the panel shows, so a dismissal has something to promote', () => {
-    const strong = [...'abcde'].map((id) =>
+    const allStrong = [...'abcde'].map((id) =>
       mail(id, { to: [SELF], unread: true, subject: 'can you review this?' }),
     );
+
     // Every one of them clears the floor, and every one is returned. Cutting to
     // three here would leave the panel nothing to reach for when a pick is
     // waved away — the window belongs to the caller.
-    expect(rankMail(strong, { self: SELF }, NOW)).toHaveLength(strong.length);
-    expect(strong.length).toBeGreaterThan(TOP_N);
+    expect(rankMail(allStrong, { self: SELF }, NOW)).toHaveLength(allStrong.length);
+    expect(allStrong.length).toBeGreaterThan(TOP_N);
   });
 
-  it('breaks a tie on recency, then on id — never on Gmail’s order', () => {
-    const tied = (id: string, h: number) =>
-      mail(id, { to: [SELF], unread: true, subject: 'can you review?', receivedAt: hoursAgo(h) });
+  it('breaks a tie on recency', () => {
+    const tied = (id: string, hours: number) =>
+      mail(id, {
+        to: [SELF],
+        unread: true,
+        subject: 'can you review?',
+        receivedAt: hoursAgo(hours),
+      });
 
-    const older = tied('b', 5);
-    const newer = tied('a', 1);
+    const picks = rankMail([tied('b', 5), tied('a', 1)], { self: SELF }, NOW);
 
-    expect(rankMail([older, newer], { self: SELF }, NOW).map((p) => p.message.id)).toEqual([
-      'a',
-      'b',
-    ]);
-    // Same score *and* same age: the id decides, so the order is stable.
-    const [x, y] = [tied('z', 3), tied('y', 3)];
-    expect(rankMail([x, y], { self: SELF }, NOW).map((p) => p.message.id)).toEqual(['y', 'z']);
+    expect(pickedIds(picks)).toEqual(['a', 'b']);
+  });
+
+  it('breaks a tie of the same age on id, never on Gmail’s order', () => {
+    const sameAge = (id: string) =>
+      mail(id, { to: [SELF], unread: true, subject: 'can you review?', receivedAt: hoursAgo(3) });
+
+    const picks = rankMail([sameAge('z'), sameAge('y')], { self: SELF }, NOW);
+
+    expect(pickedIds(picks)).toEqual(['y', 'z']);
   });
 
   it('derives the repeat-sender penalty across the whole candidate set', () => {
     // The count is a property of the inbox, not of a message, so `rankMail`
     // works it out rather than taking it on trust from the caller.
     const ask = { to: [SELF], unread: true, subject: 'can you review?' };
+
     const alone = rankMail([mail('a', ask)], { self: SELF }, NOW);
     const crowd = rankMail(
-      [1, 2, 3].map((n) => mail(`s${n}`, { ...ask, from: 'Bot <bot@x.com>' })),
+      [1, 2, 3].map((index) => mail(`s${index}`, { ...ask, from: 'Bot <bot@x.com>' })),
       { self: SELF },
       NOW,
     );
@@ -346,13 +387,19 @@ describe('rankMail', () => {
   });
 
   it('carries the breakdown that produced each pick', () => {
-    const [pick] = rankMail([mail('a', { to: [SELF], subject: 'can you review?' })], { self: SELF }, NOW);
+    const [pick] = rankMail(
+      [mail('a', { to: [SELF], subject: 'can you review?' })],
+      { self: SELF },
+      NOW,
+    );
 
     expect(pick.score).toBeGreaterThanOrEqual(FLOOR);
-    expect(pick.signals.map((s) => s.key)).toContain('request');
-    expect(pick.signals.every((s) => typeof s.points === 'number' && typeof s.factor === 'number')).toBe(
-      true,
-    );
+    expect(pick.signals.map((signal) => signal.key)).toContain('request');
+    expect(
+      pick.signals.every(
+        (signal) => typeof signal.points === 'number' && typeof signal.factor === 'number',
+      ),
+    ).toBe(true);
   });
 });
 
@@ -362,7 +409,7 @@ describe('rankMail', () => {
  * Every message here is a shape that turns up in a real inbox, and the top
  * three are the ones a person would pick reading it themselves.
  */
-describe('rankMail — a realistic inbox', () => {
+describe('rankMail on a realistic inbox', () => {
   const inbox: MailSummary[] = [
     mail('priya', {
       from: 'Priya Raman <priya@work.com>',
@@ -475,30 +522,34 @@ describe('rankMail — a realistic inbox', () => {
       unread: true,
       receivedAt: hoursAgo(2),
     }),
-    ...[1, 2, 3].map((n) =>
-      mail(`monitor-${n}`, {
+    ...[1, 2, 3].map((index) =>
+      mail(`monitor-${index}`, {
         from: 'Monitor <alerts@monitor.io>',
         subject: 'Deploy succeeded',
         snippet: 'Build 41 shipped to production.',
         to: [SELF],
         autoHeaders: true,
         unread: true,
-        receivedAt: hoursAgo(n * 2),
+        receivedAt: hoursAgo(index * 2),
       }),
     ),
   ];
 
   const context = { self: SELF, knownSenders: new Set(['priya@work.com']) };
   const picks = rankMail(inbox, context, NOW);
+
   /** What the panel actually shows: the top of the ranking it windows. */
   const shown = picks.slice(0, TOP_N);
 
+  /** One message's score in the context of this whole inbox. */
+  const scoreOf = (id: string) => scoreMail(inbox.find((each) => each.id === id)!, context, NOW).total;
+
   it('picks the colleague’s question, the failed payment, and the lease', () => {
-    expect(shown.map((p) => p.message.id)).toEqual(['priya', 'stripe', 'lease']);
+    expect(pickedIds(shown)).toEqual(['priya', 'stripe', 'lease']);
   });
 
   it('explains each pick in the panel’s words', () => {
-    expect(shown.map((p) => p.reason)).toEqual([
+    expect(shown.map((pick) => pick.reason)).toEqual([
       'Makes a direct request, asks a direct question',
       'Flags action required, addressed to you alone',
       // The star is what lifted the lease into the list, but "please review and
@@ -511,25 +562,23 @@ describe('rankMail — a realistic inbox', () => {
     // 100 hours old, read, and still third — a star and "please sign" outrank
     // four fresher messages.
     const lease = picks[2];
-    const fresher = inbox.filter((m) => m.receivedAt > lease.message.receivedAt);
+
+    const fresher = inbox.filter((each) => each.receivedAt > lease.message.receivedAt);
+
     expect(fresher.length).toBeGreaterThan(4);
   });
 
   it('buries every newsletter and promotion', () => {
-    const scored = (id: string) =>
-      scoreMail(inbox.find((m) => m.id === id)!, context, NOW).total;
-
     for (const id of ['dana', 'morning', 'shoes', 'list']) {
-      expect(scored(id)).toBeLessThan(FLOOR);
+      expect(scoreOf(id)).toBeLessThan(FLOOR);
     }
   });
 
   it('keeps a real alert from a no-reply address well above the floor', () => {
-    const scored = scoreMail(inbox.find((m) => m.id === 'security')!, context, NOW).total;
-    expect(scored).toBeGreaterThan(FLOOR);
+    expect(scoreOf('security')).toBeGreaterThan(FLOOR);
   });
 
   it('keeps the sender that filled the inbox with three of the same out of it', () => {
-    expect(picks.map((p) => p.message.id).some((id) => id.startsWith('monitor'))).toBe(false);
+    expect(pickedIds(picks).some((id) => id.startsWith('monitor'))).toBe(false);
   });
 });

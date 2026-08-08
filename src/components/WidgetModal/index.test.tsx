@@ -3,112 +3,149 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import WidgetModal from './index';
 
 /** Renders the dialog with a close spy, returning both. */
-function open(over: { className?: string } = {}) {
+function openModal(props: { className?: string } = {}) {
   const onClose = vi.fn();
-  const utils = render(
-    <WidgetModal title="News" icon="newspaper" onClose={onClose} {...over}>
+  const view = render(
+    <WidgetModal title="News" icon="newspaper" onClose={onClose} {...props}>
       <a href="#one">First</a>
       <a href="#two">Last</a>
     </WidgetModal>,
   );
-  return { ...utils, onClose };
+  return { ...view, onClose };
 }
+
+const modal = () => screen.getByRole('dialog');
+
+/** The backdrop is the dialog's parent. */
+const backdrop = () => modal().parentElement!;
 
 describe('WidgetModal', () => {
   it('renders the widget body inside a labelled modal dialog', () => {
-    open();
+    openModal();
 
-    const dialog = screen.getByRole('dialog');
-    expect(dialog).toHaveAttribute('aria-modal', 'true');
-    expect(dialog).toHaveAccessibleName('News');
-    expect(within(dialog).getByText('First')).toBeInTheDocument();
+    expect(modal()).toHaveAttribute('aria-modal', 'true');
+    expect(modal()).toHaveAccessibleName('News');
+    expect(within(modal()).getByText('First')).toBeInTheDocument();
   });
 
   it('renders into the document body, clear of the transformed widget card', () => {
-    const { container } = open();
+    const { container } = openModal();
 
     // Nothing lands in the caller's tree; the portal takes it all to the body.
     expect(container).toBeEmptyDOMElement();
-    expect(document.body).toContainElement(screen.getByRole('dialog'));
+    expect(document.body).toContainElement(modal());
   });
 
   it("carries the widget's own root class, so its styles still apply", () => {
-    open({ className: 'news-root' });
+    openModal({ className: 'news-root' });
 
-    expect(screen.getByRole('dialog')).toHaveClass('news-root');
+    expect(modal()).toHaveClass('news-root');
   });
 
   it('marks itself expanded, the hook a widget uses to fill the extra room', () => {
-    open();
+    openModal();
 
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-expanded');
+    expect(modal()).toHaveAttribute('data-expanded');
   });
 
   it("keeps the widget's own header controls in reach", () => {
-    const onClose = vi.fn();
     render(
-      <WidgetModal title="News" action={<button>Refresh</button>} onClose={onClose}>
+      <WidgetModal title="News" action={<button>Refresh</button>} onClose={vi.fn()}>
         body
       </WidgetModal>,
     );
 
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });
+});
 
-  it('closes on the close button, the backdrop, and Escape', () => {
-    const first = open();
+describe('WidgetModal dismissal', () => {
+  it('closes on the close button', () => {
+    const { onClose } = openModal();
+
     fireEvent.click(screen.getByRole('button', { name: 'Close News' }));
-    expect(first.onClose).toHaveBeenCalledTimes(1);
-    first.unmount();
 
-    const second = open();
-    // The backdrop is the dialog's parent; the dialog itself must not close it.
-    fireEvent.click(screen.getByRole('dialog'));
-    expect(second.onClose).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('dialog').parentElement!);
-    expect(second.onClose).toHaveBeenCalledTimes(1);
-    second.unmount();
-
-    const third = open();
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(third.onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('locks the page behind it, and gives the scroll back on close', () => {
-    const { unmount } = open();
+  it('closes on a click on the backdrop', () => {
+    const { onClose } = openModal();
+
+    fireEvent.click(backdrop());
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays open when the click lands on the dialog itself', () => {
+    const { onClose } = openModal();
+
+    fireEvent.click(modal());
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('closes on Escape', () => {
+    const { onClose } = openModal();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('WidgetModal and the page behind it', () => {
+  it('locks the page scroll while open', () => {
+    openModal();
+
     expect(document.body.style.overflow).toBe('hidden');
+  });
+
+  it('gives the scroll back on close', () => {
+    const { unmount } = openModal();
 
     unmount();
+
     expect(document.body.style.overflow).toBe('');
   });
 
-  it('takes focus on open and returns it to the opener on close', () => {
+  it('takes focus on open', () => {
+    openModal();
+
+    expect(modal()).toHaveFocus();
+  });
+
+  it('returns focus to the opener on close', () => {
     const opener = document.createElement('button');
     document.body.append(opener);
     opener.focus();
-
-    const { unmount } = open();
-    expect(screen.getByRole('dialog')).toHaveFocus();
+    const { unmount } = openModal();
 
     unmount();
+
     expect(opener).toHaveFocus();
     opener.remove();
   });
+});
 
-  it('keeps Tab inside the dialog', () => {
-    open();
-    const dialog = screen.getByRole('dialog');
+describe('WidgetModal focus trap', () => {
+  it('wraps Tab off the last control round to the first', () => {
+    openModal();
     // The close button leads (it is in the header); the body's links follow.
-    const close = within(dialog).getByRole('button', { name: 'Close News' });
-    const last = within(dialog).getByRole('link', { name: 'Last' });
+    const closeButton = within(modal()).getByRole('button', { name: 'Close News' });
+    within(modal()).getByRole('link', { name: 'Last' }).focus();
 
-    // Forwards off the last control wraps to the first.
-    last.focus();
-    fireEvent.keyDown(dialog, { key: 'Tab' });
-    expect(close).toHaveFocus();
+    fireEvent.keyDown(modal(), { key: 'Tab' });
 
-    // Backwards off the first wraps to the last.
-    fireEvent.keyDown(dialog, { key: 'Tab', shiftKey: true });
-    expect(last).toHaveFocus();
+    expect(closeButton).toHaveFocus();
+  });
+
+  it('wraps Shift+Tab off the first control round to the last', () => {
+    openModal();
+    const lastLink = within(modal()).getByRole('link', { name: 'Last' });
+    within(modal()).getByRole('button', { name: 'Close News' }).focus();
+
+    fireEvent.keyDown(modal(), { key: 'Tab', shiftKey: true });
+
+    expect(lastLink).toHaveFocus();
   });
 });

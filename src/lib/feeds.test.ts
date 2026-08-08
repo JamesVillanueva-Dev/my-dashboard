@@ -10,17 +10,20 @@ import {
   type Feed,
 } from './feeds';
 
-const feed = (over: Partial<Feed> = {}): Feed => ({
+const feed = (overrides: Partial<Feed> = {}): Feed => ({
   id: 'custom:https://example.com/rss.xml',
   label: 'Example',
   url: 'https://example.com/rss.xml',
-  ...over,
+  ...overrides,
 });
 
+const idsOf = (feeds: readonly Feed[]) => feeds.map((each) => each.id);
+
 describe('BUILT_IN_FEEDS', () => {
-  it('has unique ids and urls — both address a source on their own', () => {
-    expect(new Set(BUILT_IN_FEEDS.map((f) => f.id)).size).toBe(BUILT_IN_FEEDS.length);
-    expect(new Set(BUILT_IN_FEEDS.map((f) => f.url)).size).toBe(BUILT_IN_FEEDS.length);
+  it('gives every shipped source a unique id and url', () => {
+    // Either one addresses a source on its own.
+    expect(new Set(idsOf(BUILT_IN_FEEDS)).size).toBe(BUILT_IN_FEEDS.length);
+    expect(new Set(BUILT_IN_FEEDS.map((each) => each.url)).size).toBe(BUILT_IN_FEEDS.length);
   });
 
   it('survives its own normalisation, so the shipped list is never repaired', () => {
@@ -29,11 +32,11 @@ describe('BUILT_IN_FEEDS', () => {
 });
 
 describe('hostOf', () => {
-  it('names a source by its host, without the noise', () => {
+  it('names a source by its host, without the www prefix', () => {
     expect(hostOf('https://www.theverge.com/rss/index.xml')).toBe('theverge.com');
   });
 
-  it('gives back an unparseable address as-is rather than nothing', () => {
+  it('returns an unparseable address unchanged rather than nothing', () => {
     expect(hostOf('not a url')).toBe('not a url');
   });
 });
@@ -55,11 +58,13 @@ describe('makeFeed', () => {
     expect(makeFeed('   ', 'https://www.theverge.com/rss')?.label).toBe('theverge.com');
   });
 
-  it('rejects an address that is not http(s)', () => {
-    // A source is fetched, so a scheme that is not a fetchable one is not a
-    // source — and `javascript:` in particular must never be rewritten to https.
+  it('rejects a scheme that cannot be fetched', () => {
+    // `javascript:` in particular must never be rewritten to https.
     expect(makeFeed('Bad', 'javascript:alert(1)')).toBeNull();
     expect(makeFeed('Bad', 'ftp://example.com/rss')).toBeNull();
+  });
+
+  it('rejects a blank address', () => {
     expect(makeFeed('Bad', '   ')).toBeNull();
   });
 
@@ -76,14 +81,15 @@ describe('addFeed', () => {
   });
 
   it('ignores a source already in the list, even under a different name', () => {
-    const list = [feed()];
-    expect(addFeed(list, feed({ id: 'other', label: 'Renamed' }))).toBe(list);
+    const feeds = [feed()];
+
+    expect(addFeed(feeds, feed({ id: 'other', label: 'Renamed' }))).toBe(feeds);
   });
 });
 
 describe('removeFeed', () => {
   it('drops the named source and leaves the rest', () => {
-    expect(removeFeed(BUILT_IN_FEEDS, 'npr').map((f) => f.id)).toEqual([
+    expect(idsOf(removeFeed(BUILT_IN_FEEDS, 'npr'))).toEqual([
       'bbc-top',
       'bbc-world',
       'bbc-tech',
@@ -92,24 +98,35 @@ describe('removeFeed', () => {
   });
 
   it('can empty the list — removing every source is allowed', () => {
-    expect(BUILT_IN_FEEDS.reduce((list, f) => removeFeed(list, f.id), BUILT_IN_FEEDS)).toEqual([]);
+    const emptied = BUILT_IN_FEEDS.reduce(
+      (feeds, each) => removeFeed(feeds, each.id),
+      BUILT_IN_FEEDS,
+    );
+
+    expect(emptied).toEqual([]);
   });
 });
 
 describe('isDefaultFeeds', () => {
-  it('recognises the untouched list', () => {
+  it('is true for the untouched list', () => {
     expect(isDefaultFeeds(BUILT_IN_FEEDS)).toBe(true);
   });
 
-  it('recognises an edited one', () => {
+  it('is false once a source has been removed', () => {
     expect(isDefaultFeeds(removeFeed(BUILT_IN_FEEDS, 'npr'))).toBe(false);
+  });
+
+  it('is false once a source has been added', () => {
     expect(isDefaultFeeds(addFeed(BUILT_IN_FEEDS, feed()))).toBe(false);
   });
 });
 
 describe('normalizeFeeds', () => {
-  it('falls back to the built-ins when nothing usable is stored', () => {
+  it('falls back to the built-ins when nothing is stored', () => {
     expect(normalizeFeeds(undefined)).toEqual(BUILT_IN_FEEDS);
+  });
+
+  it('falls back to the built-ins when the stored value is not a list', () => {
     expect(normalizeFeeds('bbc-top')).toEqual(BUILT_IN_FEEDS);
   });
 
@@ -118,26 +135,26 @@ describe('normalizeFeeds', () => {
   });
 
   it('drops entries that could not be rendered or fetched', () => {
-    expect(
-      normalizeFeeds([
-        feed(),
-        null,
-        'bbc-top',
-        { id: 'no-url' },
-        { id: 'bad-scheme', label: 'Bad', url: 'javascript:alert(1)' },
-        { label: 'No id', url: 'https://example.org/rss' },
-      ]),
-    ).toEqual([feed()]);
+    const stored = [
+      feed(),
+      null,
+      'bbc-top',
+      { id: 'no-url' },
+      { id: 'bad-scheme', label: 'Bad', url: 'javascript:alert(1)' },
+      { label: 'No id', url: 'https://example.org/rss' },
+    ];
+
+    expect(normalizeFeeds(stored)).toEqual([feed()]);
   });
 
   it('drops a duplicate of either address, which would otherwise be ambiguous', () => {
-    expect(
-      normalizeFeeds([
-        feed(),
-        feed({ id: 'same-url-different-id' }),
-        feed({ url: 'https://elsewhere.com/rss' }),
-      ]),
-    ).toEqual([feed()]);
+    const stored = [
+      feed(),
+      feed({ id: 'same-url-different-id' }),
+      feed({ url: 'https://elsewhere.com/rss' }),
+    ];
+
+    expect(normalizeFeeds(stored)).toEqual([feed()]);
   });
 
   it('names an unnamed source after its host', () => {

@@ -4,7 +4,7 @@ import { renderHook } from '@testing-library/react';
 import { WidgetChromeProvider, useWidgetChrome, type WidgetChrome } from './chrome';
 
 /** Chrome as the dashboard grid supplies it, overridable per test. */
-function chrome(over: Partial<WidgetChrome> = {}): WidgetChrome {
+function chrome(overrides: Partial<WidgetChrome> = {}): WidgetChrome {
   return {
     id: 'weather',
     size: { cols: 2, height: null },
@@ -16,7 +16,7 @@ function chrome(over: Partial<WidgetChrome> = {}): WidgetChrome {
     onGripKeyDown: vi.fn(),
     isDragging: false,
     isResizing: false,
-    ...over,
+    ...overrides,
   };
 }
 

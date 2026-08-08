@@ -8,9 +8,9 @@ const NOW = new Date('2026-08-06T09:00:00').getTime();
 const MINUTE = 60_000;
 
 /** An agenda item for a task, defaulting to one due exactly now. */
-function task(over: Partial<AgendaItem> & { id?: string } = {}): AgendaItem {
-  const id = over.id ?? 't1';
-  const start = over.start ?? NOW;
+function task(overrides: Partial<AgendaItem> & { id?: string } = {}): AgendaItem {
+  const id = overrides.id ?? 't1';
+  const start = overrides.start ?? NOW;
   return {
     key: `task:${id}`,
     source: 'task',
@@ -20,25 +20,25 @@ function task(over: Partial<AgendaItem> & { id?: string } = {}): AgendaItem {
     end: start,
     allDay: false,
     done: false,
-    ...over,
+    ...overrides,
   };
 }
 
 /** An agenda item for a calendar event, due now. */
-function event(over: Partial<AgendaItem> = {}): AgendaItem {
+function event(overrides: Partial<AgendaItem> = {}): AgendaItem {
   return {
     ...task(),
     key: 'event:primary:e1',
     source: 'event',
     id: 'e1',
     title: 'Standup',
-    ...over,
+    ...overrides,
   };
 }
 
 /** The titles of whatever is owed, for terser assertions. */
-function titles(items: AgendaItem[], at = NOW, sent: string[] = []): string[] {
-  return pendingNotices(items, at, sent).map((n) => n.title);
+function pendingTitles(items: AgendaItem[], at = NOW, sent: string[] = []): string[] {
+  return pendingNotices(items, at, sent).map((notice) => notice.title);
 }
 
 describe('noticeKey', () => {
@@ -47,15 +47,15 @@ describe('noticeKey', () => {
   });
 
   it('changes when the task is rescheduled, so the new time can fire too', () => {
-    const before = noticeKey(task({ start: NOW }));
-    const after = noticeKey(task({ start: NOW + 60 * MINUTE }));
+    const beforeReschedule = noticeKey(task({ start: NOW }));
+    const afterReschedule = noticeKey(task({ start: NOW + 60 * MINUTE }));
 
-    expect(after).not.toBe(before);
+    expect(afterReschedule).not.toBe(beforeReschedule);
   });
 });
 
 describe('noticeBody', () => {
-  it('reads as "now" for a task that has just come due', () => {
+  it('reads as "Due now" for a task that has just come due', () => {
     expect(noticeBody(task(), NOW)).toBe('Due now');
     expect(noticeBody(task(), NOW + 59_000)).toBe('Due now');
   });
@@ -68,42 +68,42 @@ describe('noticeBody', () => {
 
 describe('pendingNotices', () => {
   it('raises a task the moment its due time arrives', () => {
-    expect(titles([task()])).toEqual(['Water the plants']);
+    expect(pendingTitles([task()])).toEqual(['Water the plants']);
   });
 
-  it('stays quiet about a task that is not due yet', () => {
-    expect(titles([task({ start: NOW + MINUTE })])).toEqual([]);
+  it('raises nothing for a task that is not due yet', () => {
+    expect(pendingTitles([task({ start: NOW + MINUTE })])).toEqual([]);
   });
 
-  it('still catches up on a task missed while the tab slept', () => {
-    expect(titles([task({ start: NOW - 20 * MINUTE })])).toEqual(['Water the plants']);
+  it('catches up on a task that came due while the tab slept', () => {
+    expect(pendingTitles([task({ start: NOW - 20 * MINUTE })])).toEqual(['Water the plants']);
   });
 
-  it('lets a long-overdue task stay quietly overdue', () => {
-    expect(titles([task({ start: NOW - GRACE_MS - MINUTE })])).toEqual([]);
+  it('raises nothing for a task overdue by longer than the grace period', () => {
+    expect(pendingTitles([task({ start: NOW - GRACE_MS - MINUTE })])).toEqual([]);
   });
 
-  it('says nothing about a task already ticked off', () => {
-    expect(titles([task({ done: true })])).toEqual([]);
+  it('raises nothing for a task already ticked off', () => {
+    expect(pendingTitles([task({ done: true })])).toEqual([]);
   });
 
-  it('leaves calendar events to Google, which alerts on them already', () => {
-    expect(titles([event()])).toEqual([]);
+  it('raises nothing for a calendar event, which Google alerts on already', () => {
+    expect(pendingTitles([event()])).toEqual([]);
   });
 
   it('does not raise the same due time twice', () => {
     const items = [task()];
-    const first = pendingNotices(items, NOW, []);
 
-    expect(first).toHaveLength(1);
-    expect(pendingNotices(items, NOW + MINUTE, [first[0].key])).toEqual([]);
+    const firstRun = pendingNotices(items, NOW, []);
+
+    expect(firstRun).toHaveLength(1);
+    expect(pendingNotices(items, NOW + MINUTE, [firstRun[0].key])).toEqual([]);
   });
 
   it('raises a task again once it is moved to a new time', () => {
-    const original = task({ start: NOW - 10 * MINUTE });
-    const sent = [noticeKey(original)];
+    const alreadySent = [noticeKey(task({ start: NOW - 10 * MINUTE }))];
 
-    expect(titles([task({ start: NOW })], NOW, sent)).toEqual(['Water the plants']);
+    expect(pendingTitles([task({ start: NOW })], NOW, alreadySent)).toEqual(['Water the plants']);
   });
 
   it('raises everything that came due together, in agenda order', () => {
@@ -112,17 +112,19 @@ describe('pendingNotices', () => {
       task({ id: 'b', title: 'Later', start: NOW - MINUTE }),
     ];
 
-    expect(titles(items)).toEqual(['Earlier', 'Later']);
+    expect(pendingTitles(items)).toEqual(['Earlier', 'Later']);
   });
 
   it('carries how late each one is', () => {
     const items = [task({ id: 'a', start: NOW - 3 * MINUTE }), task({ id: 'b', start: NOW })];
 
-    expect(pendingNotices(items, NOW, []).map((n) => n.body)).toEqual(['Due 3m ago', 'Due now']);
+    const bodies = pendingNotices(items, NOW, []).map((notice) => notice.body);
+
+    expect(bodies).toEqual(['Due 3m ago', 'Due now']);
   });
 
   it('gives an untitled task something to say', () => {
-    expect(titles([task({ title: '   ' })])).toEqual(['Task due']);
+    expect(pendingTitles([task({ title: '   ' })])).toEqual(['Task due']);
   });
 });
 
@@ -137,7 +139,7 @@ describe('pruneSent', () => {
     expect(pruneSent([`task:t1@${NOW - GRACE_MS - MINUTE}`], NOW)).toEqual([]);
   });
 
-  it('drops junk rather than carrying it forever', () => {
+  it('drops malformed entries rather than carrying them forever', () => {
     expect(pruneSent(['task:t1', '', 'task:t1@nonsense'], NOW)).toEqual([]);
   });
 
