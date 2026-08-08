@@ -2,38 +2,43 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import LegalModal from './index';
 
+/** Renders the modal showing `doc`, returning the close spy with RTL's helpers. */
+function renderLegalModal(doc: 'privacy' | 'terms' | null) {
+  const onClose = vi.fn();
+  const view = render(<LegalModal doc={doc} onClose={onClose} />);
+  return { ...view, onClose };
+}
+
 describe('LegalModal', () => {
   it('renders nothing when no document is selected', () => {
-    const { container } = render(<LegalModal doc={null} onClose={vi.fn()} />);
+    const { container } = renderLegalModal(null);
 
     expect(container).toBeEmptyDOMElement();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('shows the privacy policy', () => {
-    render(<LegalModal doc="privacy" onClose={vi.fn()} />);
+  it('shows the privacy policy on its own', () => {
+    renderLegalModal('privacy');
 
     expect(screen.getByRole('dialog', { name: 'Privacy Policy' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Privacy Policy' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Terms of Service' })).not.toBeInTheDocument();
   });
 
-  it('shows the terms of service', () => {
-    render(<LegalModal doc="terms" onClose={vi.fn()} />);
+  it('shows the terms of service on their own', () => {
+    renderLegalModal('terms');
 
     expect(screen.getByRole('dialog', { name: 'Terms of Service' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Terms of Service' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Privacy Policy' })).not.toBeInTheDocument();
   });
 
   it('is a modal dialog, so assistive technology traps focus inside it', () => {
-    render(<LegalModal doc="privacy" onClose={vi.fn()} />);
+    renderLegalModal('privacy');
 
     expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'true');
   });
 
   it('names the third-party services the browser actually contacts', () => {
-    render(<LegalModal doc="privacy" onClose={vi.fn()} />);
+    renderLegalModal('privacy');
 
     expect(screen.getByText('Open-Meteo')).toBeInTheDocument();
     expect(screen.getByText('allorigins.win')).toBeInTheDocument();
@@ -41,77 +46,71 @@ describe('LegalModal', () => {
   });
 
   it('carries a last-updated date on each document', () => {
-    const { rerender } = render(<LegalModal doc="privacy" onClose={vi.fn()} />);
+    const { rerender } = renderLegalModal('privacy');
     expect(screen.getByText(/^Last updated:/)).toBeInTheDocument();
 
     rerender(<LegalModal doc="terms" onClose={vi.fn()} />);
+
     expect(screen.getByText(/^Last updated:/)).toBeInTheDocument();
   });
+});
 
-  describe('dismissal', () => {
-    it('closes on the close button', () => {
-      const onClose = vi.fn();
-      render(<LegalModal doc="privacy" onClose={onClose} />);
+describe('LegalModal dismissal', () => {
+  it('closes on the close button', () => {
+    const { onClose } = renderLegalModal('privacy');
 
-      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 
-    it('closes on Escape', () => {
-      const onClose = vi.fn();
-      render(<LegalModal doc="terms" onClose={onClose} />);
+  it('closes on Escape', () => {
+    const { onClose } = renderLegalModal('terms');
 
-      fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
 
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 
-    it('ignores other keys', () => {
-      const onClose = vi.fn();
-      render(<LegalModal doc="terms" onClose={onClose} />);
+  it('ignores other keys', () => {
+    const { onClose } = renderLegalModal('terms');
 
-      fireEvent.keyDown(document, { key: 'Enter' });
+    fireEvent.keyDown(document, { key: 'Enter' });
 
-      expect(onClose).not.toHaveBeenCalled();
-    });
+    expect(onClose).not.toHaveBeenCalled();
+  });
 
-    it('closes on a click on the backdrop', () => {
-      const onClose = vi.fn();
-      const { container } = render(<LegalModal doc="privacy" onClose={onClose} />);
+  it('closes on a click on the backdrop', () => {
+    const { container, onClose } = renderLegalModal('privacy');
 
-      fireEvent.click(container.firstElementChild!);
+    fireEvent.click(container.firstElementChild!);
 
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 
-    it('stays open when the click lands on the document itself', () => {
-      const onClose = vi.fn();
-      render(<LegalModal doc="privacy" onClose={onClose} />);
+  it('stays open when the click lands on the document itself', () => {
+    const { onClose } = renderLegalModal('privacy');
 
-      // Selecting text in the policy must not dismiss it.
-      fireEvent.click(screen.getByRole('dialog'));
+    // Selecting text in the policy must not dismiss it.
+    fireEvent.click(screen.getByRole('dialog'));
 
-      expect(onClose).not.toHaveBeenCalled();
-    });
+    expect(onClose).not.toHaveBeenCalled();
+  });
 
-    it('does not listen for Escape while closed', () => {
-      const onClose = vi.fn();
-      render(<LegalModal doc={null} onClose={onClose} />);
+  it('does not listen for Escape while closed', () => {
+    const { onClose } = renderLegalModal(null);
 
-      fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.keyDown(document, { key: 'Escape' });
 
-      expect(onClose).not.toHaveBeenCalled();
-    });
+    expect(onClose).not.toHaveBeenCalled();
+  });
 
-    it('stops listening for Escape once unmounted', () => {
-      const onClose = vi.fn();
-      const { unmount } = render(<LegalModal doc="privacy" onClose={onClose} />);
+  it('stops listening for Escape once unmounted', () => {
+    const { unmount, onClose } = renderLegalModal('privacy');
 
-      unmount();
-      fireEvent.keyDown(document, { key: 'Escape' });
+    unmount();
+    fireEvent.keyDown(document, { key: 'Escape' });
 
-      expect(onClose).not.toHaveBeenCalled();
-    });
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

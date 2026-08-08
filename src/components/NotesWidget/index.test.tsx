@@ -2,44 +2,68 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import NotesWidget from './index';
 
+/** How long the widget waits after the last keystroke before flashing "saved". */
+const SETTLE_MS = 600;
+
+/** The note field. */
+const noteField = () => screen.getByPlaceholderText(/Jot anything down/i);
+
+/** Types into the note field. */
+const typeNote = (text: string) => fireEvent.change(noteField(), { target: { value: text } });
+
 afterEach(() => {
   vi.useRealTimers();
 });
 
 describe('NotesWidget', () => {
+  it('shows what was typed', () => {
+    render(<NotesWidget />);
+
+    typeNote('Remember the milk');
+
+    expect(noteField()).toHaveValue('Remember the milk');
+  });
+
   it('autosaves the text to localStorage as it changes', () => {
     render(<NotesWidget />);
-    const area = screen.getByPlaceholderText(/Jot anything down/i);
 
-    fireEvent.change(area, { target: { value: 'Remember the milk' } });
+    typeNote('Remember the milk');
 
-    expect(area).toHaveValue('Remember the milk');
     expect(localStorage.getItem('notes.text')).toContain('Remember the milk');
   });
 
-  it('loads previously saved notes', () => {
+  it('loads a previously saved note', () => {
     localStorage.setItem('notes.text', JSON.stringify('Earlier note'));
+
     render(<NotesWidget />);
-    expect(screen.getByPlaceholderText(/Jot anything down/i)).toHaveValue('Earlier note');
+
+    expect(noteField()).toHaveValue('Earlier note');
   });
 
-  it('flashes a saved indicator once typing settles', () => {
+  it('shows no saved indicator before anything is typed', () => {
+    render(<NotesWidget />);
+
+    expect(screen.queryByText('saved')).not.toBeInTheDocument();
+  });
+
+  it('holds the saved indicator back while typing is still settling', () => {
     vi.useFakeTimers();
     render(<NotesWidget />);
 
-    // Nothing to save yet, so no indicator.
-    expect(screen.queryByText('saved')).not.toBeInTheDocument();
+    typeNote('x');
 
-    fireEvent.change(screen.getByPlaceholderText(/Jot anything down/i), {
-      target: { value: 'x' },
-    });
-    // While the debounce is pending the flash is hidden.
     expect(screen.queryByText('saved')).not.toBeInTheDocument();
+  });
 
-    // The 600ms settle timer fires and the indicator appears.
+  it('flashes the saved indicator once typing settles', () => {
+    vi.useFakeTimers();
+    render(<NotesWidget />);
+    typeNote('x');
+
     act(() => {
-      vi.advanceTimersByTime(600);
+      vi.advanceTimersByTime(SETTLE_MS);
     });
+
     expect(screen.getByText('saved')).toBeInTheDocument();
   });
 });

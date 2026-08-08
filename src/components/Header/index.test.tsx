@@ -16,12 +16,13 @@ function renderHeader(actions?: ReactNode) {
 describe('Header', () => {
   it('shows the current time', () => {
     renderHeader();
-    const clock = screen.getByLabelText('Current time');
-    expect(clock).toHaveTextContent(/^\d{1,2}:\d{2}:\d{2}/);
+
+    expect(screen.getByLabelText('Current time')).toHaveTextContent(/^\d{1,2}:\d{2}:\d{2}/);
   });
 
   it('renders extra actions passed in', () => {
     renderHeader(<button>Menu</button>);
+
     expect(screen.getByRole('button', { name: 'Menu' })).toBeInTheDocument();
   });
 });

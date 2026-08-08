@@ -23,6 +23,9 @@ vi.mock('../../lib/googleAuth', () => ({
 
 let configured = true;
 
+/** `getAccessToken`'s argument: whether a consent popup is allowed. */
+const INTERACTIVE = true;
+
 /** Builds a fetch stub that answers calendarList then per-calendar events. */
 function stubCalendar(events: unknown[]) {
   vi.stubGlobal(
@@ -41,37 +44,87 @@ function inHours(hours: number): string {
   return new Date(Date.now() + hours * 3_600_000).toISOString();
 }
 
-describe('CalendarWidget', () => {
-  beforeEach(() => {
-    configured = true;
-    getAccessToken.mockClear();
+/** Today, as an all-day event's `date` field. */
+function todayDate(): string {
+  const today = new Date();
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+}
+
+/** Renders the widget and clicks through the connect prompt. */
+async function renderConnected(user: ReturnType<typeof userEvent.setup>) {
+  render(<CalendarWidget />);
+  await user.click(screen.getByRole('button', { name: 'Connect Google' }));
+}
+
+/** The current fetch stub, for counting requests. */
+const fetchMock = () => globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+
+beforeEach(() => {
+  configured = true;
+  getAccessToken.mockClear();
+});
+
+describe('CalendarWidget before connecting', () => {
+  it('renders the setup hint when unconfigured', () => {
+    configured = false;
+    vi.stubGlobal('fetch', vi.fn());
+
+    render(<CalendarWidget />);
+
+    expect(screen.getByText(/VITE_GOOGLE_CLIENT_ID/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Connect Google/ })).not.toBeInTheDocument();
   });
 
-  it('renders the setup hint and makes no network calls when unconfigured', () => {
+  it('makes no network calls when unconfigured', () => {
     configured = false;
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
 
     render(<CalendarWidget />);
 
-    expect(screen.getByText(/VITE_GOOGLE_CLIENT_ID/)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Connect Google/ })).not.toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('shows a connect prompt before the user connects', () => {
+  it('shows a connect prompt', () => {
     stubCalendar([]);
+
     render(<CalendarWidget />);
 
     expect(screen.getByRole('button', { name: 'Connect Google' })).toBeInTheDocument();
     expect(screen.getByText(/what’s coming up/i)).toBeInTheDocument();
   });
 
-  it('groups events by day and pins all-day events above timed ones', async () => {
-    const today = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const todayDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  it('requests a token interactively only when the user clicks connect', async () => {
+    stubCalendar([]);
+    const user = userEvent.setup();
 
+    await renderConnected(user);
+    await screen.findByText(/Nothing scheduled/);
+
+    expect(getAccessToken).toHaveBeenCalledWith(INTERACTIVE);
+  });
+});
+
+describe('CalendarWidget agenda', () => {
+  it('groups events under the day they fall on', async () => {
+    stubCalendar([
+      {
+        id: 'timed',
+        summary: 'Standup',
+        start: { dateTime: inHours(2) },
+        end: { dateTime: inHours(3) },
+      },
+    ]);
+    const user = userEvent.setup();
+
+    await renderConnected(user);
+
+    expect(await screen.findByText('Standup')).toBeInTheDocument();
+    expect(screen.getByText('Today')).toBeInTheDocument();
+  });
+
+  it('pins all-day events above timed ones within a day', async () => {
     stubCalendar([
       {
         id: 'timed',
@@ -82,21 +135,19 @@ describe('CalendarWidget', () => {
       {
         id: 'allday',
         summary: 'Conference',
-        start: { date: todayDate },
-        end: { date: todayDate },
+        start: { date: todayDate() },
+        end: { date: todayDate() },
       },
     ]);
     const user = userEvent.setup();
-    render(<CalendarWidget />);
-    await user.click(screen.getByRole('button', { name: 'Connect Google' }));
 
-    expect(await screen.findByText('Conference')).toBeInTheDocument();
-    expect(screen.getByText('Today')).toBeInTheDocument();
+    await renderConnected(user);
+    await screen.findByText('Conference');
 
-    // All-day first within the day, regardless of the order Google returned.
-    const titles = screen.getAllByRole('listitem').map((li) => li.textContent);
-    expect(titles[0]).toContain('Conference');
-    expect(titles[1]).toContain('Standup');
+    // Regardless of the order Google returned them in.
+    const rows = screen.getAllByRole('listitem').map((row) => row.textContent);
+    expect(rows[0]).toContain('Conference');
+    expect(rows[1]).toContain('Standup');
     expect(screen.getByText('All day')).toBeInTheDocument();
   });
 
@@ -110,11 +161,10 @@ describe('CalendarWidget', () => {
       },
     ]);
     const user = userEvent.setup();
-    render(<CalendarWidget />);
-    await user.click(screen.getByRole('button', { name: 'Connect Google' }));
 
-    const now = await screen.findByText('Now');
-    expect(now).toHaveClass(styles.isNow);
+    await renderConnected(user);
+
+    expect(await screen.findByText('Now')).toHaveClass(styles.isNow);
   });
 
   it('hides declined and cancelled events', async () => {
@@ -141,8 +191,8 @@ describe('CalendarWidget', () => {
       },
     ]);
     const user = userEvent.setup();
-    render(<CalendarWidget />);
-    await user.click(screen.getByRole('button', { name: 'Connect Google' }));
+
+    await renderConnected(user);
 
     expect(await screen.findByText('Office hours')).toBeInTheDocument();
     expect(screen.queryByText('Optional sync')).not.toBeInTheDocument();
@@ -152,8 +202,8 @@ describe('CalendarWidget', () => {
   it('shows an empty state when the window holds no events', async () => {
     stubCalendar([]);
     const user = userEvent.setup();
-    render(<CalendarWidget />);
-    await user.click(screen.getByRole('button', { name: 'Connect Google' }));
+
+    await renderConnected(user);
 
     expect(await screen.findByText(/Nothing scheduled in the next/)).toBeInTheDocument();
   });
@@ -164,47 +214,49 @@ describe('CalendarWidget', () => {
       vi.fn(() => Promise.resolve({ ok: false, status: 403, json: () => Promise.resolve({}) })),
     );
     const user = userEvent.setup();
-    render(<CalendarWidget />);
-    await user.click(screen.getByRole('button', { name: 'Connect Google' }));
+
+    await renderConnected(user);
 
     expect(await screen.findByText(/Couldn’t load your calendar/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
+});
 
-  it('offers the month view only once connected', async () => {
+describe('CalendarWidget month view', () => {
+  it('is not offered before connecting', () => {
     stubCalendar([]);
-    const user = userEvent.setup();
+
     render(<CalendarWidget />);
 
     expect(screen.queryByRole('button', { name: 'Open full calendar' })).not.toBeInTheDocument();
+  });
 
-    await user.click(screen.getByRole('button', { name: 'Connect Google' }));
+  it('is offered once connected', async () => {
+    stubCalendar([]);
+    const user = userEvent.setup();
+
+    await renderConnected(user);
+
     expect(await screen.findByRole('button', { name: 'Open full calendar' })).toBeInTheDocument();
   });
 
-  it('fetches a month only once the month view is opened', async () => {
+  it('fetches a month only once it is opened', async () => {
     stubCalendar([]);
     const user = userEvent.setup();
-    render(<CalendarWidget />);
-    await user.click(screen.getByRole('button', { name: 'Connect Google' }));
+    await renderConnected(user);
     await screen.findByText(/Nothing scheduled/);
-
-    const spy = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
-    const beforeOpen = spy.mock.calls.length;
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    const requestsBeforeOpen = fetchMock().mock.calls.length;
 
     await user.click(screen.getByRole('button', { name: 'Open full calendar' }));
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(spy.mock.calls.length).toBeGreaterThan(beforeOpen);
+    expect(fetchMock().mock.calls.length).toBeGreaterThan(requestsBeforeOpen);
   });
 
-  it('returns focus to the trigger when the month view closes', async () => {
+  it('returns focus to the trigger when it closes', async () => {
     stubCalendar([]);
     const user = userEvent.setup();
-    render(<CalendarWidget />);
-    await user.click(screen.getByRole('button', { name: 'Connect Google' }));
-
+    await renderConnected(user);
     const trigger = await screen.findByRole('button', { name: 'Open full calendar' });
     await user.click(trigger);
     await screen.findByRole('dialog');
@@ -213,15 +265,5 @@ describe('CalendarWidget', () => {
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
-  });
-
-  it('requests interactively only when the user clicks connect', async () => {
-    stubCalendar([]);
-    const user = userEvent.setup();
-    render(<CalendarWidget />);
-    await user.click(screen.getByRole('button', { name: 'Connect Google' }));
-    await screen.findByText(/Nothing scheduled/);
-
-    expect(getAccessToken).toHaveBeenCalledWith(true);
   });
 });

@@ -16,7 +16,7 @@ vi.mock('../../lib/googleAuth', () => ({
 const NOW = new Date(2026, 7, 3, 12).getTime();
 
 /** An ISO instant from local calendar fields, so fixtures land on the right day. */
-function at(year: number, month: number, day: number, hour = 0): string {
+function localIso(year: number, month: number, day: number, hour = 0): string {
   return new Date(year, month, day, hour).toISOString();
 }
 
@@ -33,27 +33,28 @@ function timed(id: string, day: number, from: number, to: number, month = 7): Ra
   return {
     id,
     summary: id,
-    start: { dateTime: at(2026, month, day, from) },
-    end: { dateTime: at(2026, month, day, to) },
+    start: { dateTime: localIso(2026, month, day, from) },
+    end: { dateTime: localIso(2026, month, day, to) },
   };
 }
 
 /** `endExclusive` mirrors Google: the day *after* the last day of the event. */
 function allDay(id: string, day: number, endExclusive: number, month = 7): RawEvent {
-  const iso = (d: number) => `2026-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-  return { id, summary: id, start: { date: iso(day) }, end: { date: iso(endExclusive) } };
+  const isoDate = (dayOfMonth: number) =>
+    `2026-${String(month + 1).padStart(2, '0')}-${String(dayOfMonth).padStart(2, '0')}`;
+  return { id, summary: id, start: { date: isoDate(day) }, end: { date: isoDate(endExclusive) } };
 }
 
-/** Requests held open by {@link stub}, released with {@link flushSlow}. */
-let held: (() => void)[] = [];
+/** Requests held open by {@link stubCalendarApi}, released with {@link flushWithheld}. */
+let withheldResponses: (() => void)[] = [];
 /** Every events URL requested, in order. */
-let requested: string[] = [];
+let eventRequests: string[] = [];
 /** Every non-GET request, in order. */
 let writes: { method: string; url: string; body: Record<string, unknown> | undefined }[] = [];
 
-/** Knobs for {@link stub}. */
+/** Knobs for {@link stubCalendarApi}. */
 interface StubOptions {
-  /** Months whose response is withheld until {@link flushSlow}. */
+  /** Months whose response is withheld until {@link flushWithheld}. */
   slow?: string[];
   /** `accessRole` reported for the calendar; 'reader' makes it read-only. */
   accessRole?: string;
@@ -66,11 +67,15 @@ interface StubOptions {
  * which month the request's window is centred on, and records any writes.
  *
  * @param byMonth - `YYYY-MM` → the events that month's request returns.
- * @param opts - See {@link StubOptions}.
+ * @param options - See {@link StubOptions}.
  */
-function stub(byMonth: Record<string, RawEvent[]>, opts: StubOptions = {}) {
-  const { slow = [], accessRole = 'owner', writeStatus } = opts;
-  const ok = (body: unknown, status = 200) => ({ ok: true, status, json: () => Promise.resolve(body) });
+function stubCalendarApi(byMonth: Record<string, RawEvent[]>, options: StubOptions = {}) {
+  const { slow = [], accessRole = 'owner', writeStatus } = options;
+  const ok = (body: unknown, status = 200) => ({
+    ok: true,
+    status,
+    json: () => Promise.resolve(body),
+  });
 
   vi.stubGlobal(
     'fetch',
@@ -83,7 +88,11 @@ function stub(byMonth: Record<string, RawEvent[]>, opts: StubOptions = {}) {
           body: init?.body ? JSON.parse(init.body as string) : undefined,
         });
         if (writeStatus) {
-          return Promise.resolve({ ok: false, status: writeStatus, json: () => Promise.resolve({}) });
+          return Promise.resolve({
+            ok: false,
+            status: writeStatus,
+            json: () => Promise.resolve({}),
+          });
         }
         return Promise.resolve(ok({ id: 'created' }, method === 'DELETE' ? 204 : 200));
       }
@@ -103,18 +112,18 @@ function stub(byMonth: Record<string, RawEvent[]>, opts: StubOptions = {}) {
           }),
         );
       }
-      requested.push(url);
+      eventRequests.push(url);
 
       // The window starts on the grid's first cell, up to six days before the
       // month itself; ten days in is always inside the visible month.
       const timeMin = new Date(new URL(url).searchParams.get('timeMin') as string);
-      const probe = new Date(timeMin.getTime());
-      probe.setDate(probe.getDate() + 10);
-      const key = `${probe.getFullYear()}-${String(probe.getMonth() + 1).padStart(2, '0')}`;
+      const insideTheMonth = new Date(timeMin.getTime());
+      insideTheMonth.setDate(insideTheMonth.getDate() + 10);
+      const month = `${insideTheMonth.getFullYear()}-${String(insideTheMonth.getMonth() + 1).padStart(2, '0')}`;
 
-      const body = { items: byMonth[key] ?? [] };
-      if (slow.includes(key)) {
-        return new Promise((resolve) => held.push(() => resolve(ok(body))));
+      const body = { items: byMonth[month] ?? [] };
+      if (slow.includes(month)) {
+        return new Promise((resolve) => withheldResponses.push(() => resolve(ok(body))));
       }
       return Promise.resolve(ok(body));
     }),
@@ -122,17 +131,18 @@ function stub(byMonth: Record<string, RawEvent[]>, opts: StubOptions = {}) {
 }
 
 /** Releases every withheld response and lets React settle. */
-async function flushSlow() {
+async function flushWithheld() {
   await act(async () => {
-    held.forEach((release) => release());
-    held = [];
+    withheldResponses.forEach((release) => release());
+    withheldResponses = [];
   });
 }
 
 /** The month grid's day buttons, by accessible name fragment. */
-function dayCell(name: RegExp | string) {
-  return screen.getByRole('button', { name });
-}
+const dayCell = (name: RegExp | string) => screen.getByRole('button', { name });
+
+/** The month heading, which is also the signal that a month has loaded. */
+const monthHeading = (month: string) => screen.findByRole('heading', { name: month });
 
 const AUGUST: RawEvent[] = [
   timed('Standup', 3, 9, 10),
@@ -140,41 +150,48 @@ const AUGUST: RawEvent[] = [
   { ...timed('Dentist', 5, 14, 15), location: 'Clinic', htmlLink: 'https://cal.example/dentist' },
 ];
 
-function open(now = NOW) {
+function openCalendar(now = NOW) {
   const onClose = vi.fn();
   const view = render(<CalendarModal now={now} onClose={onClose} />);
   return { onClose, ...view };
 }
 
-describe('CalendarModal', () => {
-  beforeEach(() => {
-    held = [];
-    requested = [];
-    writes = [];
-  });
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
+beforeEach(() => {
+  withheldResponses = [];
+  eventRequests = [];
+  writes = [];
+});
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('CalendarModal month grid', () => {
   it('opens on the current month with today selected', async () => {
-    stub({ '2026-08': AUGUST });
-    open();
+    stubCalendarApi({ '2026-08': AUGUST });
 
-    expect(await screen.findByRole('heading', { name: 'August 2026' })).toBeInTheDocument();
+    openCalendar();
 
+    expect(await monthHeading('August 2026')).toBeInTheDocument();
     const today = dayCell(/Monday, August 3, 2026/);
     expect(today).toHaveClass(styles.isToday);
     expect(today).toHaveClass(styles.isSelected);
     expect(today).toHaveAttribute('aria-current', 'date');
+  });
 
-    // The detail panel defaults to today.
+  it('opens the detail panel on today', async () => {
+    stubCalendarApi({ '2026-08': AUGUST });
+
+    openCalendar();
+    await monthHeading('August 2026');
+
     expect(screen.getByRole('heading', { name: 'Monday, August 3' })).toBeInTheDocument();
   });
 
   it('fills the first and last weeks with the neighbouring months', async () => {
-    stub({ '2026-08': AUGUST });
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    stubCalendarApi({ '2026-08': AUGUST });
+    openCalendar();
+    await monthHeading('August 2026');
 
     // 1 Aug 2026 is a Saturday, so the grid runs 26 Jul – 5 Sep.
     expect(dayCell(/Sunday, July 26, 2026/)).toHaveClass(styles.isOutsideMonth);
@@ -183,8 +200,9 @@ describe('CalendarModal', () => {
   });
 
   it('repeats a multi-day all-day event across each day it covers', async () => {
-    stub({ '2026-08': AUGUST });
-    open();
+    stubCalendarApi({ '2026-08': AUGUST });
+
+    openCalendar();
 
     // Conference runs 3–5 August (Google reports the end as the 6th).
     expect(await screen.findByRole('button', { name: /August 3, 2026, 2 events/ })).toBeInTheDocument();
@@ -193,11 +211,28 @@ describe('CalendarModal', () => {
     expect(dayCell(/August 6, 2026, no events/)).toBeInTheDocument();
   });
 
+  it('collapses a busy day into "+N more"', async () => {
+    stubCalendarApi({
+      '2026-08': [
+        timed('One', 12, 9, 10),
+        timed('Two', 12, 11, 12),
+        timed('Three', 12, 13, 14),
+        timed('Four', 12, 15, 16),
+        timed('Five', 12, 17, 18),
+      ],
+    });
+
+    openCalendar();
+
+    const busyDay = await screen.findByRole('button', { name: /August 12, 2026, 5 events/ });
+    expect(within(busyDay).getByText('+2 more')).toBeInTheDocument();
+  });
+
   it('shows a day’s events in the detail panel when it is clicked', async () => {
-    stub({ '2026-08': AUGUST });
+    stubCalendarApi({ '2026-08': AUGUST });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    openCalendar();
+    await monthHeading('August 2026');
 
     await user.click(dayCell(/Wednesday, August 5, 2026/));
 
@@ -207,81 +242,109 @@ describe('CalendarModal', () => {
     expect(within(panel).getByText('Clinic')).toBeInTheDocument();
     // The all-day event still covers the 5th.
     expect(within(panel).getByText('Conference')).toBeInTheDocument();
-    expect(within(panel).getByRole('link', { name: 'Dentist' })).toHaveAttribute(
+  });
+
+  it('links a day’s events out to Google Calendar', async () => {
+    stubCalendarApi({ '2026-08': AUGUST });
+    const user = userEvent.setup();
+    openCalendar();
+    await monthHeading('August 2026');
+
+    await user.click(dayCell(/Wednesday, August 5, 2026/));
+
+    expect(within(screen.getByRole('list')).getByRole('link', { name: 'Dentist' })).toHaveAttribute(
       'href',
       'https://cal.example/dentist',
     );
   });
+});
 
-  it('collapses a busy day into "+N more"', async () => {
-    stub({
-      '2026-08': [
-        timed('One', 12, 9, 10),
-        timed('Two', 12, 11, 12),
-        timed('Three', 12, 13, 14),
-        timed('Four', 12, 15, 16),
-        timed('Five', 12, 17, 18),
-      ],
-    });
-    open();
-
-    const busy = await screen.findByRole('button', { name: /August 12, 2026, 5 events/ });
-    expect(within(busy).getByText('+2 more')).toBeInTheDocument();
-  });
-
-  it('pages months and fetches the new window', async () => {
-    stub({ '2026-08': AUGUST, '2026-09': [timed('Retreat', 10, 9, 17, 8)] });
+describe('CalendarModal paging months', () => {
+  it('steps forward to the next month', async () => {
+    stubCalendarApi({ '2026-08': AUGUST, '2026-09': [timed('Retreat', 10, 9, 17, 8)] });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    openCalendar();
+    await monthHeading('August 2026');
 
     await user.click(screen.getByRole('button', { name: 'Next month' }));
-    expect(await screen.findByRole('heading', { name: 'September 2026' })).toBeInTheDocument();
+
+    expect(await monthHeading('September 2026')).toBeInTheDocument();
     expect(dayCell(/September 10, 2026, 1 event/)).toBeInTheDocument();
-    // Selection follows into the new month rather than pointing off-screen.
+  });
+
+  it('moves the selection into the new month rather than off-screen', async () => {
+    stubCalendarApi({ '2026-08': AUGUST, '2026-09': [] });
+    const user = userEvent.setup();
+    openCalendar();
+    await monthHeading('August 2026');
+
+    await user.click(screen.getByRole('button', { name: 'Next month' }));
+    await monthHeading('September 2026');
+
     expect(screen.getByRole('heading', { name: 'Tuesday, September 1' })).toBeInTheDocument();
+  });
+
+  it('fetches the window the new grid actually shows', async () => {
+    stubCalendarApi({ '2026-08': AUGUST, '2026-09': [] });
+    const user = userEvent.setup();
+    openCalendar();
+    await monthHeading('August 2026');
+
+    await user.click(screen.getByRole('button', { name: 'Next month' }));
+    await monthHeading('September 2026');
 
     // September's grid opens on 30 August.
-    const timeMin = new URL(requested[requested.length - 1]).searchParams.get('timeMin') as string;
+    const lastRequest = new URL(eventRequests[eventRequests.length - 1]);
+    const timeMin = lastRequest.searchParams.get('timeMin') as string;
     expect(new Date(timeMin).getDate()).toBe(30);
+  });
+
+  it('steps back to the previous month', async () => {
+    stubCalendarApi({ '2026-08': AUGUST, '2026-09': [] });
+    const user = userEvent.setup();
+    openCalendar();
+    await monthHeading('August 2026');
+    await user.click(screen.getByRole('button', { name: 'Next month' }));
+    await monthHeading('September 2026');
 
     await user.click(screen.getByRole('button', { name: 'Previous month' }));
-    expect(await screen.findByRole('heading', { name: 'August 2026' })).toBeInTheDocument();
+
+    expect(await monthHeading('August 2026')).toBeInTheDocument();
   });
 
   it('returns to the current month from Today', async () => {
-    stub({ '2026-08': AUGUST, '2026-09': [] });
+    stubCalendarApi({ '2026-08': AUGUST, '2026-09': [] });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
-
+    openCalendar();
+    await monthHeading('August 2026');
     await user.click(screen.getByRole('button', { name: 'Next month' }));
-    await screen.findByRole('heading', { name: 'September 2026' });
+    await monthHeading('September 2026');
 
     await user.click(screen.getByRole('button', { name: 'Today' }));
-    expect(await screen.findByRole('heading', { name: 'August 2026' })).toBeInTheDocument();
+
+    expect(await monthHeading('August 2026')).toBeInTheDocument();
     expect(dayCell(/Monday, August 3, 2026/)).toHaveClass(styles.isSelected);
   });
 
   it('serves a month from cache instead of re-fetching it', async () => {
-    stub({ '2026-08': AUGUST, '2026-09': [] });
+    stubCalendarApi({ '2026-08': AUGUST, '2026-09': [] });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
-    const afterFirstLoad = requested.length;
+    openCalendar();
+    await monthHeading('August 2026');
+    const requestsAfterFirstLoad = eventRequests.length;
 
     await user.click(screen.getByRole('button', { name: 'Next month' }));
-    await screen.findByRole('heading', { name: 'September 2026' });
+    await monthHeading('September 2026');
     await user.click(screen.getByRole('button', { name: 'Previous month' }));
-    await screen.findByRole('heading', { name: 'August 2026' });
+    await monthHeading('August 2026');
 
     // September cost one request; coming back to August cost none.
-    expect(requested).toHaveLength(afterFirstLoad + 1);
+    expect(eventRequests).toHaveLength(requestsAfterFirstLoad + 1);
     expect(screen.getByRole('button', { name: /August 3, 2026, 2 events/ })).toBeInTheDocument();
   });
 
   it('ignores a stale month’s response that lands after a newer one', async () => {
-    stub(
+    stubCalendarApi(
       {
         '2026-08': AUGUST,
         '2026-09': [timed('Stale September', 10, 9, 10, 8)],
@@ -290,91 +353,103 @@ describe('CalendarModal', () => {
       { slow: ['2026-09'] },
     );
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
-
+    openCalendar();
+    await monthHeading('August 2026');
     // September's response is withheld; October's resolves straight away.
     await user.click(screen.getByRole('button', { name: 'Next month' }));
     await user.click(screen.getByRole('button', { name: 'Next month' }));
-    expect(await screen.findByRole('heading', { name: 'October 2026' })).toBeInTheDocument();
-    expect(dayCell(/October 8, 2026, 1 event/)).toBeInTheDocument();
+    await monthHeading('October 2026');
 
     // September lands last and must not paint over October.
-    await flushSlow();
+    await flushWithheld();
+
     expect(screen.getByRole('heading', { name: 'October 2026' })).toBeInTheDocument();
     expect(dayCell(/October 8, 2026, 1 event/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /September 10, 2026, 1 event/ })).toBeNull();
   });
 
   it('surfaces an error with a working retry', async () => {
-    const failing = vi.fn(() =>
+    const failingFetch = vi.fn(() =>
       Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) }),
     );
-    vi.stubGlobal('fetch', failing);
+    vi.stubGlobal('fetch', failingFetch);
     const user = userEvent.setup();
-    open();
-
+    openCalendar();
     expect(await screen.findByText(/Couldn’t load your calendar/)).toBeInTheDocument();
+    const callsBeforeRetry = failingFetch.mock.calls.length;
 
-    const callsBeforeRetry = failing.mock.calls.length;
     await user.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(failing.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
-  });
 
-  it('moves the grid focus with the arrow keys and selects with Enter', async () => {
-    stub({ '2026-08': AUGUST });
+    expect(failingFetch.mock.calls.length).toBeGreaterThan(callsBeforeRetry);
+  });
+});
+
+describe('CalendarModal keyboard navigation', () => {
+  it('moves the grid focus with the arrow keys', async () => {
+    stubCalendarApi({ '2026-08': AUGUST });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    openCalendar();
+    await monthHeading('August 2026');
 
     await user.click(dayCell(/Monday, August 3, 2026/));
     await user.keyboard('{ArrowRight}{ArrowDown}');
+
     expect(dayCell(/Tuesday, August 11, 2026/)).toHaveFocus();
+  });
+
+  it('selects the focused day with Enter', async () => {
+    stubCalendarApi({ '2026-08': AUGUST });
+    const user = userEvent.setup();
+    openCalendar();
+    await monthHeading('August 2026');
+    await user.click(dayCell(/Monday, August 3, 2026/));
+    await user.keyboard('{ArrowRight}{ArrowDown}');
 
     await user.keyboard('{Enter}');
+
     expect(screen.getByRole('heading', { name: 'Tuesday, August 11' })).toBeInTheDocument();
   });
 
   it('pages the month when the arrow keys walk off the grid', async () => {
-    stub({ '2026-08': AUGUST, '2026-07': [] });
+    stubCalendarApi({ '2026-08': AUGUST, '2026-07': [] });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    openCalendar();
+    await monthHeading('August 2026');
 
     // 26 July is the first cell; one more step left leaves the grid.
     await user.click(dayCell(/Sunday, July 26, 2026/));
     await user.keyboard('{ArrowLeft}');
 
-    expect(await screen.findByRole('heading', { name: 'July 2026' })).toBeInTheDocument();
+    expect(await monthHeading('July 2026')).toBeInTheDocument();
     expect(dayCell(/Saturday, July 25, 2026/)).toHaveFocus();
   });
 
   it('keeps a single tab stop across the whole grid', async () => {
-    stub({ '2026-08': AUGUST });
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    stubCalendarApi({ '2026-08': AUGUST });
+    openCalendar();
+    await monthHeading('August 2026');
 
-    const tabbable = screen
+    const tabbableDays = screen
       .getAllByRole('button')
-      .filter((b) => b.className.includes(styles.day) && b.tabIndex === 0);
-    expect(tabbable).toHaveLength(1);
-    expect(tabbable[0]).toHaveAccessibleName(/Monday, August 3, 2026/);
-  });
+      .filter((button) => button.className.includes(styles.day) && button.tabIndex === 0);
 
+    expect(tabbableDays).toHaveLength(1);
+    expect(tabbableDays[0]).toHaveAccessibleName(/Monday, August 3, 2026/);
+  });
+});
+
+describe('CalendarModal editing events', () => {
   it('creates an event on the selected day', async () => {
-    stub({ '2026-08': AUGUST });
+    stubCalendarApi({ '2026-08': AUGUST });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    openCalendar();
+    await monthHeading('August 2026');
 
     await user.click(screen.getByRole('button', { name: '+ Add event' }));
     await user.type(screen.getByLabelText('Title'), 'Retro');
-    const beforeSave = requested.length;
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    // The form closes back to the day list once the write lands.
-    expect(await screen.findByRole('button', { name: '+ Add event' })).toBeInTheDocument();
-
+    await screen.findByRole('button', { name: '+ Add event' });
     expect(writes).toHaveLength(1);
     expect(writes[0].method).toBe('POST');
     expect(writes[0].url).toContain('/calendars/primary/events');
@@ -384,19 +459,31 @@ describe('CalendarModal', () => {
       start: { dateTime: new Date(2026, 7, 3, 13).toISOString() },
       end: { dateTime: new Date(2026, 7, 3, 14).toISOString() },
     });
-    // And the month is re-read, so the new event shows up.
-    expect(requested.length).toBeGreaterThan(beforeSave);
+  });
+
+  it('re-reads the month once the write lands, so the new event shows up', async () => {
+    stubCalendarApi({ '2026-08': AUGUST });
+    const user = userEvent.setup();
+    openCalendar();
+    await monthHeading('August 2026');
+    await user.click(screen.getByRole('button', { name: '+ Add event' }));
+    await user.type(screen.getByLabelText('Title'), 'Retro');
+    const requestsBeforeSave = eventRequests.length;
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await screen.findByRole('button', { name: '+ Add event' });
+    expect(eventRequests.length).toBeGreaterThan(requestsBeforeSave);
   });
 
   it('edits an existing event', async () => {
-    stub({ '2026-08': AUGUST });
+    stubCalendarApi({ '2026-08': AUGUST });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    openCalendar();
+    await monthHeading('August 2026');
 
     await user.click(dayCell(/Wednesday, August 5, 2026/));
     await user.click(screen.getByRole('button', { name: 'Edit Dentist' }));
-
     expect(screen.getByLabelText('Title')).toHaveValue('Dentist');
     await user.clear(screen.getByLabelText('Title'));
     await user.type(screen.getByLabelText('Title'), 'Dentist — moved');
@@ -409,18 +496,28 @@ describe('CalendarModal', () => {
     expect(writes[0].body).toMatchObject({ summary: 'Dentist — moved' });
   });
 
-  it('deletes an event only after the confirm step', async () => {
-    stub({ '2026-08': AUGUST });
+  it('holds a delete back until the confirm step', async () => {
+    stubCalendarApi({ '2026-08': AUGUST });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    openCalendar();
+    await monthHeading('August 2026');
 
     await user.click(dayCell(/Wednesday, August 5, 2026/));
     await user.click(screen.getByRole('button', { name: 'Edit Dentist' }));
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     expect(writes).toHaveLength(0);
+  });
 
+  it('deletes the event on the second click', async () => {
+    stubCalendarApi({ '2026-08': AUGUST });
+    const user = userEvent.setup();
+    openCalendar();
+    await monthHeading('August 2026');
+    await user.click(dayCell(/Wednesday, August 5, 2026/));
+    await user.click(screen.getByRole('button', { name: 'Edit Dentist' }));
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
     await screen.findByRole('button', { name: '+ Add event' });
@@ -430,10 +527,10 @@ describe('CalendarModal', () => {
   });
 
   it('keeps the form open with the typed values when a save fails', async () => {
-    stub({ '2026-08': AUGUST }, { writeStatus: 403 });
+    stubCalendarApi({ '2026-08': AUGUST }, { writeStatus: 403 });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    openCalendar();
+    await monthHeading('August 2026');
 
     await user.click(screen.getByRole('button', { name: '+ Add event' }));
     await user.type(screen.getByLabelText('Title'), 'Retro');
@@ -444,10 +541,10 @@ describe('CalendarModal', () => {
   });
 
   it('rejects an untitled event before reaching the network', async () => {
-    stub({ '2026-08': AUGUST });
+    stubCalendarApi({ '2026-08': AUGUST });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    openCalendar();
+    await monthHeading('August 2026');
 
     await user.click(screen.getByRole('button', { name: '+ Add event' }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
@@ -457,11 +554,10 @@ describe('CalendarModal', () => {
   });
 
   it('dismisses an open form when another day is selected', async () => {
-    stub({ '2026-08': AUGUST });
+    stubCalendarApi({ '2026-08': AUGUST });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
-
+    openCalendar();
+    await monthHeading('August 2026');
     await user.click(screen.getByRole('button', { name: '+ Add event' }));
     expect(screen.getByLabelText('Title')).toBeInTheDocument();
 
@@ -472,39 +568,51 @@ describe('CalendarModal', () => {
   });
 
   it('offers no editing for a calendar the user can only read', async () => {
-    stub({ '2026-08': AUGUST }, { accessRole: 'reader' });
+    stubCalendarApi({ '2026-08': AUGUST }, { accessRole: 'reader' });
     const user = userEvent.setup();
-    open();
-    await screen.findByRole('heading', { name: 'August 2026' });
-
+    openCalendar();
+    await monthHeading('August 2026');
     expect(screen.queryByRole('button', { name: '+ Add event' })).not.toBeInTheDocument();
 
     await user.click(dayCell(/Wednesday, August 5, 2026/));
+
     const panel = screen.getByRole('list');
     expect(within(panel).getByText('Dentist')).toBeInTheDocument();
     expect(within(panel).queryByRole('button', { name: 'Edit Dentist' })).not.toBeInTheDocument();
   });
+});
 
-  it('closes on Escape and on a backdrop click', async () => {
-    stub({ '2026-08': AUGUST });
+describe('CalendarModal dismissal', () => {
+  it('closes on Escape', async () => {
+    stubCalendarApi({ '2026-08': AUGUST });
     const user = userEvent.setup();
-    const { onClose } = open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    const { onClose } = openCalendar();
+    await monthHeading('August 2026');
 
     await user.keyboard('{Escape}');
+
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes on a backdrop click', async () => {
+    stubCalendarApi({ '2026-08': AUGUST });
+    const user = userEvent.setup();
+    const { onClose } = openCalendar();
+    await monthHeading('August 2026');
 
     await user.click(screen.getByRole('dialog').parentElement as HTMLElement);
-    expect(onClose).toHaveBeenCalledTimes(2);
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('does not close when the dialog itself is clicked', async () => {
-    stub({ '2026-08': AUGUST });
+    stubCalendarApi({ '2026-08': AUGUST });
     const user = userEvent.setup();
-    const { onClose } = open();
-    await screen.findByRole('heading', { name: 'August 2026' });
+    const { onClose } = openCalendar();
+    await monthHeading('August 2026');
 
     await user.click(screen.getByRole('heading', { name: 'August 2026' }));
+
     expect(onClose).not.toHaveBeenCalled();
   });
 });

@@ -4,159 +4,157 @@ import WidgetMenu from './index';
 import { WIDGETS } from '../../lib/registry';
 
 /** Renders the menu with sensible defaults, returning the spies. */
-function setup(over: Partial<Parameters<typeof WidgetMenu>[0]> = {}) {
+function renderWidgetMenu(overrides: Partial<Parameters<typeof WidgetMenu>[0]> = {}) {
   const props = {
-    layout: WIDGETS.map((w) => w.id),
+    layout: WIDGETS.map((widget) => widget.id),
     onToggle: vi.fn(),
     onReset: vi.fn(),
     showFocus: true,
     onToggleFocus: vi.fn(),
-    ...over,
+    ...overrides,
   };
   return { ...render(<WidgetMenu {...props} />), props };
 }
 
-/** Opens the dropdown. */
-function open() {
+/** Clicks the trigger, which opens the dropdown — or closes an open one. */
+const clickTrigger = () =>
   fireEvent.click(screen.getByRole('button', { name: 'Manage widgets' }));
-}
 
-describe('WidgetMenu', () => {
+const trigger = () => screen.getByRole('button', { name: 'Manage widgets' });
+
+describe('WidgetMenu opening and closing', () => {
   it('starts closed', () => {
-    setup();
+    renderWidgetMenu();
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Manage widgets' })).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    );
+    expect(trigger()).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('opens on click and reports it to assistive technology', () => {
-    setup();
+    renderWidgetMenu();
 
-    open();
+    clickTrigger();
 
     expect(screen.getByRole('menu')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Manage widgets' })).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    );
+    expect(trigger()).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('closes again on a second click', () => {
-    setup();
+    renderWidgetMenu();
 
-    open();
-    open();
+    clickTrigger();
+    clickTrigger();
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
+});
 
+describe('WidgetMenu contents', () => {
   it('lists every widget in the catalogue', () => {
-    setup();
+    renderWidgetMenu();
 
-    open();
+    clickTrigger();
 
-    for (const w of WIDGETS) {
-      expect(screen.getByRole('checkbox', { name: new RegExp(w.title) })).toBeInTheDocument();
+    for (const widget of WIDGETS) {
+      expect(screen.getByRole('checkbox', { name: new RegExp(widget.title) })).toBeInTheDocument();
     }
   });
 
   it('ticks the widgets that are in the layout and clears the rest', () => {
-    setup({ layout: ['notes'] });
+    renderWidgetMenu({ layout: ['notes'] });
 
-    open();
+    clickTrigger();
 
     expect(screen.getByRole('checkbox', { name: /Notes/ })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /Weather/ })).not.toBeChecked();
   });
 
-  it('toggles a widget by id', () => {
-    const { props } = setup({ layout: ['notes'] });
+  it('points at the per-panel resize control rather than offering sizes here', () => {
+    renderWidgetMenu();
 
-    open();
+    clickTrigger();
+
+    expect(screen.getByText(/Drag a panel's bottom-right corner/)).toBeInTheDocument();
+  });
+});
+
+describe('WidgetMenu actions', () => {
+  it('toggles a widget by id', () => {
+    const { props } = renderWidgetMenu({ layout: ['notes'] });
+
+    clickTrigger();
     fireEvent.click(screen.getByRole('checkbox', { name: /Weather/ }));
 
     expect(props.onToggle).toHaveBeenCalledWith('weather');
   });
 
   it('toggles the daily focus field independently of the widgets', () => {
-    const { props } = setup({ showFocus: false });
+    const { props } = renderWidgetMenu({ showFocus: false });
 
-    open();
-    const focus = screen.getByRole('checkbox', { name: /Daily focus/ });
-    expect(focus).not.toBeChecked();
-
-    fireEvent.click(focus);
+    clickTrigger();
+    const focusToggle = screen.getByRole('checkbox', { name: /Daily focus/ });
+    expect(focusToggle).not.toBeChecked();
+    fireEvent.click(focusToggle);
 
     expect(props.onToggleFocus).toHaveBeenCalledTimes(1);
     expect(props.onToggle).not.toHaveBeenCalled();
   });
 
   it('resets the layout', () => {
-    const { props } = setup();
+    const { props } = renderWidgetMenu();
 
-    open();
+    clickTrigger();
     fireEvent.click(screen.getByRole('button', { name: /Reset layout and sizes/ }));
 
     expect(props.onReset).toHaveBeenCalledTimes(1);
   });
+});
 
-  it('points at the per-panel resize control rather than offering sizes here', () => {
-    setup();
+describe('WidgetMenu dismissal', () => {
+  it('closes on Escape', () => {
+    renderWidgetMenu();
+    clickTrigger();
 
-    open();
+    fireEvent.keyDown(document, { key: 'Escape' });
 
-    expect(screen.getByText(/Drag a panel's bottom-right corner/)).toBeInTheDocument();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  describe('dismissal', () => {
-    it('closes on Escape', () => {
-      setup();
-      open();
+  it('closes on a click outside', () => {
+    renderWidgetMenu();
+    clickTrigger();
 
-      fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.mouseDown(document.body);
 
-      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
 
-    it('closes on a click outside', () => {
-      setup();
-      open();
+  it('stays open when the click lands inside the menu', () => {
+    renderWidgetMenu();
+    clickTrigger();
 
-      fireEvent.mouseDown(document.body);
+    fireEvent.mouseDown(screen.getByRole('menu'));
 
-      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    });
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
 
-    it('stays open when the click lands inside the menu', () => {
-      setup();
-      open();
+  it('ignores other keys', () => {
+    renderWidgetMenu();
+    clickTrigger();
 
-      fireEvent.mouseDown(screen.getByRole('menu'));
+    fireEvent.keyDown(document, { key: 'a' });
 
-      expect(screen.getByRole('menu')).toBeInTheDocument();
-    });
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
 
-    it('ignores other keys', () => {
-      setup();
-      open();
+  it('stops listening once closed, so it does not leak handlers', () => {
+    const removeListener = vi.spyOn(document, 'removeEventListener');
+    renderWidgetMenu();
 
-      fireEvent.keyDown(document, { key: 'a' });
+    clickTrigger();
+    fireEvent.keyDown(document, { key: 'Escape' });
 
-      expect(screen.getByRole('menu')).toBeInTheDocument();
-    });
-
-    it('stops listening once closed, so it does not leak handlers', () => {
-      const remove = vi.spyOn(document, 'removeEventListener');
-      setup();
-
-      open();
-      fireEvent.keyDown(document, { key: 'Escape' });
-
-      expect(remove).toHaveBeenCalledWith('mousedown', expect.any(Function));
-      expect(remove).toHaveBeenCalledWith('keydown', expect.any(Function));
-    });
+    expect(removeListener).toHaveBeenCalledWith('mousedown', expect.any(Function));
+    expect(removeListener).toHaveBeenCalledWith('keydown', expect.any(Function));
   });
 });

@@ -8,50 +8,64 @@ import {
   type ThemePreference,
 } from './themes';
 
+/** Matches the six-digit hex colours the swatch and favicon are drawn from. */
+const HEX_COLOUR = /^#[0-9a-f]{6}$/i;
+
 describe('THEMES', () => {
-  it('has unique ids — the id doubles as the data-theme value', () => {
-    const ids = THEMES.map((t) => t.id);
+  it('gives every palette a unique id', () => {
+    const ids = THEMES.map((theme) => theme.id);
+
+    // The id doubles as the `data-theme` attribute value.
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('includes the default', () => {
-    expect(THEMES.some((t) => t.id === DEFAULT_THEME)).toBe(true);
+  it('includes the default palette', () => {
+    expect(THEMES.some((theme) => theme.id === DEFAULT_THEME)).toBe(true);
   });
 
   it('lists the light palettes before the dark ones', () => {
-    const modes = THEMES.map((t) => t.mode);
+    const modes = THEMES.map((theme) => theme.mode);
+
     expect(modes.indexOf('dark')).toBeGreaterThan(modes.lastIndexOf('light'));
   });
 
-  it('gives every palette a label and two swatch colours', () => {
+  it('gives every palette a label and a mode', () => {
     for (const theme of THEMES) {
       expect(theme.label).toBeTruthy();
       expect(['light', 'dark']).toContain(theme.mode);
-      // The picker and favicon draw from these, so they must be real hex values.
-      expect(theme.bg).toMatch(/^#[0-9a-f]{6}$/i);
-      expect(theme.accent).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+  });
+
+  it('gives every palette two hex swatch colours', () => {
+    for (const theme of THEMES) {
+      // The picker and the favicon draw from these, so they must be real hex values.
+      expect(theme.bg).toMatch(HEX_COLOUR);
+      expect(theme.accent).toMatch(HEX_COLOUR);
     }
   });
 });
 
 describe('themeById', () => {
   it('finds a palette by id', () => {
-    expect(themeById('forest')).toMatchObject({ id: 'forest', mode: 'dark' });
+    const theme = themeById('forest');
+
+    expect(theme.id).toBe('forest');
+    expect(theme.mode).toBe('dark');
   });
 
   it('falls back to the default for an id that no longer exists', () => {
-    // A stored preference can name a theme that was since renamed.
+    // A stored preference can name a theme that has since been renamed.
     expect(themeById('retired' as ThemeId).id).toBe(DEFAULT_THEME);
   });
 });
 
 describe('resolveTheme', () => {
-  it('defers to the OS when the preference is "system"', () => {
+  it('defers to the OS palette when the preference is "system"', () => {
     expect(resolveTheme('system', 'dark')).toBe('dark');
     expect(resolveTheme('system', 'light')).toBe('light');
   });
 
-  it('pins a palette the user chose explicitly, whatever the OS says', () => {
+  it('keeps an explicitly chosen palette whatever the OS says', () => {
     expect(resolveTheme('rose', 'dark')).toBe('rose');
     expect(resolveTheme('ocean', 'light')).toBe('ocean');
   });

@@ -27,38 +27,81 @@ function stubForecast() {
   );
 }
 
-describe('WeatherWidget', () => {
-  it('renders current conditions once the forecast loads', async () => {
+/** Switches between Fahrenheit and Celsius. */
+const toggleUnits = (user: ReturnType<typeof userEvent.setup>) =>
+  user.click(screen.getByTitle('Toggle units'));
+
+describe('WeatherWidget once the forecast loads', () => {
+  it('renders the current temperature and conditions', async () => {
     stubForecast();
+
     render(<WeatherWidget />);
 
     expect(await screen.findByText('72°F')).toBeInTheDocument();
     expect(screen.getByText('Clear sky')).toBeInTheDocument();
-    expect(screen.getByText('San Diego')).toBeInTheDocument();
-    // Humidity and wind read out beside their icons.
-    expect(screen.getByText('55%')).toBeInTheDocument();
   });
 
-  it('shows an error state with a retry when the network fails', async () => {
+  it('names the place and reads out the humidity', async () => {
+    stubForecast();
+
+    render(<WeatherWidget />);
+    await screen.findByText('72°F');
+
+    expect(screen.getByText('San Diego')).toBeInTheDocument();
+    expect(screen.getByText('55%')).toBeInTheDocument();
+  });
+});
+
+describe('WeatherWidget when the network fails', () => {
+  it('shows an error state with a retry', async () => {
     // The default test fetch rejects, so this is the offline path.
     render(<WeatherWidget />);
+
     expect(await screen.findByText(/Couldn't load weather/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
+});
 
-  it('toggles the unit and persists the choice', async () => {
+describe('WeatherWidget units', () => {
+  it('switches the reading to the other unit', async () => {
     stubForecast();
     const user = userEvent.setup();
     render(<WeatherWidget />);
     await screen.findByText('72°F');
 
-    await user.click(screen.getByTitle('Toggle units'));
+    await toggleUnits(user);
 
     await waitFor(() => expect(screen.getByText('72°C')).toBeInTheDocument());
-    expect(localStorage.getItem('weather.unit')).toBe(JSON.stringify('celsius'));
   });
 
-  it('paints a re-mounted panel from cache without fetching again', async () => {
+  it('persists the choice', async () => {
+    stubForecast();
+    const user = userEvent.setup();
+    render(<WeatherWidget />);
+    await screen.findByText('72°F');
+
+    await toggleUnits(user);
+    await screen.findByText('72°C');
+
+    expect(localStorage.getItem('weather.unit')).toBe(JSON.stringify('celsius'));
+  });
+});
+
+describe('WeatherWidget caching', () => {
+  it('paints a re-mounted panel from cache, with no loading flash', async () => {
+    stubForecast();
+    const { unmount } = render(<WeatherWidget />);
+    await screen.findByText('72°F');
+
+    unmount();
+    render(<WeatherWidget />);
+
+    // The forecast is there on the first render.
+    expect(screen.getByText('72°F')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: /loading weather/i })).not.toBeInTheDocument();
+  });
+
+  it('does not fetch again for a re-mounted panel', async () => {
     stubForecast();
     const { unmount } = render(<WeatherWidget />);
     await screen.findByText('72°F');
@@ -67,23 +110,19 @@ describe('WeatherWidget', () => {
     unmount();
     render(<WeatherWidget />);
 
-    // No placeholder flash: the forecast is there on the first render.
-    expect(screen.getByText('72°F')).toBeInTheDocument();
-    expect(screen.queryByRole('status', { name: /loading weather/i })).not.toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('caches each unit separately and switches back instantly', async () => {
+  it('caches each unit separately, so switching back is instant', async () => {
     stubForecast();
     const user = userEvent.setup();
     render(<WeatherWidget />);
     await screen.findByText('72°F');
-
-    await user.click(screen.getByTitle('Toggle units'));
+    await toggleUnits(user);
     await screen.findByText('72°C');
     expect(fetch).toHaveBeenCalledTimes(2); // °C is a different request
 
-    await user.click(screen.getByTitle('Toggle units'));
+    await toggleUnits(user);
 
     expect(screen.getByText('72°F')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(2);

@@ -17,6 +17,11 @@ vi.mock('./googleAuth', () => ({
   clearAccessToken: vi.fn(),
 }));
 
+const DAY_MS = 86_400_000;
+
+/** `fetchRange`'s first argument: whether to prompt for consent. */
+const BACKGROUND = false;
+
 /** A stubbed response for one API call. */
 interface Reply {
   ok?: boolean;
@@ -42,32 +47,39 @@ function stubFetch(handler: (url: string) => Reply) {
 }
 
 /** An event fixture as Google returns it, timed unless overridden. */
-function raw(over: Record<string, unknown> = {}) {
+function raw(overrides: Record<string, unknown> = {}) {
   return {
     id: 'e1',
     summary: 'Standup',
     start: { dateTime: '2026-08-03T09:00:00Z' },
     end: { dateTime: '2026-08-03T09:15:00Z' },
-    ...over,
+    ...overrides,
   };
 }
 
 /** Converts a fixture, failing the test rather than returning null. */
-function convert(over: Record<string, unknown> = {}, calendarId = 'cal-1'): CalendarEvent {
-  const ev = toEvent(raw(over), calendarId);
-  if (!ev) throw new Error('fixture did not convert');
-  return ev;
+function convert(overrides: Record<string, unknown> = {}, calendarId = 'cal-1'): CalendarEvent {
+  const event = toEvent(raw(overrides), calendarId);
+  if (!event) throw new Error('fixture did not convert');
+  return event;
 }
+
+/** A timed event on 3 August at the given local hour. */
+const eventAtHour = (id: string, hour: number, day = 3) =>
+  convert({ id, start: { dateTime: new Date(2026, 7, day, hour).toISOString() } });
+
+/** The ids of a list of events, in order. */
+const idsOf = (events: CalendarEvent[]) => events.map((event) => event.id);
 
 describe('localMidnight', () => {
   it('parses an all-day date in local time, not UTC', () => {
-    const ms = localMidnight('2026-08-03');
-    const d = new Date(ms);
+    const midnight = new Date(localMidnight('2026-08-03'));
+
     // The bug this guards against is the date landing on the 2nd west of Greenwich.
-    expect(d.getFullYear()).toBe(2026);
-    expect(d.getMonth()).toBe(7);
-    expect(d.getDate()).toBe(3);
-    expect(d.getHours()).toBe(0);
+    expect(midnight.getFullYear()).toBe(2026);
+    expect(midnight.getMonth()).toBe(7);
+    expect(midnight.getDate()).toBe(3);
+    expect(midnight.getHours()).toBe(0);
   });
 });
 
@@ -98,20 +110,23 @@ describe('toEvent', () => {
   });
 
   it('treats a date-only event as all-day at local midnight', () => {
-    const ev = convert({ start: { date: '2026-08-03' }, end: { date: '2026-08-04' } });
-    expect(ev.allDay).toBe(true);
-    expect(ev.start).toBe(localMidnight('2026-08-03'));
-    expect(ev.end).toBe(localMidnight('2026-08-04'));
+    const event = convert({ start: { date: '2026-08-03' }, end: { date: '2026-08-04' } });
+
+    expect(event.allDay).toBe(true);
+    expect(event.start).toBe(localMidnight('2026-08-03'));
+    expect(event.end).toBe(localMidnight('2026-08-04'));
   });
 
   it('gives an all-day event with no end a full day', () => {
-    const ev = convert({ start: { date: '2026-08-03' }, end: undefined });
-    expect(ev.end - ev.start).toBe(86_400_000);
+    const event = convert({ start: { date: '2026-08-03' }, end: undefined });
+
+    expect(event.end - event.start).toBe(DAY_MS);
   });
 
-  it('falls back to a zero-length event when a timed event has no end', () => {
-    const ev = convert({ end: undefined });
-    expect(ev.end).toBe(ev.start);
+  it('gives a timed event with no end zero length', () => {
+    const event = convert({ end: undefined });
+
+    expect(event.end).toBe(event.start);
   });
 
   it('substitutes a placeholder for a missing or blank title', () => {
@@ -129,6 +144,7 @@ describe('toEvent', () => {
 
   it('drops an event the user has declined', () => {
     const attendees = [{ self: true, responseStatus: 'declined' }];
+
     expect(toEvent(raw({ attendees }), 'cal-1')).toBeNull();
   });
 
@@ -137,6 +153,7 @@ describe('toEvent', () => {
       { self: false, responseStatus: 'declined' },
       { self: true, responseStatus: 'accepted' },
     ];
+
     expect(toEvent(raw({ attendees }), 'cal-1')).not.toBeNull();
   });
 
@@ -150,8 +167,13 @@ describe('toEvent', () => {
   });
 
   it('carries the source calendar’s name, colour, and writability onto the event', () => {
-    const ev = toEvent(raw(), 'cal-1', { title: 'Work', color: '#ff0000', canWrite: true });
-    expect(ev).toMatchObject({ calendarTitle: 'Work', calendarColor: '#ff0000', canWrite: true });
+    const event = toEvent(raw(), 'cal-1', { title: 'Work', color: '#ff0000', canWrite: true });
+
+    expect(event).toMatchObject({
+      calendarTitle: 'Work',
+      calendarColor: '#ff0000',
+      canWrite: true,
+    });
   });
 
   it('marks an occurrence of a recurring series', () => {
@@ -161,93 +183,79 @@ describe('toEvent', () => {
 
 describe('sortEvents', () => {
   it('orders by start time', () => {
-    const late = convert({ id: 'late', start: { dateTime: '2026-08-03T15:00:00Z' } });
-    const early = convert({ id: 'early', start: { dateTime: '2026-08-03T08:00:00Z' } });
-    expect(sortEvents([late, early]).map((e) => e.id)).toEqual(['early', 'late']);
+    const late = eventAtHour('late', 15);
+    const early = eventAtHour('early', 8);
+
+    expect(idsOf(sortEvents([late, early]))).toEqual(['early', 'late']);
   });
 
   it('pins an all-day event above timed events on the same day', () => {
     const day = dayKey(new Date(2026, 7, 3, 12).getTime());
-    const timed = convert({
-      id: 'timed',
-      start: { dateTime: new Date(2026, 7, 3, 8).toISOString() },
-    });
+    const timed = eventAtHour('timed', 8);
     const allDay = convert({ id: 'allday', start: { date: day }, end: { date: day } });
 
-    expect(sortEvents([timed, allDay]).map((e) => e.id)).toEqual(['allday', 'timed']);
+    expect(idsOf(sortEvents([timed, allDay]))).toEqual(['allday', 'timed']);
   });
 
   it('lets chronology win across days, so all-day does not jump ahead', () => {
-    const timedToday = convert({
-      id: 'today',
-      start: { dateTime: new Date(2026, 7, 3, 8).toISOString() },
-    });
+    const timedToday = eventAtHour('today', 8);
     const allDayTomorrow = convert({
       id: 'tomorrow',
       start: { date: '2026-08-04' },
       end: { date: '2026-08-05' },
     });
 
-    expect(sortEvents([allDayTomorrow, timedToday]).map((e) => e.id)).toEqual(['today', 'tomorrow']);
+    expect(idsOf(sortEvents([allDayTomorrow, timedToday]))).toEqual(['today', 'tomorrow']);
   });
 
   it('breaks ties on title so repeated renders do not reshuffle', () => {
-    const b = convert({ id: 'b', summary: 'Beta' });
-    const a = convert({ id: 'a', summary: 'Alpha' });
-    expect(sortEvents([b, a]).map((e) => e.title)).toEqual(['Alpha', 'Beta']);
+    const beta = convert({ id: 'b', summary: 'Beta' });
+    const alpha = convert({ id: 'a', summary: 'Alpha' });
+
+    expect(sortEvents([beta, alpha]).map((event) => event.title)).toEqual(['Alpha', 'Beta']);
   });
 
   it('does not mutate the input array', () => {
-    const late = convert({ id: 'late', start: { dateTime: '2026-08-03T15:00:00Z' } });
-    const early = convert({ id: 'early', start: { dateTime: '2026-08-03T08:00:00Z' } });
-    const input = [late, early];
+    const unsorted = [eventAtHour('late', 15), eventAtHour('early', 8)];
 
-    sortEvents(input);
+    sortEvents(unsorted);
 
-    expect(input.map((e) => e.id)).toEqual(['late', 'early']);
+    expect(idsOf(unsorted)).toEqual(['late', 'early']);
   });
 });
 
 describe('groupByDay', () => {
+  /** 3 August 2026, 10:00 local. */
   const now = new Date(2026, 7, 3, 10).getTime();
 
-  it('labels the first two days in words and the rest by weekday', () => {
-    const today = convert({
-      id: 'a',
-      start: { dateTime: new Date(2026, 7, 3, 14).toISOString() },
-    });
-    const tomorrow = convert({
-      id: 'b',
-      start: { dateTime: new Date(2026, 7, 4, 9).toISOString() },
-    });
-    const later = convert({
-      id: 'c',
-      start: { dateTime: new Date(2026, 7, 6, 9).toISOString() },
-    });
+  it('groups the events by the day they fall on', () => {
+    const groups = groupByDay(
+      [eventAtHour('c', 9, 6), eventAtHour('b', 9, 4), eventAtHour('a', 14, 3)],
+      now,
+    );
 
-    const groups = groupByDay([later, tomorrow, today], now);
+    expect(groups.map((group) => group.key)).toEqual(['2026-08-03', '2026-08-04', '2026-08-06']);
+  });
 
-    expect(groups.map((g) => g.key)).toEqual(['2026-08-03', '2026-08-04', '2026-08-06']);
+  it('labels the first two days in words', () => {
+    const groups = groupByDay([eventAtHour('a', 14, 3), eventAtHour('b', 9, 4)], now);
+
     expect(groups[0].label).toBe('Today');
     expect(groups[1].label).toBe('Tomorrow');
-    expect(groups[2].label).not.toBe('Tomorrow');
-    expect(groups[2].label).toBeTruthy();
+  });
+
+  it('labels the days after that by weekday', () => {
+    const groups = groupByDay([eventAtHour('c', 9, 6)], now);
+
+    expect(groups[0].label).toBeTruthy();
+    expect(groups[0].label).not.toBe('Tomorrow');
   });
 
   it('collects a day’s events into one group, sorted', () => {
-    const later = convert({
-      id: 'later',
-      start: { dateTime: new Date(2026, 7, 3, 16).toISOString() },
-    });
-    const earlier = convert({
-      id: 'earlier',
-      start: { dateTime: new Date(2026, 7, 3, 11).toISOString() },
-    });
-
-    const groups = groupByDay([later, earlier], now);
+    const groups = groupByDay([eventAtHour('later', 16), eventAtHour('earlier', 11)], now);
 
     expect(groups).toHaveLength(1);
-    expect(groups[0].events.map((e) => e.id)).toEqual(['earlier', 'later']);
+    expect(idsOf(groups[0].events)).toEqual(['earlier', 'later']);
   });
 
   it('returns nothing for an empty list', () => {
@@ -256,8 +264,8 @@ describe('groupByDay', () => {
 });
 
 describe('fetchRange', () => {
-  const MIN = new Date(2026, 7, 1).getTime();
-  const MAX = new Date(2026, 8, 1).getTime();
+  const RANGE_MIN = new Date(2026, 7, 1).getTime();
+  const RANGE_MAX = new Date(2026, 8, 1).getTime();
 
   /** Routes the calendar list and each calendar's events. */
   function stubCalendars(
@@ -266,8 +274,8 @@ describe('fetchRange', () => {
   ) {
     return stubFetch((url) => {
       if (url.includes('/users/me/calendarList')) return { body: { items: calendars } };
-      const id = decodeURIComponent(url.split('/calendars/')[1].split('/events')[0]);
-      return events(id);
+      const calendarId = decodeURIComponent(url.split('/calendars/')[1].split('/events')[0]);
+      return events(calendarId);
     });
   }
 
@@ -277,10 +285,10 @@ describe('fetchRange', () => {
         { id: 'work', summary: 'Work', accessRole: 'owner', backgroundColor: '#f00' },
         { id: 'home', summary: 'Home', accessRole: 'reader' },
       ],
-      (id) => ({
+      (calendarId) => ({
         body: {
           items: [
-            id === 'work'
+            calendarId === 'work'
               ? raw({ id: 'w1', start: { dateTime: '2026-08-03T15:00:00Z' } })
               : raw({ id: 'h1', start: { dateTime: '2026-08-03T08:00:00Z' } }),
           ],
@@ -288,16 +296,34 @@ describe('fetchRange', () => {
       }),
     );
 
-    const { events } = await fetchRange(false, MIN, MAX);
+    const { events } = await fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX);
 
-    expect(events.map((e) => e.id)).toEqual(['h1', 'w1']);
-    expect(events.find((e) => e.id === 'w1')).toMatchObject({
+    expect(idsOf(events)).toEqual(['h1', 'w1']);
+  });
+
+  it('carries each calendar’s name and colour onto its events', async () => {
+    stubCalendars(
+      [{ id: 'work', summary: 'Work', accessRole: 'owner', backgroundColor: '#f00' }],
+      () => ({ body: { items: [raw({ id: 'w1' })] } }),
+    );
+
+    const { events } = await fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX);
+
+    expect(events[0]).toMatchObject({
       calendarTitle: 'Work',
       calendarColor: '#f00',
       canWrite: true,
     });
-    // A reader-role calendar contributes events but cannot be written to.
-    expect(events.find((e) => e.id === 'h1')?.canWrite).toBe(false);
+  });
+
+  it('marks events from a read-only calendar as unwritable', async () => {
+    stubCalendars([{ id: 'home', summary: 'Home', accessRole: 'reader' }], () => ({
+      body: { items: [raw({ id: 'h1' })] },
+    }));
+
+    const { events } = await fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX);
+
+    expect(events[0].canWrite).toBe(false);
   });
 
   it('skips calendars the user has unticked in Google Calendar', async () => {
@@ -309,11 +335,11 @@ describe('fetchRange', () => {
       () => ({ body: { items: [] } }),
     );
 
-    await fetchRange(false, MIN, MAX);
+    await fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX);
 
-    const queried = fetchMock.mock.calls.map((c) => String(c[0]));
-    expect(queried.some((u) => u.includes('/calendars/work/events'))).toBe(true);
-    expect(queried.some((u) => u.includes('/calendars/hidden/events'))).toBe(false);
+    const requestedUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(requestedUrls.some((url) => url.includes('/calendars/work/events'))).toBe(true);
+    expect(requestedUrls.some((url) => url.includes('/calendars/hidden/events'))).toBe(false);
   });
 
   it('treats a calendar with no `selected` flag as visible', async () => {
@@ -321,7 +347,7 @@ describe('fetchRange', () => {
       body: { items: [raw()] },
     }));
 
-    const { events } = await fetchRange(false, MIN, MAX);
+    const { events } = await fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX);
 
     expect(events).toHaveLength(1);
   });
@@ -335,7 +361,7 @@ describe('fetchRange', () => {
       () => ({ body: { items: [] } }),
     );
 
-    const { calendars } = await fetchRange(false, MIN, MAX);
+    const { calendars } = await fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX);
 
     expect(calendars).toEqual([
       { id: 'primary', title: 'Me', color: undefined, primary: true, canWrite: true },
@@ -348,7 +374,7 @@ describe('fetchRange', () => {
       body: { items: [] },
     }));
 
-    const { calendars } = await fetchRange(false, MIN, MAX);
+    const { calendars } = await fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX);
 
     expect(calendars[0].title).toBe('no-name@group.calendar.google.com');
   });
@@ -359,13 +385,15 @@ describe('fetchRange', () => {
         { id: 'good', summary: 'Good', accessRole: 'owner' },
         { id: 'lost-access', summary: 'Shared', accessRole: 'reader' },
       ],
-      (id) =>
-        id === 'lost-access' ? { ok: false, status: 403 } : { body: { items: [raw({ id: 'ok' })] } },
+      (calendarId) =>
+        calendarId === 'lost-access'
+          ? { ok: false, status: 403 }
+          : { body: { items: [raw({ id: 'ok' })] } },
     );
 
-    const { events } = await fetchRange(false, MIN, MAX);
+    const { events } = await fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX);
 
-    expect(events.map((e) => e.id)).toEqual(['ok']);
+    expect(idsOf(events)).toEqual(['ok']);
   });
 
   it('follows nextPageToken so a busy month is not truncated', async () => {
@@ -380,9 +408,9 @@ describe('fetchRange', () => {
       };
     });
 
-    const { events } = await fetchRange(false, MIN, MAX);
+    const { events } = await fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX);
 
-    expect(events.map((e) => e.id)).toEqual(['p1', 'p2', 'p3']);
+    expect(idsOf(events)).toEqual(['p1', 'p2', 'p3']);
   });
 
   it('stops after the page cap rather than paging forever', async () => {
@@ -392,23 +420,32 @@ describe('fetchRange', () => {
       return { body: { items: [raw({ id: `p${page}` })], nextPageToken: 'always-more' } };
     });
 
-    const { events } = await fetchRange(false, MIN, MAX);
+    const { events } = await fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX);
 
     expect(events).toHaveLength(5);
   });
 
-  it('sends the access token and the window as ISO instants', async () => {
+  it('sends the access token', async () => {
     const fetchMock = stubCalendars([{ id: 'work', accessRole: 'owner' }], () => ({
       body: { items: [] },
     }));
 
-    await fetchRange(false, MIN, MAX);
+    await fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX);
 
     const [, init] = fetchMock.mock.calls[0];
     expect(init!.headers).toMatchObject({ Authorization: 'Bearer test-token' });
+  });
+
+  it('asks for the requested window as ISO instants, with recurrences expanded', async () => {
+    const fetchMock = stubCalendars([{ id: 'work', accessRole: 'owner' }], () => ({
+      body: { items: [] },
+    }));
+
+    await fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX);
+
     const eventsUrl = String(fetchMock.mock.calls[1][0]);
-    expect(eventsUrl).toContain(`timeMin=${encodeURIComponent(new Date(MIN).toISOString())}`);
-    expect(eventsUrl).toContain(`timeMax=${encodeURIComponent(new Date(MAX).toISOString())}`);
+    expect(eventsUrl).toContain(`timeMin=${encodeURIComponent(new Date(RANGE_MIN).toISOString())}`);
+    expect(eventsUrl).toContain(`timeMax=${encodeURIComponent(new Date(RANGE_MAX).toISOString())}`);
     // Recurrences are expanded server-side, so each occurrence is its own event.
     expect(eventsUrl).toContain('singleEvents=true');
   });
@@ -416,13 +453,16 @@ describe('fetchRange', () => {
   it('rejects when the calendar list itself fails', async () => {
     stubFetch(() => ({ ok: false, status: 401 }));
 
-    await expect(fetchRange(false, MIN, MAX)).rejects.toThrow('Calendar API 401');
+    await expect(fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX)).rejects.toThrow('Calendar API 401');
   });
 
   it('copes with a calendar list that has no items', async () => {
     stubFetch(() => ({ body: {} }));
 
-    await expect(fetchRange(false, MIN, MAX)).resolves.toEqual({ events: [], calendars: [] });
+    await expect(fetchRange(BACKGROUND, RANGE_MIN, RANGE_MAX)).resolves.toEqual({
+      events: [],
+      calendars: [],
+    });
   });
 });
 
@@ -435,13 +475,13 @@ describe('fetchUpcoming', () => {
         : { body: { items: [raw()] } },
     );
 
-    const events = await fetchUpcoming(false, now);
+    const events = await fetchUpcoming(BACKGROUND, now);
 
     expect(events).toHaveLength(1);
     const eventsUrl = String(fetchMock.mock.calls[1][0]);
     expect(eventsUrl).toContain(`timeMin=${encodeURIComponent(new Date(now).toISOString())}`);
     expect(eventsUrl).toContain(
-      `timeMax=${encodeURIComponent(new Date(now + WINDOW_DAYS * 86_400_000).toISOString())}`,
+      `timeMax=${encodeURIComponent(new Date(now + WINDOW_DAYS * DAY_MS).toISOString())}`,
     );
   });
 });
