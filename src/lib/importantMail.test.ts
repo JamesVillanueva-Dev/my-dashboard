@@ -253,6 +253,14 @@ describe('scoreMail and recency', () => {
   it('does not blow up on a message with an unreadable date', () => {
     expect(Number.isFinite(scoreWithoutContext({ receivedAt: 0 }))).toBe(true);
   });
+
+  it('leaves merit alone, so age cannot push a message under the floor', () => {
+    const old = scoreMail(mail('x', { labels: { starred: true }, receivedAt: hoursAgo(168) }), { self: null }, NOW);
+    const fresh = scoreMail(mail('x', { labels: { starred: true }, receivedAt: NOW }), { self: null }, NOW);
+
+    expect(old.total).toBeLessThan(fresh.total);
+    expect(old.merit).toBe(fresh.merit);
+  });
 });
 
 describe('reasonFor', () => {
@@ -346,6 +354,19 @@ describe('rankMail', () => {
     // waved away — the window belongs to the caller.
     expect(rankMail(allStrong, { self: SELF }, NOW)).toHaveLength(allStrong.length);
     expect(allStrong.length).toBeGreaterThan(TOP_N);
+  });
+
+  it('keeps ordinary mail in the ranking as it ages, rather than dropping it', () => {
+    // Recency orders this list; it must not empty it. Applied before the floor,
+    // the ×0.6 tail would delete every plain message over ~2 days old — leaving
+    // the panel three picks and nothing behind them to promote on a dismissal.
+    const week = [1, 24, 60, 100, 168].map((hours) =>
+      mail(`h${hours}`, { to: [SELF], unread: true, receivedAt: hoursAgo(hours) }),
+    );
+
+    const picks = rankMail(week, { self: SELF }, NOW);
+
+    expect(pickedIds(picks)).toEqual(['h1', 'h24', 'h60', 'h100', 'h168']);
   });
 
   it('breaks a tie on recency', () => {

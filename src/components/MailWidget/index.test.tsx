@@ -212,7 +212,7 @@ describe('MailWidget ranked picks', () => {
     );
   });
 
-  it('shows only the top three, however deep the ranking runs', async () => {
+  it('shows only the top three in the card, however deep the ranking runs', async () => {
     seedConnected();
     gmail.rankMail.mockReturnValue(ranked(['a', 'b', 'c', 'd', 'e']));
 
@@ -221,6 +221,49 @@ describe('MailWidget ranked picks', () => {
 
     expect(screen.getByText('Subject c')).toBeInTheDocument();
     expect(screen.queryByText('Subject d')).not.toBeInTheDocument();
+  });
+
+  it('opens out to ten, which is what the extra room is for', async () => {
+    seedConnected();
+    gmail.rankMail.mockReturnValue(ranked([...'abcdefghijklm']));
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText('Subject a');
+
+    await openFullScreen(user);
+
+    // The card's three were a constraint, not the ranking's depth.
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Subject j')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Subject k')).not.toBeInTheDocument();
+  });
+
+  it('leaves the card at three once the full-screen view is closed again', async () => {
+    seedConnected();
+    gmail.rankMail.mockReturnValue(ranked([...'abcdefghijklm']));
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText('Subject a');
+    await openFullScreen(user);
+    await screen.findByRole('dialog');
+
+    await user.click(screen.getByRole('button', { name: 'Close Mail' }));
+
+    expect(await screen.findByText('Subject c')).toBeInTheDocument();
+    expect(screen.queryByText('Subject d')).not.toBeInTheDocument();
+  });
+
+  it('shows what there is when the ranking is shallower than the full-screen window', async () => {
+    seedConnected();
+    gmail.rankMail.mockReturnValue(ranked(['a', 'b']));
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText('Subject a');
+
+    await openFullScreen(user);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getAllByRole('link')).toHaveLength(2);
   });
 
   it('says so when nothing needs attention', async () => {

@@ -20,6 +20,18 @@ import styles from './styles.module.css';
  */
 const TTL_MS = 5 * 60 * 1000;
 
+/**
+ * How many picks the full-screen view shows, against {@link TOP_N} in the card.
+ *
+ * The card's three is a constraint — a dashboard tile has room for three rows of
+ * mail and no more. Full screen has the room, and the ranking almost always runs
+ * deeper than three, so showing only three there wastes the click. Ten is where
+ * the ordering stops being an argument: past it the scores are close enough
+ * together that the panel is no longer telling you anything you could not get by
+ * opening Gmail, which is one scroll away in every row.
+ */
+const EXPANDED_N = 10;
+
 /** Deep link to one message in the Gmail web client. */
 const gmailUrl = (id: string) => `https://mail.google.com/mail/u/0/#inbox/${id}`;
 
@@ -53,6 +65,81 @@ function breakdown({ score, signals }: RankedMail): string {
     s.factor === 1 ? `${s.key} ${s.points >= 0 ? '+' : ''}${s.points}` : `${s.key} ×${s.factor.toFixed(2)}`,
   );
   return `score ${score} — ${parts.join(', ')}`;
+}
+
+/** Props for {@link Picks}. */
+interface PicksProps {
+  /** Every message still wanted, best first — deeper than either window shows. */
+  kept: RankedMail[];
+  /** Hides one message from the panel. */
+  onDismiss: (id: string) => void;
+}
+
+/**
+ * The picks themselves: a window onto the ranking, sized to the room there is.
+ *
+ * {@link TOP_N} in the card, {@link EXPANDED_N} at full screen. Windowing lives
+ * here rather than in {@link MailWidget} for the same reason it does in
+ * {@link Dismissed} — only a component *inside* the widget body can read
+ * {@link useWidgetExpanded}; `MailWidget` builds that body and sits above the
+ * provider, so it would always read `false`.
+ *
+ * It takes the whole kept ranking rather than a pre-cut list, because the cut is
+ * the one thing that differs between the two sizes.
+ *
+ * @param props - See {@link PicksProps}.
+ */
+function Picks({ kept, onDismiss }: PicksProps) {
+  const expanded = useWidgetExpanded();
+  const picks = kept.slice(0, expanded ? EXPANDED_N : TOP_N);
+
+  return (
+    <ol className={styles.list}>
+      {picks.map((pick) => {
+        const { message } = pick;
+        const sender = senderName(message.from);
+        return (
+          <li
+            key={message.id}
+            className={message.unread ? styles.isUnread : undefined}
+            title={breakdown(pick)}
+          >
+            <span className={styles.avatar} aria-hidden="true">
+              {initial(sender)}
+            </span>
+            <div>
+              <header>
+                <span>{sender}</span>
+                <time dateTime={new Date(message.receivedAt).toISOString()}>
+                  {timeAgo(message.receivedAt)}
+                </time>
+                <button
+                  className={styles.dismiss}
+                  onClick={() => onDismiss(message.id)}
+                  title="Dismiss — shows the next most important message"
+                  aria-label={`Dismiss ${message.subject || '(no subject)'}`}
+                >
+                  <Icon name="close" />
+                </button>
+              </header>
+              {/* The link covers the whole row (see `.subject::after`), but its
+                  accessible name stays the subject alone. */}
+              <a
+                className={styles.subject}
+                href={gmailUrl(message.id)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {message.subject || '(no subject)'}
+              </a>
+              {message.snippet && <p>{message.snippet}</p>}
+              <p className={styles.reason}>{pick.reason}</p>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 /** Props for {@link Dismissed}. */
@@ -139,7 +226,10 @@ function Dismissed({ picks, onRestore, onRestoreAll }: DismissedProps) {
 }
 
 /**
- * The three messages most worth your attention, scored in this browser.
+ * The messages most worth your attention, scored in this browser.
+ *
+ * Three of them in the card, {@link EXPANDED_N} at full screen — one ranking,
+ * two windows onto it. See {@link Picks}.
  *
  * Needs a Google client id for Gmail (ADR 0002) and nothing else — no API key,
  * no third party. Mail is read as metadata only (sender, recipients, a handful
@@ -191,9 +281,11 @@ export default function MailWidget() {
 
   const ranked = ranking.data ?? [];
   const hidden = new Set(dismissed);
+  /**
+   * Everything still wanted, in ranked order. Kept whole here: how much of it
+   * fits depends on which size is rendering, which only {@link Picks} knows.
+   */
   const kept = ranked.filter((pick) => !hidden.has(pick.message.id));
-  /** The window onto the ranking: the best few that are still wanted. */
-  const picks = kept.slice(0, TOP_N);
 
   /**
    * What has been dismissed, newest dismissal first.
@@ -292,7 +384,7 @@ export default function MailWidget() {
       );
     }
 
-    if (picks.length === 0 && dismissedPicks.length === 0) {
+    if (kept.length === 0 && dismissedPicks.length === 0) {
       return <p className={styles.empty}>Nothing in the last week needs you. Enjoy it.</p>;
     }
 
@@ -300,61 +392,17 @@ export default function MailWidget() {
       <>
         {/* Distinct from an inbox that never had anything: this one you emptied
             by hand, and the way back is directly below. */}
-        {picks.length === 0 ? (
+        {kept.length === 0 ? (
           <p className={styles.empty}>That’s everything — you’ve dismissed the rest.</p>
         ) : (
-        <ol className={styles.list}>
-          {picks.map((pick) => {
-            const { message } = pick;
-            const sender = senderName(message.from);
-            return (
-              <li
-                key={message.id}
-                className={message.unread ? styles.isUnread : undefined}
-                title={breakdown(pick)}
-              >
-                <span className={styles.avatar} aria-hidden="true">
-                  {initial(sender)}
-                </span>
-                <div>
-                  <header>
-                    <span>{sender}</span>
-                    <time dateTime={new Date(message.receivedAt).toISOString()}>
-                      {timeAgo(message.receivedAt)}
-                    </time>
-                    <button
-                      className={styles.dismiss}
-                      onClick={() => setDismissed([...dismissed, message.id])}
-                      title="Dismiss — shows the next most important message"
-                      aria-label={`Dismiss ${message.subject || '(no subject)'}`}
-                    >
-                      <Icon name="close" />
-                    </button>
-                  </header>
-                  {/* The link covers the whole row (see `.subject::after`), but its
-                      accessible name stays the subject alone. */}
-                  <a
-                    className={styles.subject}
-                    href={gmailUrl(message.id)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {message.subject || '(no subject)'}
-                  </a>
-                  {message.snippet && <p>{message.snippet}</p>}
-                  <p className={styles.reason}>{pick.reason}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
+          <Picks kept={kept} onDismiss={(id) => setDismissed([...dismissed, id])} />
         )}
 
         {/* Says what is being kept from you, and undoes it. Without this a
             dismissal is a one-way door with no sign on it. */}
         <Dismissed
           picks={dismissedPicks}
-          onRestore={(id) => setDismissed(dismissed.filter((kept) => kept !== id))}
+          onRestore={(id) => setDismissed(dismissed.filter((each) => each !== id))}
           onRestoreAll={() => setDismissed([])}
         />
       </>
@@ -365,8 +413,8 @@ export default function MailWidget() {
     <Widget
       title="Mail"
       className={styles.container}
-      // Each pick carries a subject, a preview, and the reason it was picked.
-      // Those three lines are what get truncated first at card width.
+      // Two things the card cannot give: depth — ten picks rather than three —
+      // and width, for the subject, preview and reason that truncate first.
       expandable
       action={
         connected && (
