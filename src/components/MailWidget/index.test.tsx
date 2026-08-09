@@ -311,6 +311,31 @@ describe('MailWidget ranked picks', () => {
     expect(within(dialog).queryByText('Subject k')).not.toBeInTheDocument();
   });
 
+  it('ignores a ranking cached before `merit` existed rather than misreading it', async () => {
+    // The regression this caused: a ranking stored by the previous version has
+    // no `merit`, `undefined >= FLOOR` is false, and so every pick in it read as
+    // mail that had failed the bar — the card emptied itself and stayed empty
+    // until the entry aged out. The cache's version guard is what stops the old
+    // shape being read at all; this is here so a future change to what the panel
+    // stores cannot quietly reintroduce it.
+    seedConnected();
+    const beforeMerit = ranked(['stale']).map((pick) => {
+      const withoutMerit: Partial<RankedMail> = { ...pick };
+      delete withoutMerit.merit;
+      return withoutMerit;
+    });
+    window.localStorage.setItem(
+      'cache:mail:top:on',
+      JSON.stringify({ v: 2, at: Date.now(), value: beforeMerit }),
+    );
+
+    render(<MailWidget />);
+
+    expect(await screen.findByText('Subject a')).toBeInTheDocument();
+    expect(screen.queryByText('Subject stale')).not.toBeInTheDocument();
+    expect(screen.queryByText(/nothing in the last week needs you/i)).not.toBeInTheDocument();
+  });
+
   it('marks the rows it only showed to fill the window', async () => {
     // Depth is not permission to pass these off as picks — they carry a class
     // the stylesheet dims and captions them with.

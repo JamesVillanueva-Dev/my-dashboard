@@ -38,8 +38,18 @@ export interface CacheEntry<T> {
  * Bumped when the stored shape changes. Entries written by an older version are
  * ignored rather than parsed, so a deploy that changes what a widget stores
  * cannot hand it data it no longer understands.
+ *
+ * 3: `RankedMail` gained `merit`, which the mail panel reads to decide what
+ * cleared its floor. A version-2 ranking has no such field, and `undefined >=
+ * FLOOR` is `false` — so every pick read back from an old entry looked like mail
+ * that had failed the bar, and the card emptied itself.
+ *
+ * The cost of a bump is one cold start for every widget, not just the one whose
+ * shape moved. That is the trade this exists to make: a blank panel that fills a
+ * second later is recoverable, and a panel confidently rendering the wrong answer
+ * from data it has misread is not.
  */
-const VERSION = 2;
+const VERSION = 3;
 
 /**
  * Prefix for the `localStorage` slots.
