@@ -50,6 +50,7 @@ describe('useCachedResource with nothing cached', () => {
     await waitFor(() => expect(result.current.status).toBe('error'));
 
     expect(result.current.data).toBeNull();
+    expect(result.current.error?.message).toBe('offline');
   });
 });
 
@@ -109,6 +110,39 @@ describe('useCachedResource with a stale cached value', () => {
     // A stale headline beats an error message.
     expect(result.current.status).toBe('ready');
     expect(result.current.data).toBe('stale');
+  });
+
+  it('still reports why the refresh failed, so `ready` is not read as `current`', async () => {
+    // The whole reason this is separate from `status`: a panel serving cached
+    // data while every refresh behind it fails looks perfectly healthy, and will
+    // go on looking healthy for as long as the cache lasts. Without this there
+    // is nothing for it to notice.
+    putStale(KEY, 'stale');
+
+    const { result } = renderHook(() =>
+      useCachedResource(KEY, MINUTE, () => Promise.reject(new Error('session expired'))),
+    );
+
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.error?.message).toBe('session expired');
+    expect(result.current.status).toBe('ready');
+    expect(result.current.data).toBe('stale');
+  });
+
+  it('clears the error once a load succeeds again', async () => {
+    putStale(KEY, 'stale');
+    const loader = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce('fresh');
+
+    const { result } = renderHook(() => useCachedResource(KEY, MINUTE, loader));
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+
+    act(() => result.current.refresh());
+
+    await waitFor(() => expect(result.current.data).toBe('fresh'));
+    expect(result.current.error).toBeNull();
   });
 
   it('leaves `revalidating` alone during a background refresh', async () => {

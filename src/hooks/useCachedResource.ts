@@ -12,6 +12,16 @@ export interface CachedResource<T> {
    */
   status: 'loading' | 'ready' | 'error';
   /**
+   * Why the last load failed, or `null` when it did not.
+   *
+   * Set independently of {@link CachedResource.status}, and that is the point:
+   * a refresh that fails behind cached data leaves the status `ready`, because
+   * stale data still beats an error message. But "stale" and "current" are not
+   * the same claim, and a panel that cannot tell them apart will present a
+   * fortnight-old answer as today's. This is how it tells.
+   */
+  error: Error | null;
+  /**
    * A refresh asked for by the user is in flight. Background revalidation does
    * not set this — it is not something the panel should react to.
    */
@@ -32,6 +42,8 @@ interface State<T> {
   data: T | null;
   /** As {@link CachedResource.status}. */
   status: CachedResource<T>['status'];
+  /** As {@link CachedResource.error}. */
+  error: Error | null;
   /** As {@link CachedResource.revalidating}. */
   revalidating: boolean;
 }
@@ -43,6 +55,7 @@ function fromCache<T>(key: string): State<T> {
     key,
     data: hit ? hit.value : null,
     status: hit ? 'ready' : 'loading',
+    error: null,
     revalidating: false,
   };
 }
@@ -116,13 +129,15 @@ export function useCachedResource<T>(
       try {
         const value = await load(key, ttlMs, () => loaderRef.current(), force);
         if (!aliveRef.current || keyRef.current !== key) return;
-        setState({ key, data: value, status: 'ready', revalidating: false });
-      } catch {
+        setState({ key, data: value, status: 'ready', error: null, revalidating: false });
+      } catch (e) {
         if (!aliveRef.current || keyRef.current !== key) return;
+        const error = e instanceof Error ? e : new Error(String(e));
         setState((prev) => ({
           key,
           data: prev.data,
           status: prev.data != null ? 'ready' : 'error',
+          error,
           revalidating: false,
         }));
       }
@@ -144,5 +159,11 @@ export function useCachedResource<T>(
     void revalidate(true);
   }, [revalidate]);
 
-  return { data: state.data, status: state.status, revalidating: state.revalidating, refresh };
+  return {
+    data: state.data,
+    status: state.status,
+    error: state.error,
+    revalidating: state.revalidating,
+    refresh,
+  };
 }

@@ -57,6 +57,40 @@ const CANDIDATES = 35;
 const KNOWN_SENDER_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 
 /**
+ * How many Gmail requests may be in flight at once.
+ *
+ * Gmail bills per-user quota by the *second* — 250 units, and a `messages.get`
+ * or `messages.list` costs 5 — so what matters is not how many requests a
+ * refresh makes but how tightly they are packed. Firing {@link CANDIDATES} plus
+ * a sender lookup each through one `Promise.all` puts ~325 units on the wire at
+ * once and earns a 429 for the whole batch, which fails the entire read.
+ *
+ * Six keeps a refresh under the limit with room to spare while staying far
+ * faster than doing it one at a time. Caching used to hide this — sender
+ * lookups are held for {@link KNOWN_SENDER_TTL_MS}, so in the steady state only
+ * the message fetches fired and the burst stayed just under the line. That made
+ * the limit look like it was being respected when it was only being avoided,
+ * and any cold cache — a new browser, a cleared cache, a bumped cache version —
+ * walked straight into it.
+ */
+const CONCURRENCY = 6;
+
+/** How many times a request is retried before its failure is the caller's. */
+const MAX_ATTEMPTS = 4;
+
+/** Base for the exponential backoff between those attempts. */
+const RETRY_BASE_MS = 300;
+
+/**
+ * Statuses worth trying again: a rate limit, and Google's transient 5xx family.
+ *
+ * 403 is absent deliberately. Gmail uses it both for genuine rate limiting and
+ * for "this project cannot call this API at all", and retrying the second is
+ * pointless — {@link api} says so in words instead.
+ */
+const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+/**
  * The headers requested for every message.
  *
  * Named explicitly, and kept short on purpose: this list *is* the answer to
@@ -283,16 +317,74 @@ function decodeEntities(text: string): string {
     .replace(/&amp;/g, '&');
 }
 
-/** GETs `path` with the Gmail bearer token, throwing a readable error on failure. */
+/** Resolves after `ms`. */
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * How long to hold off before attempt `attempt`.
+ *
+ * Google's `Retry-After` wins when it sends one — it knows when the window
+ * reopens and we are guessing. Otherwise the delay doubles each time, with
+ * jitter, so a batch that was rate-limited together does not march back in
+ * lockstep and collide again.
+ */
+function backoffMs(attempt: number, retryAfter: string | null): number {
+  const seconds = Number(retryAfter);
+  if (retryAfter !== null && Number.isFinite(seconds) && seconds > 0) return seconds * 1000;
+  return RETRY_BASE_MS * 2 ** attempt * (1 + Math.random());
+}
+
+/**
+ * GETs `path` with the Gmail bearer token, throwing a readable error on failure.
+ *
+ * Retries a rate limit rather than surfacing it: a 429 means "later", not "no",
+ * and the caller's only alternative is to fail a whole refresh over a limit that
+ * clears in under a second. See {@link RETRY_STATUSES}.
+ */
 async function api<T>(path: string, token: string): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!response.ok) {
-    const detail = response.status === 403 ? ' — is the Gmail API enabled for this project?' : '';
+  for (let attempt = 0; ; attempt++) {
+    const response = await fetch(`${API}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (response.ok) return (await response.json()) as T;
+
+    if (attempt < MAX_ATTEMPTS - 1 && RETRY_STATUSES.has(response.status)) {
+      await wait(backoffMs(attempt, response.headers.get('Retry-After')));
+      continue;
+    }
+
+    const detail =
+      response.status === 403
+        ? ' — is the Gmail API enabled for this project?'
+        : response.status === 429
+          ? ' — too many requests; Gmail is rate limiting this account, try again shortly'
+          : '';
     throw new Error(`Gmail request failed (${response.status})${detail}`);
   }
-  return (await response.json()) as T;
+}
+
+/**
+ * Runs `task` over `items`, at most {@link CONCURRENCY} at a time.
+ *
+ * `Promise.all` over a mapped array starts every request in the same tick, which
+ * is exactly what {@link CONCURRENCY} exists to prevent. Results keep the order
+ * of `items` regardless of which finished first.
+ */
+async function pooled<T, R>(items: T[], task: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+
+  // Each worker takes the next index until there are none left. Safe without a
+  // lock: only one of these runs at a time between awaits.
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await task(items[index]);
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, worker));
+  return results;
 }
 
 /**
@@ -315,8 +407,8 @@ export async function fetchInbox(interactive: boolean): Promise<MailSummary[]> {
   // `metadataHeaders` keeps the response to the headers ranking reads; without
   // it Gmail returns every header on the message.
   const headers = HEADERS.map((h) => `metadataHeaders=${h}`).join('&');
-  const messages = await Promise.all(
-    ids.map((id) => api<GmailMessage>(`/messages/${id}?format=metadata&${headers}`, token)),
+  const messages = await pooled(ids, (id) =>
+    api<GmailMessage>(`/messages/${id}?format=metadata&${headers}`, token),
   );
 
   return messages
@@ -370,22 +462,20 @@ export async function fetchKnownSenders(messages: MailSummary[]): Promise<Set<st
     return new Set();
   }
 
-  const known = await Promise.all(
-    senders.map(async (address) => {
-      try {
-        const written = await load(`mail:sender:${address}`, KNOWN_SENDER_TTL_MS, async () => {
-          const found = await api<{ resultSizeEstimate?: number }>(
-            `/messages?q=${encodeURIComponent(`in:sent to:${address}`)}&maxResults=1`,
-            token,
-          );
-          return (found.resultSizeEstimate ?? 0) > 0;
-        });
-        return written ? address : '';
-      } catch {
-        return '';
-      }
-    }),
-  );
+  const known = await pooled(senders, async (address) => {
+    try {
+      const written = await load(`mail:sender:${address}`, KNOWN_SENDER_TTL_MS, async () => {
+        const found = await api<{ resultSizeEstimate?: number }>(
+          `/messages?q=${encodeURIComponent(`in:sent to:${address}`)}&maxResults=1`,
+          token,
+        );
+        return (found.resultSizeEstimate ?? 0) > 0;
+      });
+      return written ? address : '';
+    } catch {
+      return '';
+    }
+  });
 
   return new Set(known.filter(Boolean));
 }

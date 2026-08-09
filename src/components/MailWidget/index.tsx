@@ -345,16 +345,35 @@ export default function MailWidget() {
     setDismissed(dismissed.filter((id) => live.has(id)));
   }, [ranking.status, ranking.data, dismissed, setDismissed]);
 
-  const connect = async () => {
+  /**
+   * Asks Google for mail access with a consent screen if one is needed.
+   *
+   * The only path here that may do that, and the reason it exists twice below.
+   * Everything the panel does on its own passes `interactive: false`, which
+   * reuses the Google session already in the browser and rejects when there is
+   * not one — a token lives in memory for about an hour, and a silent renewal
+   * only works while that session is alive. When it is not, no amount of
+   * retrying the silent read will ever succeed; a consent screen is required,
+   * and Google will only open one from a user gesture. So a click is the sole
+   * way back, which makes offering that click a correctness matter rather than a
+   * convenience.
+   *
+   * @param after - What to do once access is granted. Connecting for the first
+   *   time flips `connected`, which moves the cache key and loads on its own;
+   *   reconnecting keeps the same key and has to ask for the reload itself.
+   */
+  const authorize = async (after: () => void) => {
     setConnectError('');
     try {
-      // Interactive: this is a click, so Google may show its consent popup.
       await fetchInbox(true);
-      setConnected(true);
+      after();
     } catch (e) {
       setConnectError(e instanceof Error ? e.message : 'Could not connect to Gmail.');
     }
   };
+
+  const connect = () => authorize(() => setConnected(true));
+  const reconnect = () => authorize(ranking.refresh);
 
 
   const body = () => {
@@ -402,12 +421,26 @@ export default function MailWidget() {
 
     if (ranking.status === 'error') {
       return (
-        <p className={styles.error}>
-          Couldn’t read your mail.{' '}
+        <>
+          {/* The reason, not just the fact. "Couldn't read your mail" on its own
+              cannot be acted on, and the two things that cause it want opposite
+              responses. */}
+          <p className={styles.error}>
+            Couldn’t read your mail{ranking.error ? `: ${ranking.error.message}` : '.'}
+          </p>
+          <p className={styles.explain}>
+            A blip wants the same read again. If retrying keeps failing, the Google session
+            this panel was using has expired — reconnecting is what asks for a new one, and
+            only your click can open Google’s consent screen.
+          </p>
+          <button className={styles.add} onClick={reconnect}>
+            Reconnect Gmail
+          </button>{' '}
           <button className={styles.link} onClick={ranking.refresh}>
             Retry
           </button>
-        </p>
+          {connectError && <p className={styles.error}>{connectError}</p>}
+        </>
       );
     }
 
@@ -432,6 +465,20 @@ export default function MailWidget() {
           onRestore={(id) => setDismissed(dismissed.filter((each) => each !== id))}
           onRestoreAll={() => setDismissed([])}
         />
+
+        {/* Cached mail is still worth showing when a refresh fails — but it has
+            to say so. Silently, this panel will present a fortnight-old inbox as
+            today's for as long as the cache survives, which is how an expired
+            session goes unnoticed until something clears the cache and the
+            failure finally has nothing left to hide behind. */}
+        {ranking.error && (
+          <p className={styles.hiddenNote}>
+            Showing older mail — the last refresh failed.{' '}
+            <button className={styles.link} onClick={reconnect}>
+              Reconnect
+            </button>
+          </p>
+        )}
       </>
     );
   };
