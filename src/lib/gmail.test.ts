@@ -255,7 +255,20 @@ describe('fetchInbox against the wire', () => {
       }
     });
     vi.stubGlobal('fetch', fetchMock);
-    return { fetchMock, peak: () => peak };
+
+    /**
+     * How many times one message id was asked for.
+     *
+     * Per-id rather than a total across the batch: a total also counts every
+     * *other* id the pool happened to reach, which depends on how the workers
+     * interleave and made this suite fail only on a loaded CI machine. The claim
+     * these tests actually make is about one request being repeated, so that is
+     * what they count.
+     */
+    const callsFor = (id: string) =>
+      fetchMock.mock.calls.filter(([url]) => url.includes(`/messages/${id}?`)).length;
+
+    return { fetchMock, peak: () => peak, callsFor };
   }
 
   beforeEach(() => {
@@ -291,7 +304,7 @@ describe('fetchInbox against the wire', () => {
 
   it('retries a rate-limited request instead of failing the whole read', async () => {
     let seen = 0;
-    const { fetchMock } = stubGmail(async (url) => {
+    const { callsFor } = stubGmail(async (url) => {
       // Only the first message call is limited; it must not sink the refresh.
       if (url.includes('/messages/m0?') && seen++ === 0) return fail(429);
       return ok({ id: 'x' });
@@ -299,20 +312,37 @@ describe('fetchInbox against the wire', () => {
     const { fetchInbox } = await import('./gmail');
 
     await expect(fetchInbox(false)).resolves.toHaveLength(IDS.length);
-    // The list, twenty messages, and one retry.
-    expect(fetchMock).toHaveBeenCalledTimes(IDS.length + 2);
+    // Asked twice: refused once, then answered.
+    expect(callsFor('m0')).toBe(2);
+    expect(callsFor('m1')).toBe(1);
   });
 
   it('gives up on a rate limit that will not clear, and says which it was', async () => {
-    stubGmail(() => fail(429));
+    const { callsFor } = stubGmail(() => fail(429));
     const { fetchInbox } = await import('./gmail');
 
     await expect(fetchInbox(false)).rejects.toThrow(/429.*rate limiting/);
+    // Four attempts is the cap, and nothing may exceed it.
+    expect(callsFor('m0')).toBeLessThanOrEqual(4);
+  });
+
+  it('stops the rest of the batch once one request has given up', async () => {
+    // Rejecting is not stopping. The workers that were still going would keep
+    // taking ids and retrying them, which for a rate limit means holding the
+    // limit open on behalf of a read whose answer is already discarded.
+    const { fetchMock } = stubGmail(() => fail(429));
+    const { fetchInbox } = await import('./gmail');
+
+    await expect(fetchInbox(false)).rejects.toThrow();
+    const settled = fetchMock.mock.calls.length;
+    await new Promise((resolve) => setTimeout(resolve, 400));
+
+    expect(fetchMock.mock.calls.length).toBe(settled);
   });
 
   it('waits as long as Gmail asks when it sends Retry-After', async () => {
     let first = true;
-    const { fetchMock } = stubGmail(() => {
+    const { callsFor } = stubGmail(() => {
       if (first) {
         first = false;
         return fail(429, { 'Retry-After': '0.05' });
@@ -324,8 +354,11 @@ describe('fetchInbox against the wire', () => {
     const started = Date.now();
     await fetchInbox(false);
 
-    expect(Date.now() - started).toBeGreaterThanOrEqual(45);
-    expect(fetchMock).toHaveBeenCalledTimes(IDS.length + 2);
+    // 50ms asked for, and honoured — not the 300ms the backoff would have picked.
+    const waited = Date.now() - started;
+    expect(waited).toBeGreaterThanOrEqual(45);
+    expect(waited).toBeLessThan(250);
+    expect(callsFor('m0')).toBe(2);
   });
 
   it('does not retry a 403, which retrying cannot fix', async () => {

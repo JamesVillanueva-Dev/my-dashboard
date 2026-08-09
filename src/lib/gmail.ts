@@ -341,16 +341,20 @@ function backoffMs(attempt: number, retryAfter: string | null): number {
  * and the caller's only alternative is to fail a whole refresh over a limit that
  * clears in under a second. See {@link RETRY_STATUSES}.
  */
-async function api<T>(path: string, token: string): Promise<T> {
+async function api<T>(path: string, token: string, abandoned?: () => boolean): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     const response = await fetch(`${API}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (response.ok) return (await response.json()) as T;
 
-    if (attempt < MAX_ATTEMPTS - 1 && RETRY_STATUSES.has(response.status)) {
+    if (attempt < MAX_ATTEMPTS - 1 && RETRY_STATUSES.has(response.status) && !abandoned?.()) {
       await wait(backoffMs(attempt, response.headers.get('Retry-After')));
-      continue;
+      // The batch may have been given up on while this one slept. Retrying now
+      // would put requests on the wire for a read whose result is already
+      // discarded — and if what stopped it was a rate limit, those are the
+      // requests keeping the limit hot.
+      if (!abandoned?.()) continue;
     }
 
     const detail =
@@ -369,17 +373,37 @@ async function api<T>(path: string, token: string): Promise<T> {
  * `Promise.all` over a mapped array starts every request in the same tick, which
  * is exactly what {@link CONCURRENCY} exists to prevent. Results keep the order
  * of `items` regardless of which finished first.
+ *
+ * The first failure ends the batch. `Promise.all` rejects on it either way, but
+ * rejecting is not stopping: without the flag below the other workers carry on
+ * taking items and retrying, filling the wire with requests for a result the
+ * caller has already thrown away. When the failure was a 429 that is worse than
+ * wasteful — it is the batch holding its own rate limit open.
+ *
+ * `task` is handed a predicate for the same reason, so a request already
+ * sleeping between retries can find out that its batch is over rather than
+ * waking up and asking again.
  */
-async function pooled<T, R>(items: T[], task: (item: T) => Promise<R>): Promise<R[]> {
+async function pooled<T, R>(
+  items: T[],
+  task: (item: T, abandoned: () => boolean) => Promise<R>,
+): Promise<R[]> {
   const results = new Array<R>(items.length);
   let next = 0;
+  let failed = false;
+  const abandoned = () => failed;
 
   // Each worker takes the next index until there are none left. Safe without a
   // lock: only one of these runs at a time between awaits.
   const worker = async () => {
-    while (next < items.length) {
+    while (next < items.length && !failed) {
       const index = next++;
-      results[index] = await task(items[index]);
+      try {
+        results[index] = await task(items[index], abandoned);
+      } catch (e) {
+        failed = true;
+        throw e;
+      }
     }
   };
 
@@ -407,8 +431,8 @@ export async function fetchInbox(interactive: boolean): Promise<MailSummary[]> {
   // `metadataHeaders` keeps the response to the headers ranking reads; without
   // it Gmail returns every header on the message.
   const headers = HEADERS.map((h) => `metadataHeaders=${h}`).join('&');
-  const messages = await pooled(ids, (id) =>
-    api<GmailMessage>(`/messages/${id}?format=metadata&${headers}`, token),
+  const messages = await pooled(ids, (id, abandoned) =>
+    api<GmailMessage>(`/messages/${id}?format=metadata&${headers}`, token, abandoned),
   );
 
   return messages
