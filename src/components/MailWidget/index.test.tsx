@@ -376,6 +376,65 @@ describe('MailWidget ranked picks', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
+  it('names the reason it could not read, rather than only that it could not', async () => {
+    seedConnected();
+    gmail.fetchInbox.mockRejectedValue(new Error('Gmail request failed (401)'));
+
+    render(<MailWidget />);
+
+    // "Couldn't read your mail" alone cannot be acted on. A 401 and a dead
+    // network want opposite responses, and only the panel knows which happened.
+    expect(await screen.findByText(/Gmail request failed \(401\)/)).toBeInTheDocument();
+  });
+
+  it('offers an interactive reconnect, the one thing a silent retry can never do', async () => {
+    // The bug this exists for: every read the panel makes on its own is silent,
+    // and a silent read cannot renew an expired Google session however many
+    // times it is repeated — only a consent screen can, and only a click opens
+    // one. Without this button the error state is a dead end.
+    seedConnected();
+    gmail.fetchInbox.mockRejectedValue(new Error('Gmail request failed (401)'));
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText(/couldn.t read your mail/i);
+    gmail.fetchInbox.mockResolvedValue([message('a')]);
+
+    await user.click(screen.getByRole('button', { name: 'Reconnect Gmail' }));
+
+    expect(gmail.fetchInbox).toHaveBeenCalledWith(INTERACTIVE);
+    expect(await screen.findByText('Subject a')).toBeInTheDocument();
+  });
+
+  it('reports a refused reconnect instead of failing silently', async () => {
+    seedConnected();
+    gmail.fetchInbox.mockRejectedValue(new Error('Gmail request failed (401)'));
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText(/couldn.t read your mail/i);
+    gmail.fetchInbox.mockRejectedValue(new Error('Google authorization was cancelled'));
+
+    await user.click(screen.getByRole('button', { name: 'Reconnect Gmail' }));
+
+    expect(await screen.findByText('Google authorization was cancelled')).toBeInTheDocument();
+  });
+
+  it('says it is showing older mail when a refresh fails behind cached picks', async () => {
+    // How this went unnoticed: cached mail outlives the session that fetched it,
+    // and a panel that never mentions a failed refresh will present a days-old
+    // inbox as today's until something clears the cache.
+    seedConnected();
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText('Subject a');
+    gmail.fetchInbox.mockRejectedValue(new Error('Gmail request failed (401)'));
+
+    await user.click(screen.getByRole('button', { name: 'Refresh mail now' }));
+
+    expect(await screen.findByText(/showing older mail/i)).toBeInTheDocument();
+    // The picks stay: stale mail still beats an empty panel, as long as it says so.
+    expect(screen.getByText('Subject a')).toBeInTheDocument();
+  });
+
   it('offers a refresh that costs nothing to take', async () => {
     seedConnected();
     const user = userEvent.setup();

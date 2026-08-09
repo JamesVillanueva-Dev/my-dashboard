@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { parseAddressList, senderAddress, senderName, toSummary } from './gmail';
 
 /** A raw Gmail `format=metadata` message. */
@@ -214,5 +214,132 @@ describe('senderAddress', () => {
   it('is empty when the header holds no address', () => {
     expect(senderAddress('')).toBe('');
     expect(senderAddress('Mailer Daemon')).toBe('');
+  });
+});
+
+/**
+ * The request layer, against a stubbed `fetch`.
+ *
+ * Everything above is pure parsing. These cover the part that talks to Google,
+ * which is where the panel's worst failure lived: a refresh fired every request
+ * it needed in one tick, went over Gmail's per-second quota, and failed the
+ * whole read with a 429 that nothing retried.
+ */
+describe('fetchInbox against the wire', () => {
+  /** Ids Gmail should report, sized to outnumber the concurrency limit. */
+  const IDS = Array.from({ length: 20 }, (_, i) => `m${i}`);
+
+  /** A stub response. */
+  const ok = (body: unknown) =>
+    ({ ok: true, status: 200, headers: new Headers(), json: async () => body }) as Response;
+  const fail = (status: number, headers: Record<string, string> = {}) =>
+    ({
+      ok: false,
+      status,
+      headers: new Headers(headers),
+      json: async () => ({}),
+    }) as Response;
+
+  /** Answers the list call, then each message, tracking how many overlap. */
+  function stubGmail(perMessage: (url: string) => Response | Promise<Response>) {
+    let inFlight = 0;
+    let peak = 0;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/messages?')) return ok({ messages: IDS.map((id) => ({ id })) });
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      try {
+        return await perMessage(url);
+      } finally {
+        inFlight--;
+      }
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return { fetchMock, peak: () => peak };
+  }
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.doMock('./googleAuth', () => ({
+      GMAIL_SCOPE: 'gmail-scope',
+      CALENDAR_SCOPE: 'calendar-scope',
+      hasGoogleClientId: () => true,
+      getAccessToken: async () => 'token',
+    }));
+  });
+
+  afterEach(() => {
+    vi.doUnmock('./googleAuth');
+    vi.unstubAllGlobals();
+  });
+
+  it('never puts more than the concurrency limit on the wire at once', async () => {
+    // The 429's actual cause. Twenty messages through one `Promise.all` is
+    // twenty simultaneous requests; Gmail bills quota per second, so the burst
+    // is what breaks, not the total.
+    const { peak } = stubGmail(async (url) => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return ok({ id: url.split('/messages/')[1].split('?')[0] });
+    });
+    const { fetchInbox } = await import('./gmail');
+
+    await fetchInbox(false);
+
+    expect(peak()).toBeLessThanOrEqual(6);
+    expect(peak()).toBeGreaterThan(1);
+  });
+
+  it('retries a rate-limited request instead of failing the whole read', async () => {
+    let seen = 0;
+    const { fetchMock } = stubGmail(async (url) => {
+      // Only the first message call is limited; it must not sink the refresh.
+      if (url.includes('/messages/m0?') && seen++ === 0) return fail(429);
+      return ok({ id: 'x' });
+    });
+    const { fetchInbox } = await import('./gmail');
+
+    await expect(fetchInbox(false)).resolves.toHaveLength(IDS.length);
+    // The list, twenty messages, and one retry.
+    expect(fetchMock).toHaveBeenCalledTimes(IDS.length + 2);
+  });
+
+  it('gives up on a rate limit that will not clear, and says which it was', async () => {
+    stubGmail(() => fail(429));
+    const { fetchInbox } = await import('./gmail');
+
+    await expect(fetchInbox(false)).rejects.toThrow(/429.*rate limiting/);
+  });
+
+  it('waits as long as Gmail asks when it sends Retry-After', async () => {
+    let first = true;
+    const { fetchMock } = stubGmail(() => {
+      if (first) {
+        first = false;
+        return fail(429, { 'Retry-After': '0.05' });
+      }
+      return ok({ id: 'x' });
+    });
+    const { fetchInbox } = await import('./gmail');
+
+    const started = Date.now();
+    await fetchInbox(false);
+
+    expect(Date.now() - started).toBeGreaterThanOrEqual(45);
+    expect(fetchMock).toHaveBeenCalledTimes(IDS.length + 2);
+  });
+
+  it('does not retry a 403, which retrying cannot fix', async () => {
+    const { fetchMock } = stubGmail(() => fail(403));
+    const { fetchInbox } = await import('./gmail');
+
+    await expect(fetchInbox(false)).rejects.toThrow(/Gmail API enabled/);
+
+    // No URL was asked for twice — a 403 is "this project cannot", and asking
+    // again cannot change the answer. The pool also stops dead rather than
+    // firing the remaining ids at an API that has already refused, so the count
+    // is the concurrency limit rather than every id.
+    const tried = fetchMock.mock.calls.map(([url]) => url).filter((u) => u.includes('/messages/'));
+    expect(new Set(tried).size).toBe(tried.length);
+    expect(tried.length).toBeLessThanOrEqual(6);
   });
 });
