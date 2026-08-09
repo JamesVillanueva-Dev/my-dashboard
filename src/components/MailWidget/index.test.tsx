@@ -3,7 +3,10 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MailWidget from './index';
 import type { MailSummary } from '../../lib/gmail';
-import type { RankedMail } from '../../lib/importantMail';
+import { FLOOR, type RankedMail } from '../../lib/importantMail';
+// Module class names are hashed at build time, so the marker is asserted through
+// the stylesheet rather than as a literal string.
+import styles from './styles.module.css';
 
 const { gmail } = vi.hoisted(() => ({
   gmail: {
@@ -53,16 +56,28 @@ const message = (id: string, overrides: Partial<MailSummary> = {}): MailSummary 
   ...overrides,
 });
 
+/**
+ * A ranking of messages that all cleared {@link FLOOR} — the ordinary case.
+ *
+ * `merit` is what the widget reads to tell a real pick from a row filling out
+ * the full-screen window, so it has to be here and has to be over the floor;
+ * see {@link rankedBelowFloor} for the other kind.
+ */
 const ranked = (ids: string[]): RankedMail[] =>
   ids.map((id) => ({
     message: message(id),
     reason: `because ${id}`,
     score: 42.5,
+    merit: FLOOR + 10,
     signals: [
       { key: 'to', phrase: 'addressed to you', tier: 2, points: 14, factor: 1 },
       { key: 'bulk', phrase: '', tier: 3, points: 0, factor: 0.25 },
     ],
   }));
+
+/** The tail of a ranking: messages the floor turned down. Sorts after `ranked`. */
+const rankedBelowFloor = (ids: string[]): RankedMail[] =>
+  ranked(ids).map((pick) => ({ ...pick, score: 4, merit: FLOOR - 10 }));
 
 /** Marks Gmail as already connected, as a returning user would be. */
 function seedConnected() {
@@ -275,6 +290,55 @@ describe('MailWidget ranked picks', () => {
     expect(await screen.findByText(/nothing in the last week needs you/i)).toBeInTheDocument();
   });
 
+  it('fills the full-screen window past the floor rather than leaving it empty', async () => {
+    // The case the extra depth exists for: a quiet week with two real picks. The
+    // card is right to stop at two; a dialog you clicked into should still hand
+    // you your inbox.
+    seedConnected();
+    gmail.rankMail.mockReturnValue([...ranked(['a', 'b']), ...rankedBelowFloor([...'cdefghijklm'])]);
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText('Subject a');
+
+    // The card holds the line: only what cleared the floor.
+    expect(screen.queryByText('Subject c')).not.toBeInTheDocument();
+
+    await openFullScreen(user);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getAllByRole('link')).toHaveLength(10);
+    expect(within(dialog).getByText('Subject j')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Subject k')).not.toBeInTheDocument();
+  });
+
+  it('marks the rows it only showed to fill the window', async () => {
+    // Depth is not permission to pass these off as picks — they carry a class
+    // the stylesheet dims and captions them with.
+    seedConnected();
+    gmail.rankMail.mockReturnValue([...ranked(['a']), ...rankedBelowFloor(['b'])]);
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText('Subject a');
+    await openFullScreen(user);
+
+    const dialog = await screen.findByRole('dialog');
+    const rows = within(dialog).getAllByRole('listitem');
+
+    expect(rows[0]).not.toHaveClass(styles.isMinor);
+    expect(rows[1]).toHaveClass(styles.isMinor);
+  });
+
+  it('points at the full-screen view when the card has nothing above the floor', async () => {
+    seedConnected();
+    gmail.rankMail.mockReturnValue(rankedBelowFloor(['a', 'b', 'c']));
+
+    render(<MailWidget />);
+
+    expect(await screen.findByText(/nothing in the last week needs you/i)).toBeInTheDocument();
+    expect(screen.getByText(/open it full screen/i)).toBeInTheDocument();
+    expect(screen.queryByText('Subject a')).not.toBeInTheDocument();
+  });
+
   it('surfaces a read failure with a retry rather than an empty panel', async () => {
     seedConnected();
     gmail.fetchInbox.mockImplementation(async () => {
@@ -313,6 +377,46 @@ describe('MailWidget dismissing a pick', () => {
 
     expect(screen.queryByText('Subject a')).not.toBeInTheDocument();
     expect(await screen.findByText('Subject d')).toBeInTheDocument();
+  });
+
+  it('refills the full-screen window from below the floor, so it stays ten deep', async () => {
+    seedConnected();
+    gmail.rankMail.mockReturnValue([
+      ...ranked(['a', 'b']),
+      ...rankedBelowFloor([...'cdefghijklm']),
+    ]);
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText('Subject a');
+    await openFullScreen(user);
+    const dialog = await screen.findByRole('dialog');
+    // The picks are the only links here — the dismissed list below is spans and
+    // buttons — so this is the window itself, not everything the dialog mentions.
+    const shown = () => within(dialog).getAllByRole('link').map((row) => row.textContent);
+    expect(shown()).not.toContain('Subject k');
+
+    await dismiss(user, 'Subject a');
+
+    // Dismissing one hands the freed row to the next in the ranking, whichever
+    // side of the floor it sits on — the window is a window, not a top ten.
+    await waitFor(() => expect(shown()).toContain('Subject k'));
+    expect(shown()).not.toContain('Subject a');
+    expect(shown()).toHaveLength(10);
+  });
+
+  it('does not promote mail below the floor into the card', async () => {
+    // The card's standard is the point of it. A dismissal there empties a row
+    // rather than filling it with something that did not earn the place.
+    seedConnected();
+    gmail.rankMail.mockReturnValue([...ranked(['a', 'b']), ...rankedBelowFloor(['c', 'd'])]);
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText('Subject a');
+
+    await dismiss(user, 'Subject a');
+
+    expect(await screen.findByText('Subject b')).toBeInTheDocument();
+    expect(screen.queryByText('Subject c')).not.toBeInTheDocument();
   });
 
   it('leaves the survivors in the order they were ranked', async () => {

@@ -20,6 +20,7 @@ import {
   TOP_N,
   TRANSACTIONAL,
   UNREAD,
+  notable,
   rankMail,
   reasonFor,
   scoreMail,
@@ -319,19 +320,23 @@ describe('rankMail', () => {
     expect(rankMail([], { self: SELF }, NOW)).toEqual([]);
   });
 
-  it('shows nothing rather than the best of a bad inbox', () => {
+  it('calls nothing important rather than the best of a bad inbox', () => {
     // A heuristic always produces a top three. The floor is what lets the panel
-    // decline to.
+    // decline to. The junk is still ranked — full screen fills its window from
+    // the tail — but none of it is claimed to matter.
     const junk = [
       mail('a', { listHeaders: true, unread: true, to: [SELF], subject: '50% off everything' }),
       mail('b', { listHeaders: true, unread: true, to: [SELF], subject: 'Our weekly newsletter' }),
       mail('c', { autoHeaders: true, unread: true, to: [SELF], subject: 'Deploy succeeded' }),
     ];
 
-    expect(rankMail(junk, { self: SELF }, NOW)).toEqual([]);
+    const picks = rankMail(junk, { self: SELF }, NOW);
+
+    expect(notable(picks)).toEqual([]);
+    expect(picks).toHaveLength(junk.length);
   });
 
-  it('shows fewer than three when only one clears the floor', () => {
+  it('finds only one notable when only one clears the floor', () => {
     const picks = rankMail(
       [
         mail('good', { to: [SELF], unread: true, subject: 'can you review this?' }),
@@ -341,7 +346,25 @@ describe('rankMail', () => {
       NOW,
     );
 
-    expect(pickedIds(picks)).toEqual(['good']);
+    expect(pickedIds(notable(picks))).toEqual(['good']);
+  });
+
+  it('sorts everything under the floor below everything over it', () => {
+    // What lets the full-screen view fill its ten rows with a plain `slice`, and
+    // what stops a high-scoring newsletter displacing a real message that only
+    // just cleared the bar.
+    const picks = rankMail(
+      [
+        mail('junk', { listHeaders: true, unread: true, to: [SELF], subject: 'Newsletter' }),
+        mail('bare', { to: [SELF], unread: true }),
+        mail('ask', { to: [SELF], unread: true, subject: 'can you review this?' }),
+      ],
+      { self: SELF },
+      NOW,
+    );
+
+    expect(pickedIds(picks)).toEqual(['ask', 'bare', 'junk']);
+    expect(picks.map((pick) => pick.merit >= FLOOR)).toEqual([true, true, false]);
   });
 
   it('ranks past what the panel shows, so a dismissal has something to promote', () => {
@@ -600,6 +623,6 @@ describe('rankMail on a realistic inbox', () => {
   });
 
   it('keeps the sender that filled the inbox with three of the same out of it', () => {
-    expect(pickedIds(picks).some((id) => id.startsWith('monitor'))).toBe(false);
+    expect(pickedIds(notable(picks)).some((id) => id.startsWith('monitor'))).toBe(false);
   });
 });
