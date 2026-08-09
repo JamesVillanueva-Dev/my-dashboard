@@ -6,7 +6,7 @@ import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { useCachedResource } from '../../hooks/useCachedResource';
 import { hasGoogleClientId } from '../../lib/googleAuth';
 import { fetchInbox, fetchKnownSenders, fetchProfileEmail, senderName } from '../../lib/gmail';
-import { rankMail, TOP_N, type RankedMail } from '../../lib/importantMail';
+import { FLOOR, notable, rankMail, TOP_N, type RankedMail } from '../../lib/importantMail';
 import styles from './styles.module.css';
 
 /**
@@ -29,6 +29,12 @@ const TTL_MS = 5 * 60 * 1000;
  * the ordering stops being an argument: past it the scores are close enough
  * together that the panel is no longer telling you anything you could not get by
  * opening Gmail, which is one scroll away in every row.
+ *
+ * Filled from the whole ranking, not only from what cleared {@link FLOOR}: a
+ * quiet week often has two or three messages that genuinely deserve the word
+ * important, and a full-screen view holding two rows and a lot of empty space is
+ * the wrong answer to a deliberate click. The rows past the floor are dimmed and
+ * say what they are, so the depth costs nothing in honesty — see {@link Picks}.
  */
 const EXPANDED_N = 10;
 
@@ -78,9 +84,16 @@ interface PicksProps {
 /**
  * The picks themselves: a window onto the ranking, sized to the room there is.
  *
- * {@link TOP_N} in the card, {@link EXPANDED_N} at full screen. Windowing lives
- * here rather than in {@link MailWidget} for the same reason it does in
- * {@link Dismissed} — only a component *inside* the widget body can read
+ * The two sizes differ in depth *and* in standard. The card shows at most
+ * {@link TOP_N}, and only messages that cleared {@link FLOOR} — a tile with three
+ * rows has no business spending one on mail that did not earn it. Full screen
+ * fills {@link EXPANDED_N} from the whole ranking, so the click is worth making
+ * on a quiet week; the rows below the floor come last, dimmed, under a line
+ * saying that is what they are. Nothing is claimed to be important that isn't —
+ * the extra rows are visibly the remainder of the inbox, in ranked order.
+ *
+ * Windowing lives here rather than in {@link MailWidget} for the same reason it
+ * does in {@link Dismissed} — only a component *inside* the widget body can read
  * {@link useWidgetExpanded}; `MailWidget` builds that body and sits above the
  * provider, so it would always read `false`.
  *
@@ -91,19 +104,33 @@ interface PicksProps {
  */
 function Picks({ kept, onDismiss }: PicksProps) {
   const expanded = useWidgetExpanded();
-  const picks = kept.slice(0, expanded ? EXPANDED_N : TOP_N);
+  const picks = expanded ? kept.slice(0, EXPANDED_N) : notable(kept).slice(0, TOP_N);
+
+  // Only reachable in the card, since `MailWidget` renders this at all only when
+  // something is left: an inbox with mail in it, none of which cleared the bar.
+  // Worth saying where the rest went — the click that shows it is right there.
+  if (picks.length === 0) {
+    return (
+      <p className={styles.empty}>
+        Nothing in the last week needs you. Open it full screen for the rest of your inbox.
+      </p>
+    );
+  }
 
   return (
     <ol className={styles.list}>
       {picks.map((pick) => {
         const { message } = pick;
         const sender = senderName(message.from);
+        const classes = [
+          message.unread && styles.isUnread,
+          // Below the floor: here to fill the window, not because it matters.
+          pick.merit < FLOOR && styles.isMinor,
+        ]
+          .filter(Boolean)
+          .join(' ');
         return (
-          <li
-            key={message.id}
-            className={message.unread ? styles.isUnread : undefined}
-            title={breakdown(pick)}
-          >
+          <li key={message.id} className={classes || undefined} title={breakdown(pick)}>
             <span className={styles.avatar} aria-hidden="true">
               {initial(sender)}
             </span>

@@ -71,6 +71,49 @@
   border-color: var(--card-border);
 }
 
+/* ---------- Rows below the floor ----------
+   Full screen fills its ten rows out of the whole ranking, so what did not clear
+   FLOOR lands here (see `Picks`). Dimmed and captioned rather than hidden: a
+   dialog you deliberately opened should show you your inbox rather than two rows
+   and a lot of nothing — but the panel will not quietly pass these off as picks,
+   so the line between them is drawn on screen where it can be read. */
+.isMinor {
+  /* Room above the first of the run for the caption it carries. */
+  margin-top: 27px;
+  opacity: 0.62;
+}
+
+/* Reaching for one is asking to read it. */
+.isMinor:hover {
+  opacity: 1;
+}
+
+/* Only the first of the run is the boundary; the rest merely follow it. There is
+   no previous-sibling selector, so the caption goes on every one and comes back
+   off any that follows another — which leaves it exactly on the first. */
+.isMinor::before {
+  content: 'The rest of your inbox';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -23px;
+  padding-top: 9px;
+  border-top: 1px solid var(--card-border);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.isMinor + .isMinor {
+  margin-top: 0;
+}
+
+.isMinor + .isMinor::before {
+  content: none;
+}
+
 /* The text column beside the avatar. `min-width: 0` is what lets the lines
    below actually truncate instead of stretching the row. */
 .list li > div {

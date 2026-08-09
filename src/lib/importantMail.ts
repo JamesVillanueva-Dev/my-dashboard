@@ -31,7 +31,7 @@ import { senderAddress, type MailSummary } from './gmail';
 export const TOP_N = 3;
 
 /**
- * The score a message must clear to be shown at all.
+ * The score a message must clear to be worth showing on its own merits.
  *
  * A heuristic always produces a top three, even from three newsletters — this
  * is what lets the panel say "nothing" instead of dressing up junk. Calibrated
@@ -40,6 +40,11 @@ export const TOP_N = 3;
  *
  * Measured against {@link Score.merit} — the score *before* recency — so this is
  * a bar on what a message is, not on how new it is. See {@link recencySignal}.
+ *
+ * A bar on what the panel *claims*, not on what it ranks: {@link rankMail}
+ * orders the whole inbox and marks where this line falls, so a view with room to
+ * spare can show past it without the panel pretending the extra rows matter. See
+ * {@link notable}.
  */
 export const FLOOR = 20;
 
@@ -336,8 +341,14 @@ export interface RankedMail {
   message: MailSummary;
   /** One short line on why it matters, built from the dominant signals. */
   reason: string;
-  /** The score it cleared {@link FLOOR} with. */
+  /** The score that ordered it — {@link Score.total}, recency included. */
   score: number;
+  /**
+   * {@link Score.merit}: the score before recency, which is what {@link FLOOR}
+   * judges. Carried so a caller can tell a pick that earned its place from one
+   * that is only filling out a window. See {@link notable}.
+   */
+  merit: number;
   /** The full breakdown, for the panel's hover explanation. */
   signals: Signal[];
 }
@@ -580,8 +591,21 @@ export function reasonFor(signals: Signal[]): string {
 }
 
 /**
- * Ranks every message whose {@link Score.merit} clears {@link FLOOR}, most
- * important first.
+ * The picks that earned their place, off the front of a ranking.
+ *
+ * Being in the ranking stopped meaning "worth showing" when {@link rankMail} was
+ * opened up to the whole inbox, so this is what carries that meaning now. It is
+ * a prefix rather than a sieve — the ordering already puts these first — but it
+ * is written as a filter so it stays correct if that ever changes.
+ *
+ * @param picks - A ranking, as returned by {@link rankMail}.
+ */
+export function notable(picks: RankedMail[]): RankedMail[] {
+  return picks.filter((pick) => pick.merit >= FLOOR);
+}
+
+/**
+ * Ranks the whole candidate set, most important first.
  *
  * Returns the whole ordering rather than the {@link TOP_N} the panel has room
  * for, because the panel's window into it moves: dismissing a pick promotes the
@@ -589,8 +613,13 @@ export function reasonFor(signals: Signal[]): string {
  * therefore the caller's job, and the honest division of labour anyway — this
  * function knows what matters, not how much of it fits on screen.
  *
- * Returning fewer than `TOP_N` — or none — is a correct outcome, not a degraded
- * one: an inbox of newsletters genuinely has nothing to show.
+ * It ranks *past* {@link FLOOR} for the same reason it ranks past `TOP_N`: the
+ * full-screen view has room for ten and a real inbox often holds fewer than ten
+ * messages that genuinely deserve the word "important", so a list cut at the
+ * floor leaves that view mostly empty. Everything below the floor sorts after
+ * everything above it and is marked by {@link RankedMail.merit}, so a caller
+ * showing the tail is padding a window on purpose rather than being told these
+ * matter. A panel with no room to spare should show {@link notable} alone.
  *
  * @param messages - Candidates, as fetched by `fetchInbox`.
  * @param context - See {@link RankContext}. `senderCounts` is derived here.
@@ -611,20 +640,24 @@ export function rankMail(
 
   return messages
     .map((message) => ({ message, ...scoreMail(message, { ...context, senderCounts }, now) }))
-    // On merit, not on the total: age orders this list, it does not shorten it.
-    .filter((scored) => scored.merit >= FLOOR)
-    // Ties break on recency, then on id — never on the order Gmail happened to
-    // return, so the same inbox always ranks the same way.
     .sort(
+      // The floor outranks the score: a message that earned its place is never
+      // displaced by one that is only making up the numbers, however close the
+      // two totals happen to be. On merit, not the total, so age reorders this
+      // list without moving anything across the line.
       (a, b) =>
+        Number(b.merit >= FLOOR) - Number(a.merit >= FLOOR) ||
+        // Ties break on recency, then on id — never on the order Gmail happened
+        // to return, so the same inbox always ranks the same way.
         b.total - a.total ||
         b.message.receivedAt - a.message.receivedAt ||
         a.message.id.localeCompare(b.message.id),
     )
-    .map(({ message, total, signals }) => ({
+    .map(({ message, total, merit, signals }) => ({
       message,
       reason: reasonFor(signals),
       score: total,
+      merit,
       signals,
     }));
 }
