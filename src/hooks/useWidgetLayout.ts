@@ -13,6 +13,7 @@ import { stepDrag, type DragTarget, type PanelRect } from '../lib/dragOrder';
 import { applySize, applySpan, gridMetrics, layoutRect, translation } from '../lib/gridGeometry';
 import {
   DEFAULT_LAYOUT,
+  HEIGHT_SNAP,
   MAX_COLS,
   clampCols,
   clampHeight,
@@ -21,8 +22,12 @@ import {
   type WidgetSize,
 } from '../lib/registry';
 
-/** How much one arrow-key press changes a panel's height, in px. */
-const HEIGHT_STEP = 24;
+/**
+ * How much one arrow-key press changes a panel's height, in px. A whole number
+ * of {@link HEIGHT_SNAP} steps, so repeated presses walk the same grid a drag
+ * snaps to rather than being rounded back onto it each time.
+ */
+const HEIGHT_STEP = HEIGHT_SNAP * 2;
 
 /**
  * How far a resize drag must travel vertically before it pins the height.
@@ -375,9 +380,11 @@ export function useWidgetLayout(): WidgetLayout {
 
   /**
    * Resize a panel by dragging the handle in its bottom-right corner. One gesture
-   * drives both axes, but they behave differently, because the dashboard is a
-   * column grid: horizontal movement snaps to whole columns, vertical movement is
-   * free pixels.
+   * drives both axes, and both snap, because the dashboard is a column grid and
+   * panels are meant to line up: horizontal movement snaps to whole columns,
+   * vertical movement to {@link HEIGHT_SNAP} px (both via `clampCols` and
+   * `clampHeight`, so the drag, the arrow keys, and a restored layout all land on
+   * the same set of sizes).
    *
    * The live size is written straight to the DOM rather than to state, so the
    * panel tracks the pointer at frame rate and the layout is only re-rendered —
