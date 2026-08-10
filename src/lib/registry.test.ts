@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_LAYOUT,
+  HEIGHT_SNAP,
   MAX_COLS,
   MAX_HEIGHT,
   MIN_COLS,
@@ -38,13 +39,24 @@ describe('clampCols', () => {
 });
 
 describe('clampHeight', () => {
-  it('leaves a height inside the usable range alone', () => {
+  it('leaves a height already on the step alone', () => {
     expect(clampHeight(300)).toBe(300);
+  });
+
+  it('snaps a dragged height to the nearest step, so two panels can be made to match', () => {
+    expect(clampHeight(302)).toBe(300);
+    expect(clampHeight(307)).toBe(310);
+    expect(clampHeight(305)).toBe(310);
   });
 
   it('pulls a height outside the usable range back to the nearest limit', () => {
     expect(clampHeight(10)).toBe(MIN_HEIGHT);
     expect(clampHeight(9999)).toBe(MAX_HEIGHT);
+  });
+
+  it('keeps the limits themselves on the step, so clamping cannot knock a height off it', () => {
+    expect(MIN_HEIGHT % HEIGHT_SNAP).toBe(0);
+    expect(MAX_HEIGHT % HEIGHT_SNAP).toBe(0);
   });
 });
 

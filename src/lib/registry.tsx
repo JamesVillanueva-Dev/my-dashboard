@@ -14,9 +14,8 @@ import ClassNotes from '../components/ClassNotes';
  * How big a panel is. Both axes are set by dragging the handle in the panel's
  * bottom-right corner, and the choice persists per widget.
  *
- * The two axes are not symmetrical, because the dashboard is a column grid:
- * width can only be a whole number of columns, so a horizontal drag snaps;
- * height is free, so a vertical drag is continuous.
+ * Both axes snap, because the dashboard is a column grid and panels are meant to
+ * line up: width to a whole number of columns, height to {@link HEIGHT_SNAP}.
  *
  * A one-column panel also gets tighter padding and a smaller type scale, so
  * reference material you only glance at never competes with a panel you act on.
@@ -41,6 +40,16 @@ export const MAX_COLS = 6;
 export const MIN_HEIGHT = 120;
 /** Tallest a panel can be dragged, in px. */
 export const MAX_HEIGHT = 1200;
+/**
+ * The px grid heights snap to.
+ *
+ * Exact-pixel heights made two panels match only by luck: landing on the same
+ * number by hand meant pixel-hunting a drag. Snapping to a step coarse enough to
+ * feel means dragging one panel roughly level with another lands it *exactly*
+ * level. {@link MIN_HEIGHT} and {@link MAX_HEIGHT} are both multiples of it, so
+ * clamping can never knock a height back off the step.
+ */
+export const HEIGHT_SNAP = 10;
 
 /** Columns each pre-resize size name occupied, for reading older saved layouts. */
 const LEGACY_COLUMNS: Record<string, number> = { compact: 1, standard: 2, wide: 3 };
@@ -50,9 +59,10 @@ export function clampCols(cols: number, max: number = MAX_COLS): number {
   return Math.min(Math.max(Math.round(cols), MIN_COLS), Math.max(MIN_COLS, Math.min(max, MAX_COLS)));
 }
 
-/** Confines a dragged height to the usable range. */
+/** Snaps a dragged height to {@link HEIGHT_SNAP} and confines it to the usable range. */
 export function clampHeight(height: number): number {
-  return Math.min(Math.max(Math.round(height), MIN_HEIGHT), MAX_HEIGHT);
+  const snapped = Math.round(height / HEIGHT_SNAP) * HEIGHT_SNAP;
+  return Math.min(Math.max(snapped, MIN_HEIGHT), MAX_HEIGHT);
 }
 
 /**

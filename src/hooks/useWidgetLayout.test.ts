@@ -8,7 +8,9 @@ const MAX_COLS = 6;
 /** The shortest a pinned panel can be. */
 const MIN_HEIGHT = 120;
 /** One vertical keypress. */
-const HEIGHT_STEP = 24;
+const HEIGHT_STEP = 20;
+/** The px grid heights snap to. */
+const HEIGHT_SNAP = 10;
 
 /** What `renderHook(() => useWidgetLayout())` hands back. */
 type LayoutView = { result: { current: ReturnType<typeof useWidgetLayout> } };
@@ -253,7 +255,28 @@ describe('resizing widgets by keyboard', () => {
 
     // 200 rendered + one step, rather than a jump from zero.
     expect(sizeOf(view, 'notes').height).toBe(200 + HEIGHT_STEP);
-    expect(view.result.current.announcement).toBe('Notes resized to 1 column wide, 224 pixels tall');
+    expect(view.result.current.announcement).toBe('Notes resized to 1 column wide, 220 pixels tall');
+  });
+
+  it('snaps a panel whose content height is off the grid onto it', () => {
+    const view = renderHook(() => useWidgetLayout());
+    registerPanel(view.result.current, 'notes', 207);
+
+    pressResizeKey(view, 'notes', 'ArrowDown');
+
+    // 207 + 20 = 227, snapped to the nearest step.
+    expect(sizeOf(view, 'notes').height).toBe(230);
+  });
+
+  it('keeps every keypress on the same step once the height is pinned', () => {
+    const view = renderHook(() => useWidgetLayout());
+    registerPanel(view.result.current, 'notes', 207);
+
+    for (let press = 0; press < 4; press++) pressResizeKey(view, 'notes', 'ArrowDown');
+
+    expect(sizeOf(view, 'notes').height! % HEIGHT_SNAP).toBe(0);
+    // Off the grid once, then a full step per press.
+    expect(sizeOf(view, 'notes').height).toBe(230 + HEIGHT_STEP * 3);
   });
 
   it('shrinks a pinned height', () => {
