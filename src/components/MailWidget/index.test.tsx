@@ -488,19 +488,75 @@ describe('MailWidget dismissing a pick', () => {
     expect(shown()).toHaveLength(10);
   });
 
-  it('does not promote mail below the floor into the card', async () => {
-    // The card's standard is the point of it. A dismissal there empties a row
-    // rather than filling it with something that did not earn the place.
+  it('refills the card past the floor rather than emptying the row', async () => {
+    // The bug this exists for: the card held its floor even against a dismissal,
+    // so waving away the last message above it left three empty rows and a note
+    // pointing at full screen — while the inbox still had mail in it and the
+    // button had just promised the next most important message.
     seedConnected();
-    gmail.rankMail.mockReturnValue([...ranked(['a', 'b']), ...rankedBelowFloor(['c', 'd'])]);
+    gmail.rankMail.mockReturnValue([...ranked(['a', 'b']), ...rankedBelowFloor(['c', 'd', 'e'])]);
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText('Subject a');
+    // Untouched, the card holds the line: two picks, not two picks and a filler.
+    expect(screen.queryByText('Subject c')).not.toBeInTheDocument();
+
+    await dismiss(user, 'Subject a');
+
+    expect(await screen.findByText('Subject c')).toBeInTheDocument();
+    expect(screen.getByText('Subject b')).toBeInTheDocument();
+    expect(screen.getByText('Subject d')).toBeInTheDocument();
+    // Filled to the card's three, not opened up to the full-screen window.
+    expect(screen.queryByText('Subject e')).not.toBeInTheDocument();
+  });
+
+  it('marks the rows it filled the card with, so they are not passed off as picks', async () => {
+    seedConnected();
+    gmail.rankMail.mockReturnValue([...ranked(['a']), ...rankedBelowFloor(['b'])]);
     const user = userEvent.setup();
     render(<MailWidget />);
     await screen.findByText('Subject a');
 
     await dismiss(user, 'Subject a');
 
-    expect(await screen.findByText('Subject b')).toBeInTheDocument();
-    expect(screen.queryByText('Subject c')).not.toBeInTheDocument();
+    // Same treatment as full screen: dimmed, and under the caption the
+    // stylesheet hangs off this class.
+    const rows = await screen.findAllByRole('listitem');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveClass(styles.isMinor);
+  });
+
+  it('keeps filling the card while a dismissal stands, not just for the next render', async () => {
+    // The refill is permission the dismissal granted, so it has to outlast the
+    // click — dismissing the filler should hand over the one after it.
+    seedConnected();
+    gmail.rankMail.mockReturnValue([...ranked(['a']), ...rankedBelowFloor(['b', 'c'])]);
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText('Subject a');
+
+    await dismiss(user, 'Subject a');
+    await screen.findByText('Subject b');
+    await dismiss(user, 'Subject b');
+
+    expect(await screen.findByText('Subject c')).toBeInTheDocument();
+  });
+
+  it('goes back to holding the floor once the dismissals are restored', async () => {
+    // Restoring puts the picks back in the rows the filler was borrowing, so the
+    // card owes nobody a third row any more.
+    seedConnected();
+    gmail.rankMail.mockReturnValue([...ranked(['a']), ...rankedBelowFloor(['b'])]);
+    const user = userEvent.setup();
+    render(<MailWidget />);
+    await screen.findByText('Subject a');
+    await dismiss(user, 'Subject a');
+    await screen.findByText('Subject b');
+
+    await user.click(screen.getByRole('button', { name: 'Restore' }));
+
+    expect(await screen.findByText('Subject a')).toBeInTheDocument();
+    expect(screen.queryByText('Subject b')).not.toBeInTheDocument();
   });
 
   it('leaves the survivors in the order they were ranked', async () => {

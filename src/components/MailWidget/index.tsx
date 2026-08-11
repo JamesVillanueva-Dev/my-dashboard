@@ -77,6 +77,11 @@ function breakdown({ score, signals }: RankedMail): string {
 interface PicksProps {
   /** Every message still wanted, best first — deeper than either window shows. */
   kept: RankedMail[];
+  /**
+   * Whether the card may fill past {@link FLOOR}: true once a dismissal has
+   * emptied a row. See {@link Picks}.
+   */
+  backfill: boolean;
   /** Hides one message from the panel. */
   onDismiss: (id: string) => void;
 }
@@ -85,12 +90,21 @@ interface PicksProps {
  * The picks themselves: a window onto the ranking, sized to the room there is.
  *
  * The two sizes differ in depth *and* in standard. The card shows at most
- * {@link TOP_N}, and only messages that cleared {@link FLOOR} — a tile with three
- * rows has no business spending one on mail that did not earn it. Full screen
- * fills {@link EXPANDED_N} from the whole ranking, so the click is worth making
- * on a quiet week; the rows below the floor come last, dimmed, under a line
- * saying that is what they are. Nothing is claimed to be important that isn't —
- * the extra rows are visibly the remainder of the inbox, in ranked order.
+ * {@link TOP_N}, and — until it is asked otherwise — only messages that cleared
+ * {@link FLOOR}: a tile with three rows has no business spending one on mail
+ * that did not earn it. Full screen fills {@link EXPANDED_N} from the whole
+ * ranking, so the click is worth making on a quiet week; the rows below the
+ * floor come last, dimmed, under a line saying that is what they are. Nothing is
+ * claimed to be important that isn't — the extra rows are visibly the remainder
+ * of the inbox, in ranked order.
+ *
+ * A dismissal is that asking. Dismissing says "not this one, what's next", and
+ * the panel promises exactly that on the button; a card that answers by emptying
+ * itself has broken the promise, which is what `backfill` fixes. Once a row has
+ * been cleared by hand the card fills from the whole ranking like full screen
+ * does, dimmed rows and caption included, rather than going blank while the
+ * inbox still has mail in it. An untouched card holds the floor, so a genuinely
+ * quiet week still reads as quiet rather than as three rows of newsletter.
  *
  * Windowing lives here rather than in {@link MailWidget} for the same reason it
  * does in {@link Dismissed} — only a component *inside* the widget body can read
@@ -102,13 +116,15 @@ interface PicksProps {
  *
  * @param props - See {@link PicksProps}.
  */
-function Picks({ kept, onDismiss }: PicksProps) {
+function Picks({ kept, backfill, onDismiss }: PicksProps) {
   const expanded = useWidgetExpanded();
-  const picks = expanded ? kept.slice(0, EXPANDED_N) : notable(kept).slice(0, TOP_N);
+  const pool = expanded || backfill ? kept : notable(kept);
+  const picks = pool.slice(0, expanded ? EXPANDED_N : TOP_N);
 
-  // Only reachable in the card, since `MailWidget` renders this at all only when
-  // something is left: an inbox with mail in it, none of which cleared the bar.
-  // Worth saying where the rest went — the click that shows it is right there.
+  // Only reachable in an untouched card, since `MailWidget` renders this at all
+  // only when something is left: an inbox with mail in it, none of which cleared
+  // the bar. Worth saying where the rest went — the click that shows it is right
+  // there. (Dismiss from here and `backfill` shows it in place instead.)
   if (picks.length === 0) {
     return (
       <p className={styles.empty}>
@@ -455,7 +471,15 @@ export default function MailWidget() {
         {kept.length === 0 ? (
           <p className={styles.empty}>That’s everything — you’ve dismissed the rest.</p>
         ) : (
-          <Picks kept={kept} onDismiss={(id) => setDismissed([...dismissed, id])} />
+          <Picks
+            kept={kept}
+            // Dismissing is a request for the next one, so a dismissal still in
+            // the ranking is standing permission for the card to fill past the
+            // floor. It lapses when that message ages out, which is right: the
+            // row it emptied went with it.
+            backfill={dismissedPicks.length > 0}
+            onDismiss={(id) => setDismissed([...dismissed, id])}
+          />
         )}
 
         {/* Says what is being kept from you, and undoes it. Without this a
