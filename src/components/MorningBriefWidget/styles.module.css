@@ -1,0 +1,151 @@
+/* morning-brief-widget
+   `.container` is the root, handed to the shared <Widget> shell, which puts it
+   on the card element — so every rule below is scoped to it. This panel is
+   prose, so it takes almost no chrome: a sentence, a short list under it, and
+   the picks. Prefer descendant selectors over a className on every line. */
+.container > div {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ---------- The headline ----------
+   The one line naming the day, and the only thing here set above body size.
+   Everything else in the panel is a footnote to it. */
+.headline {
+  margin: 0;
+  padding-left: 11px;
+  border-left: 2px solid var(--card-border);
+  font-size: 1.02rem;
+  font-weight: 550;
+  line-height: 1.5;
+  /* Reads as a sentence someone wrote, not as a data point. */
+  text-wrap: pretty;
+}
+
+/* ---------- Load ----------
+   A rule down the left of the headline, weighted by how the day classified:
+   full accent for a heavy one, the soft accent for a steady one, the plain card
+   border for an open one — an open day being the absence of load, its marker is
+   the absence of colour.
+
+   Carried on a border rather than on the text, because three shades of coloured
+   prose would be harder to read for the one bit of information they add, and
+   this way the sentence stays the colour every other sentence on the dashboard
+   is. Never `--danger`: a heavy day is a fact about your calendar, not a fault,
+   and the panel has no business alarming anyone about it. */
+.isHeavy .headline {
+  border-left-width: 3px;
+  border-left-color: var(--accent);
+}
+
+.isNormal .headline {
+  border-left-color: var(--accent-soft);
+}
+
+.isOpen .headline {
+  border-left-color: var(--card-border);
+}
+
+/* ---------- The shape of the day ----------
+   Where it starts, the room in it, when it ends. Plain lines rather than
+   bulleted ones: three short facts in sequence read as a paragraph broken up,
+   which is what they are. */
+.shape {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+/* ---------- The picks ----------
+   Title and the ranking's own one-line reason. Deliberately not the mail-row
+   treatment the Mail panel uses — no avatar, no preview, no age. The brief is
+   pointing at three things, not being an inbox. */
+.mail {
+  padding-top: 11px;
+  border-top: 1px solid var(--card-border);
+}
+
+.mail h3 {
+  margin: 0 0 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mail ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.mail li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  /* Lets the title below actually truncate rather than stretching the card. */
+  min-width: 0;
+}
+
+/* The title. Body colour and no underline — it is the line you read; that it
+   also opens the message is something it only admits on hover. */
+.mail a {
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 550;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mail a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* The ranking's own words for why this placed. Quiet: it is the justification,
+   not the thing being justified. */
+.mail p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* ---------- Failure and absence ---------- */
+.empty {
+  composes: empty from '../../styles/controls.module.css';
+}
+
+/* Says the inbox went unread, so the brief's silence about mail is not mistaken
+   for "nothing needs you". */
+.note {
+  composes: muted small from '../../styles/controls.module.css';
+  margin: 0;
+}
+
+.link {
+  composes: link from '../../styles/controls.module.css';
+  font-size: inherit;
+}
+
+/* One column: the sentences get tighter, but nothing is dropped — a brief with
+   half its lines missing is not a smaller brief. */
+@media (max-width: 480px) {
+  .headline {
+    font-size: 0.96rem;
+  }
+}
