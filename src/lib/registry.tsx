@@ -8,6 +8,7 @@ import NotesWidget from '../components/NotesWidget';
 import SpotifyWidget from '../components/SpotifyWidget';
 import YouTubeWidget from '../components/YouTubeWidget';
 import MailWidget from '../components/MailWidget';
+import MorningBriefWidget from '../components/MorningBriefWidget';
 import ClassNotes from '../components/ClassNotes';
 
 /**
@@ -141,6 +142,19 @@ export const WIDGETS: WidgetDef[] = [
     // on for them without their say-so.
     defaultOff: true,
     render: () => <MailWidget />,
+  },
+  {
+    id: 'brief',
+    title: 'Morning Brief',
+    icon: 'sun',
+    cols: 2,
+    // Off until switched on. It reads nothing the dashboard is not already
+    // reading, but it is a panel that talks: a sentence about your day is
+    // either wanted or it is an intrusion, and that is not a call to make on
+    // someone's behalf. It also has little to say until the calendar is
+    // connected, which a fresh dashboard's is not.
+    defaultOff: true,
+    render: () => <MorningBriefWidget />,
   },
   {
     id: 'spotify',
