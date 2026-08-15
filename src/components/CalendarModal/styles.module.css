@@ -80,15 +80,21 @@
   margin-left: 4px;
 }
 
+/* Centred with flex rather than on the text baseline: the glyph is the button's
+   only content, and baseline metrics would leave it a pixel high — by a
+   different amount at each size the button takes (32px, 44px on touch). */
 .close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--card);
   border: 1px solid var(--card-border);
   border-radius: 50%;
   width: 32px;
   height: 32px;
+  padding: 0;
   flex: 0 0 auto;
   font-size: 1.2rem;
-  line-height: 1;
   color: var(--text-muted);
 }
 .close:hover {
